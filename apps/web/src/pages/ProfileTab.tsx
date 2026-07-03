@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth';
 import { disablePush, enablePush, getSubscription, pushSupported } from '../push';
+import { isIos, isStandalone } from '../pwa';
 
 export default function ProfileTab() {
   const { me, logout } = useAuth();
@@ -12,6 +13,9 @@ export default function ProfileTab() {
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const supported = pushSupported();
+  // iOS는 홈 화면에 추가(standalone)해야만 알림을 켤 수 있다.
+  // 이 경우 토글 대신 온보딩으로 안내한다.
+  const needsInstall = isIos() && !isStandalone();
 
   // 현재 브라우저의 구독 상태를 확인해 토글 초기값을 맞춘다.
   useEffect(() => {
@@ -48,32 +52,46 @@ export default function ProfileTab() {
       </div>
 
       <div className="mx-4 divide-y divide-hairline rounded-xl border border-hairline">
-        {/* 푸시 알림 토글 */}
-        <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <p className="font-normal">푸시 알림</p>
-            <p className="text-xs text-ink-mute">
-              {supported
-                ? '접속 중이 아닐 때 새 메시지를 알려드려요'
-                : '이 브라우저에서는 지원되지 않아요'}
-            </p>
-          </div>
+        {needsInstall ? (
+          /* iOS 미설치 — 토글 대신 홈 화면 추가 + 알림 등록 온보딩으로 안내 */
           <button
-            role="switch"
-            aria-checked={pushOn}
-            disabled={!supported || pushBusy}
-            onClick={() => void togglePush()}
-            className={`h-7 w-12 rounded-full p-0.5 transition-colors disabled:opacity-40 ${
-              pushOn ? 'bg-primary' : 'bg-hairline-input'
-            }`}
+            onClick={() => navigate('/onboarding')}
+            className="flex w-full items-center justify-between px-4 py-3 text-left active:bg-canvas-soft"
           >
-            <span
-              className={`block size-6 rounded-full bg-white shadow transition-transform ${
-                pushOn ? 'translate-x-5' : ''
-              }`}
-            />
+            <div>
+              <p className="font-normal">푸시 알림</p>
+              <p className="text-xs text-ink-mute">홈 화면에 추가하고 알림 받기</p>
+            </div>
+            <span className="text-lg text-ink-mute">›</span>
           </button>
-        </div>
+        ) : (
+          /* 푸시 알림 토글 */
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="font-normal">푸시 알림</p>
+              <p className="text-xs text-ink-mute">
+                {supported
+                  ? '접속 중이 아닐 때 새 메시지를 알려드려요'
+                  : '이 브라우저에서는 지원되지 않아요'}
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={pushOn}
+              disabled={!supported || pushBusy}
+              onClick={() => void togglePush()}
+              className={`h-7 w-12 rounded-full p-0.5 transition-colors disabled:opacity-40 ${
+                pushOn ? 'bg-primary' : 'bg-hairline-input'
+              }`}
+            >
+              <span
+                className={`block size-6 rounded-full bg-white shadow transition-transform ${
+                  pushOn ? 'translate-x-5' : ''
+                }`}
+              />
+            </button>
+          </div>
+        )}
 
         {/* 로그아웃 */}
         <button

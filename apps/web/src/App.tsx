@@ -18,6 +18,7 @@ const ChatRoom = lazy(() => import('./pages/ChatRoom'));
 const ChatsTab = lazy(() => import('./pages/ChatsTab'));
 const FriendsTab = lazy(() => import('./pages/FriendsTab'));
 const ProfileTab = lazy(() => import('./pages/ProfileTab'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 /** 전체 화면 로딩 스피너 */
 function Loading() {
@@ -55,6 +56,14 @@ export default function App() {
           element={
             <RequireAuth>
               <ChatRoom />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <Onboarding />
             </RequireAuth>
           }
         />

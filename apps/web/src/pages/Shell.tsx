@@ -6,6 +6,11 @@
 import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useConversations, useFriendRequests, useRealtimeSync } from '../data';
+import { getSubscription, pushSupported } from '../push';
+import { isIos, isStandalone } from '../pwa';
+
+/** iOS 알림 온보딩을 한 번 자동 안내했는지 기억하는 localStorage 키 */
+const IOS_ONBOARD_SEEN = 'lc:ios-onboard-seen';
 
 /** 검색 입력 포커스를 요청하는 전역 커스텀 이벤트 이름 */
 export const SEARCH_EVENT = 'lc:focus-search';
@@ -41,6 +46,27 @@ export function Shell() {
   // 배지: 안읽은 메시지 총합 / 받은 친구 요청 수
   const unreadTotal = conversations?.reduce((sum, c) => sum + c.unread, 0) ?? 0;
   const incomingCount = requests?.incoming.length ?? 0;
+
+  // iOS 사용자에게 알림 온보딩을 최초 1회 자동 안내한다.
+  //  - Safari(미설치)      → 홈 화면 추가 흐름을 보여준다
+  //  - 설치된 PWA(미구독)  → 알림 켜기 단계를 보여준다
+  // localStorage는 Safari와 standalone이 분리돼 있어 각 컨텍스트에서 한 번씩 뜬다.
+  useEffect(() => {
+    if (!isIos() || localStorage.getItem(IOS_ONBOARD_SEEN)) return;
+    if (!isStandalone()) {
+      localStorage.setItem(IOS_ONBOARD_SEEN, '1');
+      navigate('/onboarding');
+      return;
+    }
+    if (pushSupported()) {
+      void getSubscription().then((sub) => {
+        if (!sub && !localStorage.getItem(IOS_ONBOARD_SEEN)) {
+          localStorage.setItem(IOS_ONBOARD_SEEN, '1');
+          navigate('/onboarding');
+        }
+      });
+    }
+  }, [navigate]);
 
   // 데스크탑 단축키
   useEffect(() => {
