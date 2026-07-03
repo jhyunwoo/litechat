@@ -6,8 +6,12 @@ services:
   app:
     build: .
     restart: unless-stopped
-    ports:
-      - '3000:3000'
+    # 호스트 포트를 공개하지 않는다. Traefik이 dokploy-network를 통해
+    # 컨테이너 내부 3000 포트로 직접 라우팅한다(loadbalancer.server.port=3000).
+    # 3000:3000 공개는 재배포 시 포트 충돌을 일으키고, Traefik/TLS를 우회해
+    # 앱을 인터넷에 직접 노출시키므로 제거한다.
+    expose:
+      - '3000'
     environment:
       REDIS_URL: redis://redis:6379
       COOKIE_DOMAIN: .moveto.kr        # 두 서브도메인이 세션 쿠키를 공유
