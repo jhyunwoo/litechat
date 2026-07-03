@@ -72,7 +72,9 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 .meta .rd { color: #533afd; display: block; text-align: right; }
 .pend { opacity: .55; }
 .imgbtn { border: 1px dashed #a8c3de; border-radius: 12px; padding: 8px 12px; color: #64748d; font-size: 13px; }
-.b img { max-width: 100%; border-radius: 10px; display: block; }
+/* height:auto 필수 — width/height 속성으로 예약된 크기가 max-width로 줄 때
+   height 속성이 고정돼 비율이 깨지는 것을 막는다 (원본 사진 비율 유지) */
+.b img { max-width: 100%; height: auto; border-radius: 10px; display: block; }
 
 /* 입력 바 */
 .bar {
