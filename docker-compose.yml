@@ -20,6 +20,11 @@ services:
       VAPID_SUBJECT: mailto:admin@moveto.kr
     volumes:
       - litechat-data:/app/data        # SQLite DB + 업로드 이미지 영속화
+    # Traefik(Dokploy)이 컨테이너에 도달하려면 외부 dokploy-network에 연결돼 있어야 한다.
+    # (Compose 배포는 Application 타입과 달리 자동 연결되지 않는다)
+    networks:
+      - dokploy-network
+      - default
     depends_on:
       redis:
         condition: service_healthy
@@ -48,3 +53,10 @@ services:
 
 volumes:
   litechat-data:
+
+networks:
+  # Dokploy가 Traefik과 함께 사용하는 외부 네트워크. 이 네트워크에 연결돼야
+  # chat.moveto.kr / litechat.moveto.kr 로 라우팅된다.
+  dokploy-network:
+    external: true
+  default: {}
