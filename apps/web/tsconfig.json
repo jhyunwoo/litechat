@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable", "WebWorker"],
+    "jsx": "react-jsx",
+    // @types/bun: 서버의 AppType(hc RPC)을 타입 검사할 때 bun:sqlite 등 서버 모듈 해석용
+    "types": ["vite/client", "vite-plugin-pwa/client", "@types/bun"]
+  },
+  "include": ["src", "vite.config.ts"]
+}

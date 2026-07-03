@@ -1,0 +1,44 @@
+# LiteChat 배포 구성 (Dokploy)
+#
+# Traefik(Dokploy 내장)이 chat.moveto.kr / litechat.moveto.kr 두 도메인을
+# 모두 app:3000 으로 라우팅하면, 서버가 Host 헤더로 사이트를 구분한다.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      REDIS_URL: redis://redis:6379
+      COOKIE_DOMAIN: .moveto.kr        # 두 서브도메인이 세션 쿠키를 공유
+      WEB_HOST: chat.moveto.kr
+      LITE_HOST: litechat.moveto.kr
+      # Web Push (한 번 생성해 Dokploy 환경 변수로 주입):
+      #   bunx web-push generate-vapid-keys
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: mailto:admin@moveto.kr
+    volumes:
+      - litechat-data:/app/data        # SQLite DB + 업로드 이미지 영속화
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 세션은 재생성 가능하므로 영속화 없이 가볍게 운용한다.
+    command: redis-server --save '' --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  litechat-data:

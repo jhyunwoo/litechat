@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.turbo
+**/.turbo
+e2e/test-results
+e2e/.data
+data
+*.md
+!packages/**/*.md
