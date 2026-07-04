@@ -7,13 +7,16 @@ FROM oven/bun:1.3 AS build
 WORKDIR /app
 
 # 의존성 레이어 캐시를 위해 매니페스트 먼저 복사
+# (apps/app 매니페스트는 lockfile 검증에 필요하지만, Expo/RN 의존성은
+#  서버 이미지에 불필요하므로 --filter '!app'으로 설치를 건너뛴다)
 COPY package.json bun.lock turbo.json tsconfig.base.json ./
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY apps/lite/package.json apps/lite/
+COPY apps/app/package.json apps/app/
 COPY packages/types/package.json packages/types/
 COPY e2e/package.json e2e/
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --filter '!app'
 
 # 소스 복사 후 프론트엔드 빌드
 COPY . .
