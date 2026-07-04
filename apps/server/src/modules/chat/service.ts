@@ -83,6 +83,9 @@ export class ChatService {
     if (!peerOnline && this.onOfflinePeer) {
       const sender = this.users.findPublicById(meId)!;
       this.onOfflinePeer(peerId, sender, message);
+    } else if (peerOnline) {
+      // 관측성: 상대가 온라인(WS 연결 존재)이라 푸시를 건너뛴 경우를 남긴다.
+      console.log(`[push] peer=${peerId} online — skipping push (conv=${conversationId})`);
     }
 
     return message;

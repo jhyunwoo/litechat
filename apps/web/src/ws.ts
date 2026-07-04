@@ -16,6 +16,8 @@ class ChatSocket {
   private retryDelay = 500;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private shouldRun = false;
+  /** 앱이 백그라운드/종료로 잠시 끊긴 상태 (pagehide). resume 시 다시 연결한다. */
+  private paused = false;
   /** 최초 연결이 아닌 재연결인지 구분 (catch-up 트리거용) */
   private hasConnectedOnce = false;
 
@@ -29,10 +31,33 @@ class ChatSocket {
   /** 로그아웃 시 호출 — 연결을 완전히 종료한다 */
   stop(): void {
     this.shouldRun = false;
+    this.paused = false;
     this.clearPing();
     this.ws?.close();
     this.ws = null;
     this.hasConnectedOnce = false;
+  }
+
+  /**
+   * 앱이 백그라운드로 가거나 닫힐 때(pagehide) 호출 — 소켓을 깨끗하게 닫는다.
+   * 서버가 즉시 onClose로 사용자를 오프라인 처리해, 이후 도착하는 메시지가
+   * 푸시 알림으로 발송된다(특히 iOS PWA는 백그라운드에서 JS가 중단되어
+   * 실시간 수신이 불가하므로 이때 끊는 것이 옳다).
+   */
+  pause(): void {
+    if (!this.shouldRun || this.paused) return;
+    this.paused = true;
+    this.clearPing();
+    this.ws?.close();
+    this.ws = null;
+  }
+
+  /** 앱이 다시 보일 때(pageshow) 호출 — 연결을 재개한다 */
+  resume(): void {
+    if (!this.shouldRun || !this.paused) return;
+    this.paused = false;
+    this.retryDelay = 500;
+    this.connect();
   }
 
   /** 프레임 전송 — 연결이 없으면 false (호출자는 REST 폴백 사용) */
@@ -84,7 +109,8 @@ class ChatSocket {
 
     ws.onclose = () => {
       this.clearPing();
-      if (!this.shouldRun) return;
+      // 로그아웃(stop) 또는 백그라운드(pause)로 인한 종료면 재연결하지 않는다.
+      if (!this.shouldRun || this.paused) return;
       // 지수 백오프 재연결
       setTimeout(() => this.connect(), this.retryDelay);
       this.retryDelay = Math.min(this.retryDelay * 2, 8000);
@@ -104,3 +130,11 @@ class ChatSocket {
 
 /** 앱 전역 싱글턴 소켓 */
 export const socket = new ChatSocket();
+
+// 앱이 백그라운드로 가거나 닫힐 때 소켓을 즉시 정리해 서버가 오프라인으로 인식하게 한다.
+// (그래야 닫힌 iOS PWA로 푸시 알림이 발송된다) pagehide는 데스크톱 탭 전환에서는
+// 발생하지 않고 실제 언로드/닫기에서만 발생하므로 데스크톱 연결은 유지된다.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => socket.pause());
+  window.addEventListener('pageshow', () => socket.resume());
+}

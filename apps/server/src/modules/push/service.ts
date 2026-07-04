@@ -94,19 +94,32 @@ export class PushService {
   /** 사용자의 모든 기기로 발송. 만료(404/410) 구독은 삭제한다. */
   private async sendToUser(userId: number, payload: string): Promise<void> {
     if (!this.sender) return;
-    for (const subscription of this.repo.listByUser(userId)) {
+    const subscriptions = this.repo.listByUser(userId);
+    // 관측성: 오프라인 훅이 실제로 발송을 시도했는지 / 구독이 있는지를 로그로 남긴다.
+    if (subscriptions.length === 0) {
+      console.log(`[push] user=${userId} offline but has 0 subscriptions — nothing to send`);
+      return;
+    }
+    console.log(`[push] user=${userId} sending to ${subscriptions.length} subscription(s)`);
+    let ok = 0;
+    let failed = 0;
+    for (const subscription of subscriptions) {
       try {
         await this.sender(subscription, payload);
+        ok += 1;
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) {
           // 브라우저에서 구독이 제거된 endpoint — 더 이상 보낼 수 없으니 정리한다.
           this.repo.deleteByEndpoint(subscription.endpoint);
+          console.log(`[push] user=${userId} pruned expired subscription (${status})`);
         } else {
-          console.error('push send failed:', error);
+          failed += 1;
+          console.error(`[push] user=${userId} send failed (status=${status ?? 'n/a'}):`, error);
         }
       }
     }
+    console.log(`[push] user=${userId} done: ok=${ok} failed=${failed}`);
   }
 }
 
