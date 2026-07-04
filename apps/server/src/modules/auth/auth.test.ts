@@ -115,6 +115,64 @@ describe('POST /api/auth/login', () => {
   });
 });
 
+describe('Bearer 토큰 인증 (네이티브 앱)', () => {
+  /** 응답 본문에서 토큰을 꺼낸다 */
+  async function tokenOf(res: Response): Promise<string> {
+    return ((await res.json()) as { token: string }).token;
+  }
+
+  test('register/login 응답 본문에 세션 토큰이 포함된다', async () => {
+    const reg = await register(app);
+    expect(await tokenOf(reg)).toBeTruthy();
+
+    const login = await app.request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'alice', password: 'password123' }),
+    });
+    expect(await tokenOf(login)).toBeTruthy();
+  });
+
+  test('Authorization: Bearer 헤더로 me 조회가 된다', async () => {
+    const token = await tokenOf(await register(app));
+    const res = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { user: { username: string } }).user.username).toBe('alice');
+  });
+
+  test('무효한 Bearer 토큰이면 401을 반환한다', async () => {
+    await register(app);
+    const res = await app.request('/api/auth/me', {
+      headers: { Authorization: 'Bearer not-a-real-token' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('형식이 어긋난 Authorization 헤더는 쿠키로 폴백하지 않고 401', async () => {
+    const reg = await register(app);
+    // 유효한 쿠키가 함께 있어도, 깨진 Authorization 헤더가 있으면 거부한다.
+    const res = await app.request('/api/auth/me', {
+      headers: { Authorization: 'Basic abc', cookie: sessionCookie(reg) },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('Bearer 토큰으로 로그아웃하면 세션이 파기된다', async () => {
+    const token = await tokenOf(await register(app));
+    const out = await app.request('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(out.status).toBe(200);
+    const res = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('GET /api/auth/me', () => {
   test('세션 쿠키가 있으면 내 정보를 반환한다', async () => {
     const reg = await register(app);

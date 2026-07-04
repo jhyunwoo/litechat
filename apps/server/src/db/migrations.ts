@@ -85,4 +85,16 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX ix_push_user ON push_subscriptions (user_id);
   `,
+
+  // v1 → v2: Expo Push 토큰 (네이티브 앱)
+  `
+  -- Expo Push 토큰 — 네이티브 기기당 하나. 같은 토큰이 다시 오면 소유자를 갱신한다.
+  CREATE TABLE expo_push_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    token      TEXT    NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX ix_expo_push_user ON expo_push_tokens (user_id);
+  `,
 ];

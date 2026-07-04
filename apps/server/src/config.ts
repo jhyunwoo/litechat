@@ -30,6 +30,8 @@ export interface AppConfig {
   vapidPrivateKey: string;
   /** VAPID 연락처 (mailto: 또는 https URL) */
   vapidSubject: string;
+  /** Expo Push API 액세스 토큰 (선택 — Expo 계정에서 push security를 켠 경우에만 필요) */
+  expoPushAccessToken: string;
   /** 프로덕션 여부 — 쿠키 Secure 속성 등에 사용 */
   isProduction: boolean;
   /** argon2id 메모리 비용 (KiB) — 테스트에서는 낮춰 빠르게 실행 */
@@ -55,6 +57,7 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     vapidPublicKey: env.VAPID_PUBLIC_KEY ?? '',
     vapidPrivateKey: env.VAPID_PRIVATE_KEY ?? '',
     vapidSubject: env.VAPID_SUBJECT ?? 'mailto:admin@moveto.kr',
+    expoPushAccessToken: env.EXPO_PUSH_ACCESS_TOKEN ?? '',
     isProduction: env.NODE_ENV === 'production',
     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),

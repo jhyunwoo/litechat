@@ -15,6 +15,7 @@ import { ChatService } from './modules/chat/service';
 import { friendsRoutes } from './modules/friends/routes';
 import { imagesRoutes, imgRoutes } from './modules/images/routes';
 import { ImagesService } from './modules/images/service';
+import { ExpoPushService, type ExpoPushSender } from './modules/push/expo-service';
 import { pushRoutes } from './modules/push/routes';
 import { PushService, type PushSender } from './modules/push/service';
 import { wsRoutes } from './ws/routes';
@@ -30,14 +31,21 @@ export type AppEnv = { Variables: AppVariables };
 /** createApp 옵션 — 테스트에서 외부 의존(푸시 발송)을 대체할 때 사용 */
 export interface CreateAppOptions {
   pushSender?: PushSender;
+  expoPushSender?: ExpoPushSender;
 }
 
 /** 의존성을 주입받아 Hono 앱을 조립한다. */
 export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   // 상대가 오프라인일 때 푸시를 쏘는 훅을 ChatService에 주입한다.
+  // Web Push(브라우저/PWA)와 Expo Push(네이티브 앱)를 하나의 훅으로 합성한다.
   const pushService = new PushService(deps, options.pushSender);
+  const expoPushService = new ExpoPushService(deps, options.expoPushSender);
+  const offlineHook: typeof pushService.offlineHook = (peerId, sender, message) => {
+    pushService.offlineHook(peerId, sender, message);
+    expoPushService.offlineHook(peerId, sender, message);
+  };
   // ChatService는 REST와 WS 라우트가 공유한다.
-  const chatService = new ChatService(deps, pushService.offlineHook);
+  const chatService = new ChatService(deps, offlineHook);
   const imagesService = new ImagesService(deps);
 
   const app = new Hono<AppEnv>()
@@ -47,7 +55,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     .route('/api/friends', friendsRoutes(deps))
     .route('/api/chat', chatRoutes(deps, chatService))
     .route('/api/images', imagesRoutes(deps, imagesService))
-    .route('/api/push', pushRoutes(deps, pushService))
+    .route('/api/push', pushRoutes(deps, pushService, expoPushService))
     .route('/img', imgRoutes(deps, imagesService))
     .route('/', wsRoutes(deps, chatService));
 

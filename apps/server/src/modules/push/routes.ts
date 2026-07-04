@@ -2,14 +2,20 @@
  * Web Push REST 라우트: /api/push/*
  */
 import { validator as zValidator } from 'hono-openapi/zod';
-import { pushSubscribeSchema, pushUnsubscribeSchema } from '@litechat/types';
+import {
+  expoPushRegisterSchema,
+  expoPushUnregisterSchema,
+  pushSubscribeSchema,
+  pushUnsubscribeSchema,
+} from '@litechat/types';
 import { Hono } from 'hono';
 import type { AppEnv } from '../../app';
 import type { AppDeps } from '../../deps';
 import { requireAuth } from '../../middleware/auth';
+import type { ExpoPushService } from './expo-service';
 import type { PushService } from './service';
 
-export function pushRoutes(deps: AppDeps, service: PushService) {
+export function pushRoutes(deps: AppDeps, service: PushService, expo: ExpoPushService) {
   return (
     new Hono<AppEnv>()
       .use('*', requireAuth(deps))
@@ -23,6 +29,16 @@ export function pushRoutes(deps: AppDeps, service: PushService) {
       // 알림 끄기
       .post('/unsubscribe', zValidator('json', pushUnsubscribeSchema), (c) => {
         service.unsubscribe(c.req.valid('json').endpoint);
+        return c.json({ ok: true }, 200);
+      })
+      // 네이티브 앱 알림 켜기 — Expo Push 토큰 등록
+      .post('/expo/register', zValidator('json', expoPushRegisterSchema), (c) => {
+        expo.register(c.var.userId, c.req.valid('json').token);
+        return c.json({ ok: true }, 201);
+      })
+      // 네이티브 앱 알림 끄기 — 본인 토큰만 해지된다
+      .post('/expo/unregister', zValidator('json', expoPushUnregisterSchema), (c) => {
+        expo.unregister(c.var.userId, c.req.valid('json').token);
         return c.json({ ok: true }, 200);
       })
   );

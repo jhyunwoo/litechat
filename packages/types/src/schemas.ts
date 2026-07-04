@@ -91,3 +91,23 @@ export type PushSubscribeInput = z.infer<typeof pushSubscribeSchema>;
 export const pushUnsubscribeSchema = z.object({
   endpoint: z.string().url(),
 });
+
+/**
+ * Expo Push 토큰 — 네이티브 앱(expo-notifications)이 발급받는 형식.
+ * 예: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+ */
+export const expoPushTokenSchema = z
+  .string()
+  .max(64)
+  .regex(/^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$/);
+
+/** Expo Push 토큰 등록 요청 (네이티브 앱) */
+export const expoPushRegisterSchema = z.object({
+  token: expoPushTokenSchema,
+});
+export type ExpoPushRegisterInput = z.infer<typeof expoPushRegisterSchema>;
+
+/** Expo Push 토큰 해지 요청 */
+export const expoPushUnregisterSchema = z.object({
+  token: expoPushTokenSchema,
+});

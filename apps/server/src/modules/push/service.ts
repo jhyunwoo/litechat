@@ -6,10 +6,11 @@
  *
  * 발송 함수(sender)를 주입할 수 있어 테스트에서는 실제 푸시 서비스 없이 검증한다.
  */
-import type { PublicUser, PushSubscribeInput, WireMessage } from '@litechat/types';
+import type { PushSubscribeInput } from '@litechat/types';
 import webpush from 'web-push';
 import type { AppDeps } from '../../deps';
 import type { OfflineMessageHook } from '../chat/service';
+import { previewOf } from './preview';
 import { PushRepo, type PushSubscriptionRow } from './repo';
 
 /** 발송 함수 시그니처 — 프로덕션에서는 web-push, 테스트에서는 기록용 가짜 */
@@ -121,10 +122,4 @@ export class PushService {
     }
     console.log(`[push] user=${userId} done: ok=${ok} failed=${failed}`);
   }
-}
-
-/** 알림 본문 미리보기 — 이미지/이모지는 텍스트 대체 표시 */
-function previewOf(message: WireMessage): string {
-  if (message.k === 'i') return '📷 사진';
-  return message.x.length > 80 ? `${message.x.slice(0, 80)}…` : message.x;
 }

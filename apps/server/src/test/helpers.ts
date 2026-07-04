@@ -14,22 +14,26 @@ export async function signup(app: AppType, username: string, nickname = username
     body: JSON.stringify({ username, password: 'password123', nickname }),
   });
   if (res.status !== 201) throw new Error(`signup failed: ${res.status}`);
-  const { user } = (await res.json()) as { user: { id: number; username: string } };
+  const { user, token } = (await res.json()) as {
+    user: { id: number; username: string };
+    token: string;
+  };
   const cookie = (res.headers.get('set-cookie') ?? '').match(/lc_sess=[^;]+/)?.[0] ?? '';
-  return { user, cookie };
+  return { user, cookie, token };
 }
 
-/** JSON 요청 헬퍼 — 쿠키와 본문을 붙여 app.request를 호출한다. */
+/** JSON 요청 헬퍼 — 쿠키/Bearer 토큰과 본문을 붙여 app.request를 호출한다. */
 export function jsonRequest(
   app: AppType,
   path: string,
-  options: { method?: string; cookie?: string; body?: unknown } = {},
+  options: { method?: string; cookie?: string; token?: string; body?: unknown } = {},
 ) {
   return app.request(path, {
     method: options.method ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
       ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
   });
