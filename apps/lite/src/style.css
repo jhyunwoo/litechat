@@ -75,6 +75,7 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 /* height:auto 필수 — width/height 속성으로 예약된 크기가 max-width로 줄 때
    height 속성이 고정돼 비율이 깨지는 것을 막는다 (원본 사진 비율 유지) */
 .b img { max-width: 100%; height: auto; border-radius: 10px; display: block; }
+.b.imgb { background: none !important; padding: 0; }
 
 /* 입력 바 */
 .bar {

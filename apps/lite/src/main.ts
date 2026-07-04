@@ -495,7 +495,7 @@ function chatView(convId: number): HTMLElement {
             const btn = e.currentTarget as HTMLElement;
             const img = h('img', { src: `/img/${image.id}/thumb`, width: image.w, height: image.h, alt: '사진' });
             img.onclick = () => showImageOverlay(image);
-            const holder = h('div', { class: 'b' }, img);
+            const holder = h('div', { class: 'b imgb' }, img);
             btn.replaceWith(holder);
           },
         },
