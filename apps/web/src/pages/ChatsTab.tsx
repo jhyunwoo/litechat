@@ -2,7 +2,7 @@
  * 채팅 탭 — 대화 목록 (마지막 메시지 미리보기 + 안읽음 배지)
  */
 import type { WireMessage } from '@litechat/types';
-import { Link } from 'react-router';
+import { Link, useMatch } from 'react-router';
 import { useConversations } from '../data';
 import { formatTime } from '../lib/format';
 
@@ -15,6 +15,8 @@ function preview(last: WireMessage | null): string {
 
 export default function ChatsTab() {
   const { data: conversations, isPending } = useConversations();
+  // 데스크탑 2-pane에서 현재 열려 있는 대화를 강조하기 위한 활성 id
+  const activeId = Number(useMatch('/chat/:id')?.params.id);
 
   return (
     <div>
@@ -39,7 +41,9 @@ export default function ChatsTab() {
             <li key={conv.id}>
               <Link
                 to={`/chat/${conv.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas-soft active:bg-canvas-soft"
+                className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas-soft active:bg-canvas-soft ${
+                  conv.id === activeId ? 'bg-canvas-soft' : ''
+                }`}
               >
                 {/* 아바타 — 닉네임 첫 글자 */}
                 <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-soft to-primary-deep text-lg font-light text-white">

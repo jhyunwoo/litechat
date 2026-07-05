@@ -18,7 +18,6 @@ import {
   sendMessage,
   useConversations,
   useMessages,
-  useRealtimeSync,
 } from '../data';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ImageViewer } from '../components/ImageViewer';
@@ -26,7 +25,7 @@ import { MessageBubble } from '../components/MessageBubble';
 import { isEmojiOnly } from '../lib/format';
 
 export default function ChatRoom() {
-  useRealtimeSync();
+  // 실시간 동기화는 Shell 한 곳에서만 구독한다(중복 구독 시 메시지·안읽음이 2배가 됨).
   const { id } = useParams();
   const convId = Number(id);
   const { me } = useAuth();
@@ -131,13 +130,13 @@ export default function ChatRoom() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col bg-white">
+    <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* 헤더 */}
       <header className="pt-safe flex items-center gap-2 border-b border-hairline bg-white/95 px-2 py-2 backdrop-blur">
         <button
           onClick={() => navigate('/')}
           aria-label="뒤로"
-          className="rounded-full p-2 text-xl leading-none text-primary active:bg-canvas-soft"
+          className="rounded-full p-2 text-xl leading-none text-primary active:bg-canvas-soft md:hidden"
         >
           ‹
         </button>
