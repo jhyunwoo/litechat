@@ -22,6 +22,7 @@ import {
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ImageViewer } from '../components/ImageViewer';
 import { MessageBubble } from '../components/MessageBubble';
+import { Icon } from '../components/Icon';
 import { isEmojiOnly } from '../lib/format';
 
 export default function ChatRoom() {
@@ -136,9 +137,9 @@ export default function ChatRoom() {
         <button
           onClick={() => navigate('/')}
           aria-label="뒤로"
-          className="rounded-full p-2 text-xl leading-none text-primary active:bg-canvas-soft md:hidden"
+          className="rounded-full p-2 text-primary active:bg-canvas-soft md:hidden"
         >
-          ‹
+          <Icon name="back" className="size-6" />
         </button>
         <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-primary-soft to-primary-deep text-sm font-light text-white">
           {conversation?.peer.nickname.charAt(0) ?? '?'}
@@ -151,6 +152,7 @@ export default function ChatRoom() {
 
       {/* 메시지 목록 */}
       <div ref={listRef} onScroll={() => void onScroll()} className="scroll-thin min-h-0 flex-1 overflow-y-auto py-3">
+        <div className="mx-auto w-full max-w-3xl">
         {messages?.map((message, index) => {
           const mine = message.s === me?.id;
           const next = messages[index + 1];
@@ -173,6 +175,7 @@ export default function ChatRoom() {
             첫 메시지를 보내 대화를 시작해 보세요 👋
           </p>
         )}
+        </div>
       </div>
 
       {error && (
@@ -183,22 +186,22 @@ export default function ChatRoom() {
 
       {/* 입력 바 */}
       <div className="pb-safe border-t border-hairline bg-white">
-        <div className="flex items-end gap-2 p-2">
+        <div className="mx-auto flex w-full max-w-3xl items-end gap-2 p-2">
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void onPickFile(e)} />
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             aria-label="사진 보내기"
-            className="rounded-full p-2 text-xl leading-none active:bg-canvas-soft disabled:opacity-40"
+            className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft disabled:opacity-40"
           >
-            {uploading ? '⏳' : '📷'}
+            <Icon name={uploading ? 'spinner' : 'camera'} className="size-6" />
           </button>
           <button
             onClick={() => setShowEmoji((v) => !v)}
             aria-label="이모지"
-            className="rounded-full p-2 text-xl leading-none active:bg-canvas-soft"
+            className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft"
           >
-            😊
+            <Icon name="smile" className="size-6" />
           </button>
           <textarea
             ref={inputRef}
@@ -213,18 +216,20 @@ export default function ChatRoom() {
             onClick={() => void submit()}
             disabled={!draft.trim()}
             aria-label="전송"
-            className="rounded-full bg-primary p-2.5 leading-none text-white transition active:scale-90 disabled:opacity-30"
+            className="rounded-full bg-primary p-2.5 text-white transition active:scale-90 disabled:opacity-30"
           >
-            ↑
+            <Icon name="send" className="size-5" />
           </button>
         </div>
         {showEmoji && (
-          <EmojiPicker
-            onPick={(emoji) => {
-              setDraft((d) => d + emoji);
-              inputRef.current?.focus();
-            }}
-          />
+          <div className="mx-auto w-full max-w-3xl">
+            <EmojiPicker
+              onPick={(emoji) => {
+                setDraft((d) => d + emoji);
+                inputRef.current?.focus();
+              }}
+            />
+          </div>
         )}
       </div>
 

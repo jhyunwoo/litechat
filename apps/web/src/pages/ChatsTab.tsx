@@ -5,6 +5,7 @@ import type { WireMessage } from '@litechat/types';
 import { Link, useMatch } from 'react-router';
 import { useConversations } from '../data';
 import { formatTime } from '../lib/format';
+import { Icon } from '../components/Icon';
 
 /** 마지막 메시지 미리보기 텍스트 */
 function preview(last: WireMessage | null): string {
@@ -27,8 +28,10 @@ export default function ChatsTab() {
       {isPending ? (
         <p className="py-16 text-center text-sm text-ink-mute">불러오는 중…</p>
       ) : conversations?.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-20 text-ink-mute">
-          <span className="text-4xl">💬</span>
+        <div className="flex flex-col items-center gap-3 py-20 text-ink-mute">
+          <div className="flex size-16 items-center justify-center rounded-full bg-canvas-soft text-primary-subdued">
+            <Icon name="chat" className="size-8" />
+          </div>
           <p className="text-sm">
             아직 대화가 없어요.
             <br />

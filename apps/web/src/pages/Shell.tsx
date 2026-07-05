@@ -14,6 +14,7 @@ import { isIos, isStandalone } from '../pwa';
 import ChatsTab from './ChatsTab';
 import FriendsTab from './FriendsTab';
 import ProfileTab from './ProfileTab';
+import { Icon, type IconName } from '../components/Icon';
 
 /** iOS 알림 온보딩을 한 번 자동 안내했는지 기억하는 localStorage 키 */
 const IOS_ONBOARD_SEEN = 'lc:ios-onboard-seen';
@@ -32,7 +33,7 @@ function Badge({ count }: { count: number }) {
 }
 
 /** 하단 탭(모바일) 항목 */
-function Tab({ to, label, icon, active, badge }: { to: string; label: string; icon: string; active: boolean; badge?: number }) {
+function Tab({ to, label, icon, active, badge }: { to: string; label: string; icon: IconName; active: boolean; badge?: number }) {
   return (
     <Link
       to={to}
@@ -40,7 +41,7 @@ function Tab({ to, label, icon, active, badge }: { to: string; label: string; ic
         active ? 'text-primary' : 'text-ink-mute hover:text-ink-secondary'
       }`}
     >
-      <span className="text-xl leading-none">{icon}</span>
+      <Icon name={icon} className="size-6" />
       <span>{label}</span>
       {badge ? (
         <span className="absolute top-1 right-[calc(50%-1.6rem)]">
@@ -52,15 +53,15 @@ function Tab({ to, label, icon, active, badge }: { to: string; label: string; ic
 }
 
 /** 네비 레일(데스크탑) 항목 — 세로 배치 */
-function RailItem({ to, label, icon, active, badge }: { to: string; label: string; icon: string; active: boolean; badge?: number }) {
+function RailItem({ to, label, icon, active, badge }: { to: string; label: string; icon: IconName; active: boolean; badge?: number }) {
   return (
     <Link
       to={to}
-      className={`relative flex w-full flex-col items-center gap-0.5 rounded-xl py-2.5 text-[11px] transition-colors ${
+      className={`relative flex w-full flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] transition-colors ${
         active ? 'bg-canvas-soft text-primary' : 'text-ink-mute hover:bg-canvas-soft hover:text-ink-secondary'
       }`}
     >
-      <span className="text-2xl leading-none">{icon}</span>
+      <Icon name={icon} className="size-7" />
       <span>{label}</span>
       {badge ? (
         <span className="absolute top-1.5 right-[calc(50%-1.4rem)]">
@@ -136,12 +137,12 @@ export function Shell() {
   }, [navigate]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col bg-white md:flex-row">
+    <div className="flex h-full w-full flex-col bg-white md:flex-row">
       {/* 네비 레일 — 데스크탑 전용 */}
       <nav className="hidden w-20 shrink-0 flex-col gap-1 border-r border-hairline p-2 md:flex">
-        <RailItem to="/" label="채팅" icon="💬" active={section === 'chats'} badge={unreadTotal} />
-        <RailItem to="/friends" label="친구" icon="👥" active={section === 'friends'} badge={incomingCount} />
-        <RailItem to="/profile" label="프로필" icon="👤" active={section === 'profile'} />
+        <RailItem to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
+        <RailItem to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
+        <RailItem to="/profile" label="프로필" icon="profile" active={section === 'profile'} />
       </nav>
 
       {/* 리스트 컬럼 — 활성 섹션. 모바일에서 대화 중이면 숨긴다. */}
@@ -161,9 +162,9 @@ export function Shell() {
       {/* 하단 탭 바 — 모바일 전용. 대화 중에는 숨긴다(ChatRoom 자체 뒤로가기 사용). */}
       {!inChat && (
         <nav className="pb-safe flex shrink-0 border-t border-hairline bg-white/95 backdrop-blur md:hidden">
-          <Tab to="/" label="채팅" icon="💬" active={section === 'chats'} badge={unreadTotal} />
-          <Tab to="/friends" label="친구" icon="👥" active={section === 'friends'} badge={incomingCount} />
-          <Tab to="/profile" label="프로필" icon="👤" active={section === 'profile'} />
+          <Tab to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
+          <Tab to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
+          <Tab to="/profile" label="프로필" icon="profile" active={section === 'profile'} />
         </nav>
       )}
     </div>

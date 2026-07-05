@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { enablePush, getSubscription, pushSupported } from '../push';
 import { isIos, isStandalone, notificationPermission } from '../pwa';
+import { Icon } from '../components/Icon';
 
 /** iOS 공유 버튼 글리프 (사각형 + 위로 향한 화살표) */
 function ShareGlyph({ className = '' }: { className?: string }) {
@@ -70,7 +71,7 @@ function Step({
           done ? 'bg-primary text-white' : 'bg-primary-subdued/40 text-primary-deep'
         }`}
       >
-        {done ? '✓' : n}
+        {done ? <Icon name="check" className="size-4" /> : n}
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-normal text-ink">{title}</p>
@@ -126,16 +127,16 @@ export default function Onboarding() {
       <button
         onClick={() => navigate('/profile')}
         aria-label="닫기"
-        className="pt-safe absolute top-2 right-4 z-10 flex size-9 items-center justify-center rounded-full text-xl text-ink-mute active:bg-canvas-soft"
+        className="pt-safe absolute top-2 right-4 z-10 flex size-9 items-center justify-center rounded-full text-ink-mute active:bg-canvas-soft"
       >
-        ✕
+        <Icon name="close" className="size-5" />
       </button>
 
       <div className="pt-safe pb-safe relative">
         <div className="pt-10" />
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-soft to-primary-deep text-3xl shadow-sm">
-            🔔
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-soft to-primary-deep text-white shadow-sm">
+            <Icon name="bell" className="size-8" />
           </div>
           <h1 className="display text-3xl text-ink">알림 받기</h1>
           <p className="mt-2 text-sm text-ink-mute">

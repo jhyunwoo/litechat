@@ -40,13 +40,29 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     'w-full rounded-md border border-hairline-input bg-white px-3 py-2.5 text-[16px] outline-none focus:border-primary transition-colors';
 
   return (
-    <div className="relative mx-auto flex h-full max-w-sm flex-col justify-center px-6">
-      {/* 그라디언트 메시 밴드 — 마케팅 히어로의 브랜드 시그니처 (상단 1/3) */}
-      <div className="mesh pointer-events-none absolute inset-x-0 top-0 h-1/3" aria-hidden />
+    <div className="flex h-full w-full flex-col md:flex-row">
+      {/* 브랜드 패널 — 데스크탑에서는 좌측 히어로, 모바일에서는 상단 메시 밴드 */}
+      <div className="mesh pointer-events-none relative h-32 shrink-0 md:hidden" aria-hidden />
+      <div className="relative hidden shrink-0 overflow-hidden md:flex md:w-[45%] md:max-w-2xl md:flex-col md:justify-center md:px-16 lg:px-24">
+        <div className="mesh pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative">
+          <h1 className="display text-6xl text-ink">LiteChat</h1>
+          <p className="mt-4 max-w-sm text-lg text-ink-secondary">
+            가볍고 빠른 채팅.
+            <br />
+            친구와 지금 바로 대화를 시작하세요.
+          </p>
+        </div>
+      </div>
 
-      <div className="pt-safe pb-safe relative">
-        <h1 className="display mb-1 text-center text-4xl text-ink">LiteChat</h1>
-        <p className="mb-8 text-center text-sm text-ink-mute">가볍고 빠른 채팅</p>
+      {/* 폼 패널 — 데스크탑에서는 우측, 세로 중앙 정렬 */}
+      <div className="relative flex flex-1 flex-col justify-center px-6">
+      <div className="pt-safe pb-safe relative mx-auto w-full max-w-sm">
+        <h1 className="display mb-1 text-center text-4xl text-ink md:hidden">LiteChat</h1>
+        <p className="mb-8 text-center text-sm text-ink-mute md:hidden">가볍고 빠른 채팅</p>
+        <h2 className="display mb-8 hidden text-center text-2xl text-ink md:block">
+          {isRegister ? '회원가입' : '로그인'}
+        </h2>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <input
@@ -112,6 +128,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </>
         )}
       </p>
+      </div>
       </div>
     </div>
   );
