@@ -97,4 +97,61 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX ix_expo_push_user ON expo_push_tokens (user_id);
   `,
+
+  // v2 → v3: 사용자 분석(웹/lite/앱 방문·이벤트·웹바이탈) + 관리자 계정
+  `
+  -- 방문자 세션 — 로그인 여부와 무관하게 항상 존재한다. visitor_id는 로그인 전후를
+  -- 아우르는 장기 상관관계 키(쿠키 또는 앱이 생성), user_id는 로그인 시에만 채워진다.
+  CREATE TABLE analytics_sessions (
+    id           TEXT    PRIMARY KEY,               -- UUID (lc_sid 쿠키 또는 앱이 생성)
+    visitor_id   TEXT    NOT NULL,                   -- UUID (lc_vid 쿠키 또는 앱이 생성, 장기 보관)
+    user_id      INTEGER REFERENCES users(id),        -- 로그인 전이면 NULL
+    platform     TEXT    NOT NULL CHECK (platform IN ('web', 'lite', 'app')),
+    ip           TEXT    NOT NULL,
+    user_agent   TEXT    NOT NULL DEFAULT '',
+    referrer     TEXT,
+    geo_country  TEXT,
+    geo_region   TEXT,
+    geo_city     TEXT,
+    geo_lat      REAL,
+    geo_lon      REAL,
+    created_at   INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL
+  );
+  CREATE INDEX ix_analytics_sessions_user    ON analytics_sessions (user_id, created_at);
+  CREATE INDEX ix_analytics_sessions_created ON analytics_sessions (created_at);
+  CREATE INDEX ix_analytics_sessions_visitor ON analytics_sessions (visitor_id, created_at);
+  -- 지도 표기용: 위경도가 있는 세션만 빠르게 나열
+  CREATE INDEX ix_analytics_sessions_geo
+    ON analytics_sessions (created_at) WHERE geo_lat IS NOT NULL;
+
+  -- 페이지/화면 조회 이벤트 — 세션당 다건 (SPA 라우트 전환, 앱 화면/포그라운드 전환)
+  CREATE TABLE analytics_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT    NOT NULL REFERENCES analytics_sessions(id),
+    path       TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX ix_analytics_events_session ON analytics_events (session_id, created_at);
+  CREATE INDEX ix_analytics_events_created ON analytics_events (created_at);
+
+  -- Web Vitals — web(Full Chat)만 해당. lite/app은 전송하지 않는다.
+  CREATE TABLE analytics_vitals (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT    NOT NULL REFERENCES analytics_sessions(id),
+    metric     TEXT    NOT NULL CHECK (metric IN ('LCP', 'CLS', 'INP', 'FCP', 'TTFB')),
+    value      REAL    NOT NULL,
+    path       TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX ix_analytics_vitals_metric_created ON analytics_vitals (metric, created_at);
+
+  -- 관리자 계정 — 채팅 users 테이블/세션과 완전히 분리된 별도 인증
+  CREATE TABLE admin_users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,                   -- argon2id (Bun.password, users와 동일 방식)
+    created_at    INTEGER NOT NULL
+  );
+  `,
 ];

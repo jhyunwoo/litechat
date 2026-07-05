@@ -1,0 +1,51 @@
+/**
+ * 관리자 대시보드 스타일 — DESIGN.md의 "dashboard track" 다크 셸을 따른다.
+ * (마케팅 페이지는 흰 캔버스지만, 대시보드/제품 UI는 딥 네이비로 극성이 뒤집힌다)
+ */
+@import 'tailwindcss';
+
+@theme {
+  --color-primary: #533afd;
+  --color-primary-soft: #8b7bff;
+  --color-shell: #1c1e54;
+  --color-card: #24275f;
+  --color-hairline: #34366e;
+  --color-ink: #ffffff;
+  --color-ink-mute: #a3a6d1;
+  --color-series-sessions: #8b7bff;
+  --color-series-events: #1f9d6e;
+  /* 브랜드 ruby(#ea2261)를 다크 셸(#1c1e54) 위에서 4.5:1 이상 나오도록 밝힌 변형 */
+  --color-danger: #ff6b95;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-shell);
+  color: var(--color-ink);
+  font-family:
+    'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+    'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+  font-weight: 300;
+  font-feature-settings: 'ss01';
+}
+
+.tnum {
+  font-feature-settings: 'ss01', 'tnum';
+  letter-spacing: -0.02em;
+}
+
+.display {
+  font-weight: 300;
+  letter-spacing: -0.026em;
+}
+
+/* react-leaflet 컨테이너는 명시적 높이가 필요하다 */
+.leaflet-container {
+  height: 420px;
+  border-radius: 12px;
+}

@@ -6,8 +6,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import App from './App';
+import { bootstrapAnalytics } from './analytics';
 import { AuthProvider } from './auth';
 import './styles.css';
+
+bootstrapAnalytics();
 
 const queryClient = new QueryClient({
   defaultOptions: {

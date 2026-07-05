@@ -34,6 +34,12 @@ export interface AppConfig {
   expoPushAccessToken: string;
   /** 프로덕션 여부 — 쿠키 Secure 속성 등에 사용 */
   isProduction: boolean;
+  /** 관리자 대시보드 사이트 호스트명 (Host 헤더 라우팅용) */
+  dashboardHost: string;
+  /** 관리자 대시보드 정적 파일 디렉터리 (빌드 산출물) */
+  dashboardStaticDir: string;
+  /** MaxMind GeoLite2-City.mmdb 경로 — 파일이 없으면 GeoIP 조회를 건너뛴다 */
+  geoipDbPath: string;
   /** argon2id 메모리 비용 (KiB) — 테스트에서는 낮춰 빠르게 실행 */
   passwordMemoryCost: number;
   /** argon2id 반복 횟수 */
@@ -59,6 +65,9 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     vapidSubject: env.VAPID_SUBJECT ?? 'mailto:admin@moveto.kr',
     expoPushAccessToken: env.EXPO_PUSH_ACCESS_TOKEN ?? '',
     isProduction: env.NODE_ENV === 'production',
+    dashboardHost: env.DASHBOARD_HOST ?? 'dash.moveto.kr',
+    dashboardStaticDir: env.DASHBOARD_STATIC_DIR ?? '../dashboard/dist',
+    geoipDbPath: env.GEOIP_DB_PATH ?? 'data/GeoLite2-City.mmdb',
     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),
     ...overrides,

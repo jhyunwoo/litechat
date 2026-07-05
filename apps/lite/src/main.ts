@@ -434,6 +434,7 @@ function profileView(): HTMLElement {
         '로그아웃',
       ),
     ),
+    h('p', { class: 'dim', style: 'text-align:center;padding:8px 14px' }, '서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.'),
   );
 }
 

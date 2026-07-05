@@ -6,14 +6,17 @@
  */
 import { createApp } from './app';
 import { createDeps } from './deps';
+import { AnalyticsService } from './modules/analytics/service';
 import { serveFrontend } from './static';
 import { websocket } from './ws/hub';
 
 const deps = createDeps();
-const app = createApp(deps);
+// static.ts의 lite 서버사이드 수집 훅과 /api/analytics, /api/admin 라우트가 같은 인스턴스를 공유한다.
+const analyticsService = new AnalyticsService(deps);
+const app = createApp(deps, { analyticsService });
 
 // 위의 어떤 라우트에도 걸리지 않은 요청은 정적 파일로 처리한다 (SPA fallback 포함).
-app.get('*', serveFrontend(deps));
+app.get('*', serveFrontend(deps, analyticsService));
 
 console.log(`LiteChat server listening on :${deps.config.port}`);
 

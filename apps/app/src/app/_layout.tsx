@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { AuthProvider, useAuth } from '@/data/auth';
 import { useRealtimeSync } from '@/data/data';
+import { useAppAnalytics } from '@/lib/analytics';
 import { useNotificationDeepLink } from '@/lib/notifications';
 import { useOTAUpdates } from '@/lib/ota';
 import { bindAppState } from '@/lib/ws';
@@ -38,6 +39,8 @@ function Root() {
   useNotificationDeepLink();
   // OTA 업데이트 — 포그라운드 복귀 시 백그라운드 다운로드, 다음 실행에 적용
   useOTAUpdates();
+  // 사용자 분석 — 콜드 스타트/포그라운드 복귀/화면 전환마다 접속 정보를 기록한다
+  useAppAnalytics();
 
   // 앱 백그라운드/활성 전환에 맞춰 소켓을 닫고/재연결한다.
   useEffect(() => bindAppState(), []);

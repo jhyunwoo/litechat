@@ -7,8 +7,9 @@
  * /chat/:id    → 채팅방
  * /login /register → 인증 화면
  */
-import { lazy, Suspense, type ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { trackPageview } from './analytics';
 import { useAuth } from './auth';
 import { Shell } from './pages/Shell';
 
@@ -37,8 +38,17 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** SPA 라우트 전환마다(최초 진입 포함) 페이지뷰를 기록한다 */
+function useAnalyticsPageview() {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageview(location.pathname);
+  }, [location.pathname]);
+}
+
 export default function App() {
   const { me, ready } = useAuth();
+  useAnalyticsPageview();
 
   return (
     <Suspense fallback={<Loading />}>

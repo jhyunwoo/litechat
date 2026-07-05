@@ -137,6 +137,8 @@ export default function SignIn() {
             <Text style={styles.switchLink}>{isRegister ? '로그인' : '가입하기'}</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.notice}>서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -222,5 +224,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
     fontWeight: '400',
+  },
+  notice: {
+    ...type.caption,
+    textAlign: 'center',
+    marginTop: spacing.xl,
   },
 });

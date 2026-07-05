@@ -1,7 +1,13 @@
 # LiteChat 배포 구성 (Dokploy)
 #
-# Traefik(Dokploy 내장)이 chat.moveto.kr / litechat.moveto.kr 두 도메인을
-# 모두 app:3000 으로 라우팅하면, 서버가 Host 헤더로 사이트를 구분한다.
+# Traefik(Dokploy 내장)이 chat.moveto.kr / litechat.moveto.kr / dash.moveto.kr
+# 세 도메인을 모두 app:3000 으로 라우팅하면, 서버가 Host 헤더로 사이트를 구분한다.
+# dash.moveto.kr의 DNS/Traefik 라우팅 등록은 기존 두 서브도메인과 동일한 방식으로
+# Dokploy에서 수동으로 추가해야 한다(이 파일만으로는 라우팅이 생기지 않는다).
+#
+# GeoLite2-City.mmdb(GeoIP 조회용, MaxMind 라이선스 바이너리)는 git에 커밋하지 않고
+# litechat-data 볼륨(/app/data/GeoLite2-City.mmdb)에 운영자가 직접 배치해야 한다.
+# 파일이 없으면 서버는 위치 조회만 건너뛰고 정상 동작한다.
 services:
   app:
     build: .
@@ -17,6 +23,7 @@ services:
       COOKIE_DOMAIN: .moveto.kr        # 두 서브도메인이 세션 쿠키를 공유
       WEB_HOST: chat.moveto.kr
       LITE_HOST: litechat.moveto.kr
+      DASHBOARD_HOST: ${DASHBOARD_HOST:-dash.moveto.kr}
       # Web Push (한 번 생성해 Dokploy 환경 변수로 주입):
       #   bunx web-push generate-vapid-keys
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}

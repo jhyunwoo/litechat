@@ -9,6 +9,9 @@ import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { attachDocs } from './docs';
 import { ApiError } from './errors';
+import { adminRoutes } from './modules/admin/routes';
+import { analyticsRoutes } from './modules/analytics/routes';
+import { AnalyticsService } from './modules/analytics/service';
 import { authRoutes } from './modules/auth/routes';
 import { chatRoutes } from './modules/chat/routes';
 import { ChatService } from './modules/chat/service';
@@ -28,10 +31,12 @@ export interface AppVariables {
 
 export type AppEnv = { Variables: AppVariables };
 
-/** createApp 옵션 — 테스트에서 외부 의존(푸시 발송)을 대체할 때 사용 */
+/** createApp 옵션 — 테스트에서 외부 의존(푸시 발송)을 대체하거나, index.ts가 static.ts와
+ * 공유할 AnalyticsService 인스턴스를 주입할 때 사용 */
 export interface CreateAppOptions {
   pushSender?: PushSender;
   expoPushSender?: ExpoPushSender;
+  analyticsService?: AnalyticsService;
 }
 
 /** 의존성을 주입받아 Hono 앱을 조립한다. */
@@ -47,6 +52,8 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   // ChatService는 REST와 WS 라우트가 공유한다.
   const chatService = new ChatService(deps, offlineHook);
   const imagesService = new ImagesService(deps);
+  // static.ts의 lite 서버사이드 수집 훅과 같은 인스턴스를 쓰도록 index.ts가 주입할 수 있다.
+  const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
 
   const app = new Hono<AppEnv>()
     // 헬스체크 — 배포 환경(Dokploy)의 컨테이너 상태 확인용
@@ -56,6 +63,8 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     .route('/api/chat', chatRoutes(deps, chatService))
     .route('/api/images', imagesRoutes(deps, imagesService))
     .route('/api/push', pushRoutes(deps, pushService, expoPushService))
+    .route('/api/analytics', analyticsRoutes(analyticsService))
+    .route('/api/admin', adminRoutes(deps, analyticsService))
     .route('/img', imgRoutes(deps, imagesService))
     .route('/', wsRoutes(deps, chatService));
 

@@ -111,3 +111,44 @@ export type ExpoPushRegisterInput = z.infer<typeof expoPushRegisterSchema>;
 export const expoPushUnregisterSchema = z.object({
   token: expoPushTokenSchema,
 });
+
+/** 분석 클라이언트가 보내는 방문자/세션 상관관계 키 — 쿠키가 없는 앱 클라이언트만 사용 */
+const analyticsCorrelationSchema = {
+  visitorId: z.string().uuid().optional(),
+  sessionId: z.string().uuid().optional(),
+};
+
+/**
+ * 분석 세션 시작/하트비트 (POST /api/analytics/session) — 방문자 식별과 기기 정보 등록만
+ * 담당한다. 페이지/화면 조회 기록은 항상 analyticsEventSchema(/api/analytics/event)로 보낸다.
+ */
+export const analyticsSessionSchema = z.object({
+  platform: z.enum(['web', 'app']),
+  referrer: z.string().max(500).optional(),
+  deviceInfo: z.string().max(300).optional(),
+  ...analyticsCorrelationSchema,
+});
+export type AnalyticsSessionInput = z.infer<typeof analyticsSessionSchema>;
+
+/** 페이지/화면 조회 이벤트 (POST /api/analytics/event) */
+export const analyticsEventSchema = z.object({
+  path: z.string().min(1).max(500),
+  ...analyticsCorrelationSchema,
+});
+export type AnalyticsEventInput = z.infer<typeof analyticsEventSchema>;
+
+/** Web Vitals 측정치 (POST /api/analytics/vitals) — web에서만 전송 */
+export const analyticsVitalsSchema = z.object({
+  metric: z.enum(['LCP', 'CLS', 'INP', 'FCP', 'TTFB']),
+  value: z.number().nonnegative(),
+  path: z.string().min(1).max(500),
+  ...analyticsCorrelationSchema,
+});
+export type AnalyticsVitalsInput = z.infer<typeof analyticsVitalsSchema>;
+
+/** 관리자 로그인 요청 (POST /api/admin/login) */
+export const adminLoginSchema = z.object({
+  username: usernameSchema,
+  password: passwordSchema,
+});
+export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
