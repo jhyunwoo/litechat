@@ -8,7 +8,7 @@
  * - 등장 애니메이션은 첫 렌더 이후 도착한 메시지에만 적용 (히스토리 제외)
  */
 import type { ConversationSummary, WireMessage } from '@litechat/types';
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -17,7 +17,7 @@ import { colors, spacing } from '@/theme/tokens';
 import { MessageBubble } from './message-bubble';
 
 /** 렌더 항목 — 파생 플래그를 미리 계산해 말풍선 memo가 잘 듣게 한다 */
-interface Row {
+export interface Row {
   message: WireMessage;
   mine: boolean;
   pending: boolean;
@@ -32,9 +32,18 @@ interface Props {
   messages: WireMessage[];
   conversation: ConversationSummary | undefined;
   onImagePress: (message: WireMessage) => void;
+  /** 키보드가 열릴 때 부모가 바닥으로 스크롤하기 위한 ref */
+  listRef?: React.Ref<FlashListRef<Row>>;
 }
 
-export function MessageList({ convId, meId, messages, conversation, onImagePress }: Props) {
+export function MessageList({
+  convId,
+  meId,
+  messages,
+  conversation,
+  onImagePress,
+  listRef,
+}: Props) {
   const queryClient = useQueryClient();
   const [loadingOlder, setLoadingOlder] = useState(false);
   const exhausted = useRef(false);
@@ -98,6 +107,7 @@ export function MessageList({ convId, meId, messages, conversation, onImagePress
 
   return (
     <FlashList
+      ref={listRef}
       data={rows}
       renderItem={renderItem}
       keyExtractor={(row) => String(row.message.id)}

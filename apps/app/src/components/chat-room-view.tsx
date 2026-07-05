@@ -9,11 +9,17 @@
  * - 키보드: keyboard-controller로 프레임 동기 이동 + 인터랙티브 내리기
  */
 import type { MessageKind, WireMessage } from '@litechat/types';
+import type { FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+  KeyboardAvoidingView,
+  useKeyboardHandler,
+  useReanimatedKeyboardAnimation,
+} from 'react-native-keyboard-controller';
+import Animated, { runOnJS, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
 import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
@@ -21,7 +27,7 @@ import { errorMessage } from '@/lib/api';
 import { colors, spacing } from '@/theme/tokens';
 import { Composer } from './composer';
 import { ImageViewer } from './image-viewer';
-import { MessageList } from './message-list';
+import { MessageList, type Row } from './message-list';
 
 interface Props {
   convId: number;
@@ -39,6 +45,28 @@ export function ChatRoomView({ convId, meId }: Props) {
   const [viewing, setViewing] = useState<WireMessage | null>(null);
   const [error, setError] = useState('');
   const focused = useRef(false);
+  const listRef = useRef<FlashListRef<Row>>(null);
+
+  // 키보드가 열리면 최신 메시지가 컴포저 위에 보이도록 바닥으로 스크롤한다.
+  const scrollToEnd = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, []);
+  useKeyboardHandler(
+    {
+      onStart: (e) => {
+        'worklet';
+        if (e.height > 0) runOnJS(scrollToEnd)();
+      },
+    },
+    [scrollToEnd],
+  );
+
+  // 컴포저 하단 여백: 키보드가 닫혀 있을 때만 홈 인디케이터 인셋을 채운다.
+  // (키보드가 열리면 KeyboardAvoidingView가 그 영역을 이미 덮으므로 0으로 접는다)
+  const { progress } = useReanimatedKeyboardAnimation();
+  const composerPad = useAnimatedStyle(() => ({
+    paddingBottom: insets.bottom * (1 - progress.value),
+  }));
 
   // 화면이 보이는 동안: 이 방의 푸시 알림 억제 + 읽음 처리 활성화
   useFocusEffect(
@@ -75,6 +103,7 @@ export function ChatRoomView({ convId, meId }: Props) {
             messages={messages}
             conversation={conversation}
             onImagePress={setViewing}
+            listRef={listRef}
           />
         )}
       </View>
@@ -85,9 +114,9 @@ export function ChatRoomView({ convId, meId }: Props) {
         </Pressable>
       )}
 
-      <View style={{ paddingBottom: insets.bottom }}>
+      <Animated.View style={composerPad}>
         <Composer onSend={onSend} onError={(err) => setError(errorMessage(err))} />
-      </View>
+      </Animated.View>
 
       <ImageViewer message={viewing} onClose={() => setViewing(null)} />
     </KeyboardAvoidingView>

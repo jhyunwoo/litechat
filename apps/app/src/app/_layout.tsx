@@ -50,6 +50,11 @@ function Root() {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
 
+  // 세션 확인이 끝나기 전에는 Stack을 렌더하지 않는다 — 네이티브 스플래시가
+  // 화면을 덮은 채 대기하므로, sign-in을 미리 마운트해 생기는 로그인 화면
+  // 플래시가 사라진다. ready 이후 곧바로 올바른 브랜치로 마운트된다.
+  if (!ready) return null;
+
   return (
     <Stack
       screenOptions={{
