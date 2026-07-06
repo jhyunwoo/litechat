@@ -1,4 +1,4 @@
-# LiteChat Project
+# litechat Project
 
 최소한의 인터넷 통신만으로 채팅 기능을 구현하는 프로젝트
 

@@ -15,7 +15,7 @@ const DOCS_HTML = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LiteChat API 문서</title>
+  <title>litechat API 문서</title>
 </head>
 <body>
   <script id="api-reference" data-url="/openapi.json"></script>
@@ -30,7 +30,7 @@ export function attachDocs(app: Hono<AppEnv>): void {
     openAPISpecs(app, {
       documentation: {
         info: {
-          title: 'LiteChat API',
+          title: 'litechat API',
           version: '1.0.0',
           description:
             '초저용량 실시간 채팅 서비스 API. 실시간 경로는 GET /ws (WebSocket, ' +

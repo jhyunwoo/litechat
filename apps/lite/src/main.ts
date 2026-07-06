@@ -219,7 +219,7 @@ function authView(signup: boolean): HTMLElement {
         })();
       },
     },
-    h('h1', {}, 'LiteChat'),
+    h('h1', {}, 'litechat'),
     h('p', {}, '초경량 · 데이터 절약 채팅'),
     username,
     signup ? nickname : null,

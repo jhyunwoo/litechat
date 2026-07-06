@@ -64,7 +64,7 @@ export default function SignIn() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>LiteChat</Text>
+        <Text style={styles.title}>litechat</Text>
         <Text style={styles.subtitle}>가볍고 빠른 채팅</Text>
 
         <View style={styles.form}>

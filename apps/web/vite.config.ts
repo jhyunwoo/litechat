@@ -21,8 +21,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       manifest: {
-        name: 'LiteChat',
-        short_name: 'LiteChat',
+        name: 'litechat',
+        short_name: 'litechat',
         description: '가볍고 빠른 실시간 채팅',
         lang: 'ko',
         display: 'standalone',

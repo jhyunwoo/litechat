@@ -81,7 +81,7 @@ export default function ProfileTab() {
         </Pressable>
       </View>
 
-      <Text style={styles.footer}>LiteChat</Text>
+      <Text style={styles.footer}>litechat</Text>
     </View>
   );
 }

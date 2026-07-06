@@ -44,7 +44,7 @@ function Shell() {
   return (
     <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-6 px-6 py-8">
       <header className="flex items-center justify-between">
-        <h1 className="display text-2xl">LiteChat 대시보드</h1>
+        <h1 className="display text-2xl">litechat 대시보드</h1>
         <div className="flex items-center gap-3 text-sm text-ink-mute">
           <span>{admin?.username}</span>
           <button onClick={() => void logout()} className="hover:text-white">

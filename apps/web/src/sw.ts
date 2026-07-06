@@ -29,7 +29,7 @@ self.addEventListener('push', (event) => {
     return;
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title ?? 'LiteChat', {
+    self.registration.showNotification(payload.title ?? 'litechat', {
       body: payload.body ?? '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',

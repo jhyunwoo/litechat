@@ -30,13 +30,13 @@ async function getVisitorId(): Promise<string> {
   return visitorId;
 }
 
-/** "LiteChatApp/1.4.2 (114; iPhone15,3; iOS 18.1)" 형태의 기기 정보 문자열 */
+/** "litechatApp/1.4.2 (114; iPhone15,3; iOS 18.1)" 형태의 기기 정보 문자열 */
 function deviceInfo(): string {
   const appVersion = Application.nativeApplicationVersion ?? '?';
   const buildVersion = Application.nativeBuildVersion ?? '?';
   const model = Device.modelName ?? Device.deviceName ?? 'unknown';
   const os = `${Device.osName ?? 'OS'} ${Device.osVersion ?? ''}`.trim();
-  return `LiteChatApp/${appVersion} (${buildVersion}; ${model}; ${os})`.trim();
+  return `litechatApp/${appVersion} (${buildVersion}; ${model}; ${os})`.trim();
 }
 
 /** 콜드 스타트 또는 오래 쉬었다 복귀했을 때만 새 세션 ID를 발급한다 */

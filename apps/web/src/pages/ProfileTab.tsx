@@ -105,7 +105,7 @@ export default function ProfileTab() {
       </div>
 
       <p className="py-8 text-center text-xs text-ink-mute/60">
-        LiteChat · 단축키: Alt+1/2/3 탭 이동 · Ctrl+K 검색
+        litechat · 단축키: Alt+1/2/3 탭 이동 · Ctrl+K 검색
         <br />
         서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.
       </p>

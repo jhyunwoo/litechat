@@ -1,5 +1,5 @@
 /**
- * LiteChat WebSocket 실시간 프로토콜 정의
+ * litechat WebSocket 실시간 프로토콜 정의
  *
  * 모든 프레임은 한 줄 JSON이며 `t` 필드로 종류를 구분한다.
  * 초저용량 목표를 위해 모든 키는 한 글자이다.

@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="flex h-full items-center justify-center">
       <form onSubmit={onSubmit} className="w-full max-w-xs rounded-xl border border-hairline bg-card p-8">
-        <h1 className="display mb-6 text-center text-2xl">LiteChat 대시보드</h1>
+        <h1 className="display mb-6 text-center text-2xl">litechat 대시보드</h1>
         <div className="flex flex-col gap-3">
           <input
             className="rounded-md border border-hairline bg-shell px-3 py-2.5 outline-none focus:border-primary"

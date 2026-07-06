@@ -1,4 +1,4 @@
-# LiteChat 프로덕션 이미지 (linux/arm64 — Oracle Ampere A1 대응)
+# litechat 프로덕션 이미지 (linux/arm64 — Oracle Ampere A1 대응)
 #
 # 1단계: 의존성 설치 + 세 프론트엔드 빌드 (web/lite/dashboard)
 # 2단계: 서버 소스 + 빌드 산출물만 담은 런타임 이미지

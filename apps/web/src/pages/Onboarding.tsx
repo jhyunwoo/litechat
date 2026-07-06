@@ -176,7 +176,7 @@ export default function Onboarding() {
                 n={3}
                 title={
                   <>
-                    홈 화면의 <span className="font-medium">LiteChat</span> 아이콘으로 다시 여세요
+                    홈 화면의 <span className="font-medium">litechat</span> 아이콘으로 다시 여세요
                   </>
                 }
                 desc="그다음 이 안내가 알림 켜기 버튼으로 바뀌어요"
@@ -237,7 +237,7 @@ export default function Onboarding() {
 
             {result === 'denied' && permission === 'denied' && (
               <p className="mt-3 text-center text-sm text-ruby">
-                알림이 차단돼 있어요. 설정 → 알림에서 LiteChat 알림을 허용해 주세요.
+                알림이 차단돼 있어요. 설정 → 알림에서 litechat 알림을 허용해 주세요.
               </p>
             )}
             {result === 'denied' && permission !== 'denied' && (

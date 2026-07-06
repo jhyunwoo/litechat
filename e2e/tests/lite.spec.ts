@@ -24,7 +24,7 @@ test('Lite 사이트가 서빙되고 초기 페이지가 극도로 가볍다', a
     if (res.url().startsWith(BASE)) responses.push(size);
   });
   await page.goto(BASE);
-  await expect(page.getByRole('heading', { name: 'LiteChat' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'litechat' })).toBeVisible();
   // 초기 전송 총량이 10KB 미만이어야 한다 (압축 기준).
   const total = responses.reduce((a, b) => a + b, 0);
   expect(total).toBeLessThan(10 * 1024);
