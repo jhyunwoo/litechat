@@ -5,7 +5,7 @@
  * 모든 화면은 #app에 직접 렌더링한다. 주석은 빌드 시 제거되므로 크기 부담이 없다.
  */
 import type { ConversationSummary, PublicUser, ServerFrame, WireMessage } from '@litechat/types';
-import { addBytes, errMsg, fmtBytes, onBytesChange, req, resetBytes, totalBytes } from './net';
+import { errMsg, fmtBytes, onBytesChange, req, resetBytes, totalBytes } from './net';
 import { onFrame, onReconnect, send, startSocket, stopSocket } from './sock';
 
 /* ---------- 상태 ---------- */
@@ -240,32 +240,41 @@ function authView(signup: boolean): HTMLElement {
   return form;
 }
 
-/* ---------- 화면: 탭 공통 ---------- */
-function tabsView(active: string, title: string, body: HTMLElement): HTMLElement {
+/* ---------- 화면: 셸 (데스크탑 nav 레일 + 목록 컬럼 + 대화 컬럼) ---------- */
+function shell(section: string, body: HTMLElement, detail: HTMLElement, inChat: boolean): HTMLElement {
   const unread = convs.reduce((sum, c) => sum + c.unread, 0);
-  const usage = h('span', { id: 'use' }, fmtBytes(totalBytes()));
-  const wrap = h(
+  const title = section === 'friends' ? '친구' : section === 'profile' ? '내정보' : '채팅';
+  return h(
     'div',
-    { style: 'display:flex;flex-direction:column;height:100%' },
-    h('header', {}, h('h1', {}, title), usage),
-    h('main', {}, errorText ? h('div', { class: 'err' }, errorText) : null, body),
+    { class: `layout${inChat ? ' chat' : ''}` },
+    h(
+      'aside',
+      { class: 'listcol' },
+      h('header', {}, h('h1', {}, title), h('span', { class: 'use' }, fmtBytes(totalBytes()))),
+      h('main', {}, errorText ? h('div', { class: 'err' }, errorText) : null, body),
+    ),
+    h('main', { class: 'detailcol' }, detail),
     h(
       'nav',
       {},
       h(
         'button',
-        { class: active === 'chats' ? 'on' : '', onclick: () => go('chats') },
+        { class: section === 'chats' ? 'on' : '', onclick: () => go('chats') },
         `채팅${unread ? ` (${unread})` : ''}`,
       ),
       h(
         'button',
-        { class: active === 'friends' ? 'on' : '', onclick: () => go('friends') },
+        { class: section === 'friends' ? 'on' : '', onclick: () => go('friends') },
         `친구${requests.incoming.length ? ` (${requests.incoming.length})` : ''}`,
       ),
-      h('button', { class: active === 'profile' ? 'on' : '', onclick: () => go('profile') }, '내정보'),
+      h('button', { class: section === 'profile' ? 'on' : '', onclick: () => go('profile') }, '내정보'),
     ),
   );
-  return wrap;
+}
+
+/** 데스크탑 빈 대화 컬럼 플레이스홀더 (모바일에선 CSS로 숨겨진다) */
+function emptyView(): HTMLElement {
+  return h('div', { class: 'stat dim', style: 'margin:auto' }, '대화를 선택하세요');
 }
 
 /* ---------- 화면: 채팅 목록 ---------- */
@@ -279,7 +288,7 @@ function chatsView(): HTMLElement {
     list.append(
       h(
         'div',
-        { class: 'row', onclick: () => go(`c/${conv.id}`) },
+        { class: `row${conv.id === currentConv() ? ' on' : ''}`, onclick: () => go(`c/${conv.id}`) },
         h(
           'div',
           { class: 'grow' },
@@ -440,6 +449,9 @@ function profileView(): HTMLElement {
 
 /* ---------- 화면: 채팅방 ---------- */
 const QUICK_EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '✨'];
+/** 재렌더 직전 포커스가 입력바 안에 있었으면, 새로 그린 입력창에 포커스를 복원한다.
+    (전송 시 낙관적 렌더 + ack 렌더가 연달아 일어나도 포커스가 유지된다) */
+let keepBarFocus = false;
 
 function chatView(convId: number): HTMLElement {
   const conv = convs.find((c) => c.id === convId);
@@ -571,15 +583,13 @@ function chatView(convId: number): HTMLElement {
     render();
   }
 
-  // 사진 업로드
+  // 사진 전송 — 파일 선택과 웹캠 촬영이 공용으로 쓰는 업로드 경로
   const file = h('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-  file.onchange = async () => {
-    const picked = file.files?.[0];
-    file.value = '';
-    if (!picked || !me) return;
+  async function uploadAndSend(blob: Blob): Promise<void> {
+    if (!me) return;
     try {
       const form = new FormData();
-      form.append('file', picked);
+      form.append('file', blob, blob instanceof File ? blob.name : 'photo.jpg');
       const res = await fetch('/api/images', { method: 'POST', body: form });
       const { image, error } = (await res.json()) as { image?: { id: string }; error?: string };
       if (!res.ok || !image) throw new Error(error ?? 'INVALID_IMAGE');
@@ -592,7 +602,71 @@ function chatView(convId: number): HTMLElement {
     } catch (error) {
       showError(errMsg(error));
     }
+  }
+  file.onchange = () => {
+    const picked = file.files?.[0];
+    file.value = '';
+    if (picked) void uploadAndSend(picked);
   };
+
+  // 웹캠 촬영 — 노트북 카메라 프리뷰 → 캔버스 캡처 → 위 업로드 경로 재사용
+  async function openCamera(): Promise<void> {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    } catch {
+      showError('카메라를 열 수 없어요');
+      return;
+    }
+    const video = h('video', { autoplay: '', playsinline: '' });
+    video.muted = true;
+    video.srcObject = stream;
+    const stop = () => {
+      for (const track of stream.getTracks()) track.stop();
+    };
+    const overlay = h(
+      'div',
+      { class: 'ov' },
+      video,
+      h(
+        'div',
+        { style: 'display:flex;gap:10px' },
+        h('button', { class: 'btn2', onclick: () => { stop(); overlay.remove(); } }, '취소'),
+        h(
+          'button',
+          {
+            class: 'btn2',
+            onclick: () => {
+              const canvas = h('canvas', {});
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              canvas.getContext('2d')?.drawImage(video, 0, 0);
+              canvas.toBlob((blob) => { if (blob) void uploadAndSend(blob); }, 'image/jpeg', 0.9);
+              stop();
+              overlay.remove();
+            },
+          },
+          '촬영',
+        ),
+      ),
+    );
+    document.body.append(overlay);
+  }
+
+  // 사진 버튼 → 파일 선택 / 웹캠 촬영 시트
+  function photoMenu(): void {
+    const sheet = h(
+      'div',
+      { class: 'ov', onclick: () => sheet.remove() },
+      h(
+        'div',
+        { class: 'sheet', onclick: (e: Event) => e.stopPropagation() },
+        h('button', { class: 'btn', onclick: () => { sheet.remove(); file.click(); } }, '파일 선택'),
+        h('button', { class: 'btn2', style: 'width:100%', onclick: () => { sheet.remove(); void openCamera(); } }, '웹캠 촬영'),
+      ),
+    );
+    document.body.append(sheet);
+  }
 
   const view = h(
     'div',
@@ -600,9 +674,9 @@ function chatView(convId: number): HTMLElement {
     h(
       'header',
       {},
-      h('button', { onclick: () => go('chats'), style: 'font-size:20px;color:#533afd;padding:0 6px' }, '‹'),
+      h('button', { class: 'chat-back', onclick: () => go('chats'), style: 'font-size:20px;color:#533afd;padding:0 6px' }, '‹'),
       h('h1', {}, conv?.peer.nickname ?? '대화'),
-      h('span', { id: 'use' }, fmtBytes(totalBytes())),
+      h('span', { class: 'use' }, fmtBytes(totalBytes())),
     ),
     errorText ? h('div', { class: 'err' }, errorText) : null,
     msgList,
@@ -613,12 +687,13 @@ function chatView(convId: number): HTMLElement {
         h('button', { onclick: () => { input.value += emoji; input.focus(); } }, emoji),
       ),
     ),
-    h('div', { class: 'bar' }, h('button', { class: 'btn2', onclick: () => file.click() }, '사진'), file, input, sendBtn),
+    h('div', { class: 'bar' }, h('button', { class: 'btn2', onclick: () => photoMenu() }, '사진'), file, input, sendBtn),
   );
 
-  // 렌더 후 맨 아래로 스크롤
+  // 렌더 후 맨 아래로 스크롤 + (직전에 입력바에 있던) 포커스 복원
   requestAnimationFrame(() => {
     msgList.scrollTop = msgList.scrollHeight;
+    if (keepBarFocus) input.focus();
   });
   return view;
 }
@@ -646,22 +721,19 @@ function render(): void {
     app.replaceChildren(current === 'signup' ? authView(true) : authView(false));
     return;
   }
+  // 교체 전에 포커스가 입력바 안에 있었는지 기록 → 재렌더 후 chatView가 포커스를 복원한다.
+  keepBarFocus = document.activeElement?.closest('.bar') != null;
   const convId = currentConv();
-  if (convId) {
-    app.replaceChildren(chatView(convId));
-  } else if (current === 'friends') {
-    app.replaceChildren(tabsView('friends', '친구', friendsView()));
-  } else if (current === 'profile') {
-    app.replaceChildren(tabsView('profile', '내정보', profileView()));
-  } else {
-    app.replaceChildren(tabsView('chats', '채팅', chatsView()));
-  }
+  const section = current === 'friends' ? 'friends' : current === 'profile' ? 'profile' : 'chats';
+  const body = section === 'friends' ? friendsView() : section === 'profile' ? profileView() : chatsView();
+  const detail = convId != null ? chatView(convId) : emptyView();
+  app.replaceChildren(shell(section, body, detail, convId != null));
 }
 
 // 헤더의 사용량 카운터는 전체 재렌더 없이 텍스트만 갱신한다.
 onBytesChange(() => {
-  const usage = document.getElementById('use');
-  if (usage) usage.textContent = fmtBytes(totalBytes());
+  const text = fmtBytes(totalBytes());
+  for (const usage of document.querySelectorAll('.use')) usage.textContent = text;
 });
 
 /* ---------- 부팅 ---------- */

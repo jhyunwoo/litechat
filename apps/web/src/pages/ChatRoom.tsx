@@ -21,6 +21,7 @@ import {
 } from '../data';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ImageViewer } from '../components/ImageViewer';
+import { WebcamCapture } from '../components/WebcamCapture';
 import { MessageBubble } from '../components/MessageBubble';
 import { Icon } from '../components/Icon';
 import { isEmojiOnly } from '../lib/format';
@@ -42,6 +43,8 @@ export default function ChatRoom() {
   const [viewing, setViewing] = useState<WireMessage | null>(null);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showCamMenu, setShowCamMenu] = useState(false);
+  const [showWebcam, setShowWebcam] = useState(false);
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -111,15 +114,13 @@ export default function ChatRoom() {
     }
   }
 
-  /** 사진 선택 → 업로드 → 이미지 메시지 전송 */
-  async function onPickFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !me) return;
+  /** 업로드 → 이미지 메시지 전송 (파일 선택·웹캠 촬영 공용) */
+  async function uploadBlob(blob: Blob) {
+    if (!me) return;
     setUploading(true);
     try {
       const form = new FormData();
-      form.append('file', file);
+      form.append('file', blob, blob instanceof File ? blob.name : 'photo.jpg');
       const res = await fetch('/api/images', { method: 'POST', body: form });
       const { image } = await unwrap<{ image: { id: string } }>(res);
       await sendMessage(queryClient, me.id, convId, 'i', image.id);
@@ -128,6 +129,13 @@ export default function ChatRoom() {
     } finally {
       setUploading(false);
     }
+  }
+
+  /** 파일 선택 → 업로드 */
+  function onPickFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) void uploadBlob(file);
   }
 
   return (
@@ -187,15 +195,43 @@ export default function ChatRoom() {
       {/* 입력 바 */}
       <div className="pb-safe border-t border-hairline bg-white">
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2 p-2">
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void onPickFile(e)} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            aria-label="사진 보내기"
-            className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft disabled:opacity-40"
-          >
-            <Icon name={uploading ? 'spinner' : 'camera'} className="size-6" />
-          </button>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
+          <div className="relative">
+            <button
+              onClick={() => setShowCamMenu((v) => !v)}
+              disabled={uploading}
+              aria-label="사진 보내기"
+              className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft disabled:opacity-40"
+            >
+              <Icon name={uploading ? 'spinner' : 'camera'} className="size-6" />
+            </button>
+            {showCamMenu && (
+              <>
+                {/* 바깥 클릭으로 닫기 */}
+                <div className="fixed inset-0 z-10" onClick={() => setShowCamMenu(false)} />
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-36 overflow-hidden rounded-xl border border-hairline bg-white shadow-lg">
+                  <button
+                    onClick={() => {
+                      setShowCamMenu(false);
+                      fileRef.current?.click();
+                    }}
+                    className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
+                  >
+                    파일 선택
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCamMenu(false);
+                      setShowWebcam(true);
+                    }}
+                    className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
+                  >
+                    웹캠 촬영
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => setShowEmoji((v) => !v)}
             aria-label="이모지"
@@ -234,6 +270,14 @@ export default function ChatRoom() {
       </div>
 
       <ImageViewer message={viewing} onClose={() => setViewing(null)} />
+      <WebcamCapture
+        open={showWebcam}
+        onClose={() => setShowWebcam(false)}
+        onCapture={(blob) => {
+          setShowWebcam(false);
+          void uploadBlob(blob);
+        }}
+      />
     </div>
   );
 }
