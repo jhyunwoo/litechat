@@ -135,6 +135,39 @@ export class AnalyticsRepo {
       .all(since);
   }
 
+  /** 지도 진단 — 최근 기간 세션 중 위치를 확보한 비율을 파악한다. */
+  geoDiagnostics(days: number): { total: number; withGeo: number } {
+    const since = Math.floor(Date.now() / 1000) - days * 86400;
+    return (
+      this.db
+        .query<{ total: number; withGeo: number }, [number]>(
+          `SELECT COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE geo_lat IS NOT NULL) AS withGeo
+           FROM analytics_sessions WHERE created_at >= ?`,
+        )
+        .get(since) ?? { total: 0, withGeo: 0 }
+    );
+  }
+
+  /**
+   * 위치 조회에 실패한(geo_lat IS NULL) IP를 최근순으로 표본 추출한다.
+   * IP가 사설(10./172./192.168.)이면 프록시 헤더 문제, 공인인데도 실패면 mmdb 문제로
+   * 대시보드에서 원인을 구분할 수 있다.
+   */
+  ungeolocatedIps(days: number, limit: number): { ip: string; count: number; lastAt: number }[] {
+    const since = Math.floor(Date.now() / 1000) - days * 86400;
+    return this.db
+      .query<{ ip: string; count: number; lastAt: number }, [number, number]>(
+        `SELECT ip, COUNT(*) AS count, MAX(created_at) AS lastAt
+         FROM analytics_sessions
+         WHERE created_at >= ? AND geo_lat IS NULL
+         GROUP BY ip
+         ORDER BY lastAt DESC
+         LIMIT ?`,
+      )
+      .all(since, limit);
+  }
+
   userVisitCounts(): {
     userId: number;
     username: string;

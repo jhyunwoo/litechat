@@ -15,16 +15,48 @@ export interface GeoResult {
   lon: number | null;
 }
 
+/**
+ * GeoIP DB 로드 상태 — 대시보드 진단에 노출한다.
+ * 'unopened' 아직 열기 시도 안 함 / 'ok' 로드 성공 / 'missing' 파일 없음(ENOENT) / 'error' 그 외 실패
+ */
+export type GeoipStatus = 'unopened' | 'ok' | 'missing' | 'error';
+
 // undefined = 아직 열기 시도 안 함, null = 열기 실패(영구 스킵), Reader = 성공
 let reader: Reader<CityResponse> | null | undefined;
+let status: GeoipStatus = 'unopened';
+
+/** 현재 GeoIP DB 로드 상태 (열기를 시도하지 않는다). */
+export function geoipStatus(): GeoipStatus {
+  return status;
+}
+
+/**
+ * DB를 (아직 안 했다면) 열어보고 상태를 반환한다 — 대시보드 진단용.
+ * 열기 결과는 lookupGeo와 같은 reader 캐시를 공유하므로, 실제 조회 동작과
+ * 항상 일치하는 상태를 보고한다(실패는 재시작 전까지 영구 스킵된다).
+ */
+export async function probeGeoip(dbPath: string): Promise<GeoipStatus> {
+  await getReader(dbPath);
+  return status;
+}
 
 async function getReader(dbPath: string): Promise<Reader<CityResponse> | null> {
   if (reader !== undefined) return reader;
   try {
     // 캐시는 maxmind 내장 LRU를 사용 — 별도 캐시 레이어를 두지 않는다.
     reader = await maxmind.open<CityResponse>(dbPath, { cache: { max: 20_000 } });
-  } catch {
-    console.error(`GeoIP: ${dbPath} 를 열 수 없어 이후 위치 조회를 건너뜁니다.`);
+    status = 'ok';
+    console.log(`GeoIP: ${dbPath} 로드 완료 — 위치 조회 활성화`);
+  } catch (err) {
+    // 파일 없음(ENOENT)은 "mmdb를 배치하라"는 운영자 액션이 필요한 흔한 경우라 구분해 안내한다.
+    const missing = (err as NodeJS.ErrnoException)?.code === 'ENOENT';
+    status = missing ? 'missing' : 'error';
+    console.error(
+      missing
+        ? `GeoIP: ${dbPath} 파일이 없어 위치 조회를 건너뜁니다. MaxMind GeoLite2-City.mmdb를 이 경로에 배치한 뒤 앱을 재시작하세요.`
+        : `GeoIP: ${dbPath} 를 열 수 없어 이후 위치 조회를 건너뜁니다:`,
+      missing ? '' : err,
+    );
     reader = null;
   }
   return reader;

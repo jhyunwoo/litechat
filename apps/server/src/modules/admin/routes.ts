@@ -11,6 +11,7 @@ import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppDeps } from '../../deps';
 import { requireAdmin } from '../../middleware/admin-auth';
+import { probeGeoip } from '../analytics/geoip';
 import type { AnalyticsService } from '../analytics/service';
 import { AdminRepo } from './repo';
 import {
@@ -76,6 +77,14 @@ export function adminRoutes(deps: AppDeps, analyticsService: AnalyticsService) {
     .get('/geo', requireAdmin(deps), (c) => {
       const days = Number(c.req.query('days') ?? 30);
       return c.json(analyticsService.queries.geoPoints(days), 200);
+    })
+    // 지도가 비는 원인 진단 — GeoIP DB 로드 상태 + 위치 조회 실패 IP 표본
+    .get('/geo/status', requireAdmin(deps), async (c) => {
+      const days = Number(c.req.query('days') ?? 30);
+      const dbStatus = await probeGeoip(deps.config.geoipDbPath);
+      const diag = analyticsService.queries.geoDiagnostics(days);
+      const ungeolocated = analyticsService.queries.ungeolocatedIps(days, 8);
+      return c.json({ dbStatus, dbPath: deps.config.geoipDbPath, ...diag, ungeolocated }, 200);
     })
     .get('/users/visits', requireAdmin(deps), (c) => {
       return c.json(analyticsService.queries.userVisitCounts(), 200);

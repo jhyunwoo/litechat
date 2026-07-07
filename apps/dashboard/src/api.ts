@@ -59,6 +59,19 @@ export interface GeoPoint {
   count: number;
 }
 
+export interface GeoStatus {
+  /** GeoIP DB 로드 상태 */
+  dbStatus: 'unopened' | 'ok' | 'missing' | 'error';
+  /** 서버가 기대하는 mmdb 경로 (파일 배치 위치 확인용) */
+  dbPath: string;
+  /** 최근 기간 전체 세션 수 */
+  total: number;
+  /** 그중 위치를 확보한 세션 수 */
+  withGeo: number;
+  /** 위치 조회에 실패한 IP 표본 (최근순) */
+  ungeolocated: { ip: string; count: number; lastAt: number }[];
+}
+
 export interface UserVisit {
   userId: number;
   username: string;
@@ -82,6 +95,7 @@ export const adminApi = {
   overview: (days = 30) => request<Overview>(`/overview?days=${days}`),
   timeseries: (days = 30) => request<TimeseriesPoint[]>(`/timeseries?days=${days}`),
   geo: (days = 30) => request<GeoPoint[]>(`/geo?days=${days}`),
+  geoStatus: (days = 30) => request<GeoStatus>(`/geo/status?days=${days}`),
   usersVisits: () => request<UserVisit[]>('/users/visits'),
   vitals: (metric = 'LCP', days = 30) => request<VitalsPoint[]>(`/vitals?metric=${metric}&days=${days}`),
 };
