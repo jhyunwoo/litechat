@@ -8,6 +8,7 @@ import { useAdminAuth } from './auth';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
+const SessionsPage = lazy(() => import('./pages/SessionsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const VitalsPage = lazy(() => import('./pages/VitalsPage'));
 
@@ -55,6 +56,7 @@ function Shell() {
       <nav className="flex gap-2">
         <Tab to="/" label="개요" />
         <Tab to="/map" label="지도" />
+        <Tab to="/sessions" label="접속 기록" />
         <Tab to="/users" label="사용자별 방문" />
         <Tab to="/vitals" label="웹 바이탈" />
       </nav>
@@ -79,6 +81,7 @@ export default function App() {
         >
           <Route path="/" element={<OverviewPage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/vitals" element={<VitalsPage />} />
         </Route>

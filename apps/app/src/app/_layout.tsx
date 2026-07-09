@@ -7,6 +7,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -16,7 +17,7 @@ import { useAppAnalytics } from '@/lib/analytics';
 import { useNotificationDeepLink } from '@/lib/notifications';
 import { useOTAUpdates } from '@/lib/ota';
 import { bindAppState } from '@/lib/ws';
-import { colors } from '@/theme/tokens';
+import { ThemeProvider, useTheme } from '@/theme/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,6 +33,7 @@ const queryClient = new QueryClient({
 
 function Root() {
   const { me, ready } = useAuth();
+  const { colors } = useTheme();
 
   // 실시간 프레임 → 캐시 반영 (로그인 트리 전체에서 한 번만)
   useRealtimeSync();
@@ -79,7 +81,11 @@ export default function RootLayout() {
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <Root />
+            <ThemeProvider>
+              {/* auto — Appearance 유효 스킴(수동 오버라이드 포함)을 따라간다 */}
+              <StatusBar style="auto" />
+              <Root />
+            </ThemeProvider>
           </AuthProvider>
         </QueryClientProvider>
       </KeyboardProvider>

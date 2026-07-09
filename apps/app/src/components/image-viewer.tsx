@@ -9,11 +9,12 @@ import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { authHeaders } from '@/lib/api';
 import { imageUrl } from '@/lib/env';
 import { formatBytes } from '@/lib/format';
-import { colors, rounded, spacing } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { rounded, spacing } from '@/theme/tokens';
 
 interface Props {
   message: WireMessage | null;
@@ -21,6 +22,8 @@ interface Props {
 }
 
 export function ImageViewer({ message, onClose }: Props) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [busy, setBusy] = useState<'thumb' | 'orig' | null>(null);
   const image = message?.im;
 
@@ -87,7 +90,8 @@ export function ImageViewer({ message, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+// 전체 화면 사진 뷰어는 두 스킴 모두 의도적으로 어두운 표면을 쓴다 (사진 감상 최적)
+const useStyles = makeStyles(({ colors }) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.92)',
@@ -117,4 +121,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontVariant: ['tabular-nums'],
   },
-});
+}));

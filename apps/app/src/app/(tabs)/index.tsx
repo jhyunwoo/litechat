@@ -24,7 +24,8 @@ import { ChatRoomView } from '@/components/chat-room-view';
 import { useAuth } from '@/data/auth';
 import { useConversations } from '@/data/data';
 import { formatTime } from '@/lib/format';
-import { colors, spacing, type } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { spacing } from '@/theme/tokens';
 
 /** iPad 2-pane 전환 기준 폭 */
 const SPLIT_BREAKPOINT = 768;
@@ -45,6 +46,8 @@ function ConversationRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -77,6 +80,7 @@ function ConversationRow({
 }
 
 export default function ChatsTab() {
+  const styles = useStyles();
   const { me } = useAuth();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -162,7 +166,7 @@ export default function ChatsTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, type }) => ({
   split: {
     flex: 1,
     flexDirection: 'row',
@@ -272,4 +276,4 @@ const styles = StyleSheet.create({
     color: colors.inkMute,
     lineHeight: 20,
   },
-});
+}));

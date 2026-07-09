@@ -11,12 +11,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { useFriendRequests, useFriends } from '@/data/data';
 import { api, errorMessage, unwrap } from '@/lib/api';
-import { colors, rounded, spacing, type } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { rounded, spacing } from '@/theme/tokens';
 
 type SearchUser = PublicUser & { rel: string };
 
 /** 검색 결과의 관계 상태 → 버튼/라벨 */
 function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number) => void }) {
+  const styles = useStyles();
   switch (user.rel) {
     case 'self':
       return <Text style={styles.relLabel}>나</Text>;
@@ -39,6 +41,8 @@ function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number)
 }
 
 export default function FriendsTab() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
@@ -195,7 +199,7 @@ export default function FriendsTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, type }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -309,4 +313,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '400',
   },
-});
+}));

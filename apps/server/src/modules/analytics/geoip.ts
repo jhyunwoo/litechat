@@ -31,6 +31,15 @@ export function geoipStatus(): GeoipStatus {
 }
 
 /**
+ * 리더 캐시를 비워 다음 조회 때 mmdb를 다시 열게 한다 — DB 파일을 갱신(교체)한
+ * 직후 호출한다. (reader는 영구 캐시라 이 호출 없이는 재시작 전까지 옛 DB를 쓴다)
+ */
+export function reloadGeoip(): void {
+  reader = undefined;
+  status = 'unopened';
+}
+
+/**
  * DB를 (아직 안 했다면) 열어보고 상태를 반환한다 — 대시보드 진단용.
  * 열기 결과는 lookupGeo와 같은 reader 캐시를 공유하므로, 실제 조회 동작과
  * 항상 일치하는 상태를 보고한다(실패는 재시작 전까지 영구 스킵된다).

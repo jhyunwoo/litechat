@@ -10,9 +10,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { useAuth } from '@/data/auth';
 import { isPushEnabled, registerForPush, unregisterPush } from '@/lib/notifications';
-import { colors, rounded, spacing, type } from '@/theme/tokens';
+import type { ThemePreference } from '@/lib/theme-pref';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { rounded, spacing } from '@/theme/tokens';
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: '시스템' },
+  { value: 'light', label: '라이트' },
+  { value: 'dark', label: '다크' },
+];
 
 export default function ProfileTab() {
+  const styles = useStyles();
+  const { colors, pref, setPref } = useTheme();
   const { me, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const [pushOn, setPushOn] = useState(false);
@@ -69,6 +79,30 @@ export default function ProfileTab() {
 
         <View style={styles.divider} />
 
+        {/* 화면 테마 — 시스템 추종 또는 수동 고정 */}
+        <View style={styles.cardRow}>
+          <View style={styles.cardRowText}>
+            <Text style={styles.rowTitle}>화면 테마</Text>
+          </View>
+          <View style={styles.segments}>
+            {THEME_OPTIONS.map((option) => (
+              <Pressable
+                key={option.value}
+                onPress={() => setPref(option.value)}
+                style={[styles.segment, pref === option.value && styles.segmentOn]}
+              >
+                <Text
+                  style={[styles.segmentLabel, pref === option.value && styles.segmentLabelOn]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
         {/* 로그아웃 */}
         <Pressable
           onPress={() => void logout()}
@@ -86,7 +120,7 @@ export default function ProfileTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, type }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -150,6 +184,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.ruby,
   },
+  segments: {
+    flexDirection: 'row',
+    backgroundColor: colors.canvasSoft,
+    borderRadius: rounded.pill,
+    padding: 2,
+  },
+  segment: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: rounded.pill,
+  },
+  segmentOn: {
+    backgroundColor: colors.primary,
+  },
+  segmentLabel: {
+    fontSize: 13,
+    color: colors.inkMute,
+  },
+  segmentLabelOn: {
+    color: colors.onPrimary,
+    fontWeight: '500',
+  },
   footer: {
     textAlign: 'center',
     paddingVertical: spacing.xxl,
@@ -157,4 +213,4 @@ const styles = StyleSheet.create({
     color: colors.inkMute,
     opacity: 0.6,
   },
-});
+}));

@@ -2,9 +2,10 @@
  * 이모지 피커 — 외부 라이브러리 없이 자주 쓰는 이모지 그리드 (웹 포팅)
  */
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { colors, rounded, spacing } from '@/theme/tokens';
+import { makeStyles } from '@/theme/theme';
+import { rounded, spacing } from '@/theme/tokens';
 
 const EMOJIS = [
   '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😎',
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function EmojiPicker({ onPick }: Props) {
+  const styles = useStyles();
   return (
     <Animated.View entering={FadeInDown.duration(180)} style={styles.grid}>
       {EMOJIS.map((emoji) => (
@@ -38,7 +40,7 @@ export function EmojiPicker({ onPick }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -60,6 +62,6 @@ const styles = StyleSheet.create({
   emoji: {
     fontSize: 24,
   },
-});
+}));
 
 export default EmojiPicker;

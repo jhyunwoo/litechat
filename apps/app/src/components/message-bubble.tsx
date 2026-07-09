@@ -10,12 +10,13 @@
 import type { WireMessage } from '@litechat/types';
 import { Image } from 'expo-image';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import Animated, { withSpring, type EntryAnimationsValues } from 'react-native-reanimated';
 import { authHeaders } from '@/lib/api';
 import { imageUrl } from '@/lib/env';
 import { formatTime, isEmojiOnly } from '@/lib/format';
-import { colors, spacing } from '@/theme/tokens';
+import { makeStyles } from '@/theme/theme';
+import { spacing } from '@/theme/tokens';
 
 /** 이미지 말풍선 최대 크기 */
 const MAX_IMAGE_WIDTH = 240;
@@ -62,6 +63,7 @@ export const MessageBubble = memo(function MessageBubble({
   animate,
   onImagePress,
 }: Props) {
+  const styles = useStyles();
   const emojiOnly = message.k === 'e' || (message.k === 't' && isEmojiOnly(message.x));
 
   /** 이미지 표시 크기 — 원본 비율 유지, 최대 크기 제한 */
@@ -118,7 +120,7 @@ export const MessageBubble = memo(function MessageBubble({
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   row: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -176,4 +178,4 @@ const styles = StyleSheet.create({
     color: colors.inkMute,
     fontVariant: ['tabular-nums'],
   },
-});
+}));

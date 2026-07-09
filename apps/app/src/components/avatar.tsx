@@ -2,8 +2,8 @@
  * 아바타 — 닉네임 첫 글자 + 인디고 그라디언트 원
  */
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text } from 'react-native';
-import { colors } from '@/theme/tokens';
+import { Text } from 'react-native';
+import { makeStyles, useTheme } from '@/theme/theme';
 
 interface Props {
   nickname: string;
@@ -13,6 +13,8 @@ interface Props {
 }
 
 export function Avatar({ nickname, size = 48, variant = 'primary' }: Props) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const gradient =
     variant === 'dark'
       ? ([colors.brandDark, colors.primaryDeep] as const)
@@ -31,7 +33,7 @@ export function Avatar({ nickname, size = 48, variant = 'primary' }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   circle: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -40,4 +42,4 @@ const styles = StyleSheet.create({
     color: colors.onPrimary,
     fontWeight: '300',
   },
-});
+}));

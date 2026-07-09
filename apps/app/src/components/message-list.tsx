@@ -11,9 +11,10 @@ import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { loadOlderMessages } from '@/data/data';
-import { colors, spacing } from '@/theme/tokens';
+import { makeStyles } from '@/theme/theme';
+import { spacing } from '@/theme/tokens';
 import { MessageBubble } from './message-bubble';
 
 /** 렌더 항목 — 파생 플래그를 미리 계산해 말풍선 memo가 잘 듣게 한다 */
@@ -44,6 +45,7 @@ export function MessageList({
   onImagePress,
   listRef,
 }: Props) {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const [loadingOlder, setLoadingOlder] = useState(false);
   const exhausted = useRef(false);
@@ -125,7 +127,7 @@ export function MessageList({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   content: {
     paddingVertical: spacing.md,
   },
@@ -140,4 +142,4 @@ const styles = StyleSheet.create({
     color: colors.inkMute,
     textAlign: 'center',
   },
-});
+}));

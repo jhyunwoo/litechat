@@ -43,9 +43,3 @@ body {
   font-weight: 300;
   letter-spacing: -0.026em;
 }
-
-/* react-leaflet 컨테이너는 명시적 높이가 필요하다 */
-.leaflet-container {
-  height: 420px;
-  border-radius: 12px;
-}

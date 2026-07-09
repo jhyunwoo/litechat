@@ -7,9 +7,10 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useConversations, useFriendRequests } from '@/data/data';
 import { useBadgeSync } from '@/lib/notifications';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/theme';
 
 export default function TabLayout() {
+  const { colors } = useTheme();
   const { data: conversations } = useConversations();
   const { data: requests } = useFriendRequests();
 

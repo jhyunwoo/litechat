@@ -38,6 +38,13 @@ export interface AdminMe {
   admin: { id: number; username: string };
 }
 
+export interface AdminConfig {
+  /** Google Maps JS API 키 — 비어 있으면 지도를 표시하지 않는다 */
+  googleMapsApiKey: string;
+  /** AdvancedMarker 렌더링용 Map ID */
+  googleMapsMapId: string;
+}
+
 export interface Overview {
   sessions: number;
   visitors: number;
@@ -59,6 +66,12 @@ export interface GeoPoint {
   count: number;
 }
 
+export interface GeoipRefreshInfo {
+  at: number;
+  ok: boolean;
+  error?: string;
+}
+
 export interface GeoStatus {
   /** GeoIP DB 로드 상태 */
   dbStatus: 'unopened' | 'ok' | 'missing' | 'error';
@@ -70,6 +83,72 @@ export interface GeoStatus {
   withGeo: number;
   /** 위치 조회에 실패한 IP 표본 (최근순) */
   ungeolocated: { ip: string; count: number; lastAt: number }[];
+  /** MaxMind 자격 증명이 설정돼 주간 자동 갱신이 켜져 있는지 */
+  autoRefresh: boolean;
+  /** 마지막 DB 갱신 시도 결과 (서버 재시작 후에는 null) */
+  lastRefresh: GeoipRefreshInfo | null;
+}
+
+export interface SessionRow {
+  id: string;
+  visitorId: string;
+  userId: number | null;
+  username: string | null;
+  nickname: string | null;
+  platform: string;
+  ip: string;
+  userAgent: string;
+  referrer: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  lat: number | null;
+  lon: number | null;
+  createdAt: number;
+  lastSeenAt: number;
+}
+
+export interface SessionsResult {
+  rows: SessionRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SessionsParams {
+  userId?: number;
+  platform?: string;
+  ip?: string;
+  from?: number;
+  to?: number;
+  sort?: 'created_at' | 'last_seen_at';
+  dir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface Insights {
+  ip: string;
+  fetchedAt: number;
+  lat: number | null;
+  lon: number | null;
+  /** 위치 정확도 반경 (km) */
+  accuracyRadius: number | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  isp: string | null;
+  organization: string | null;
+  userType: string | null;
+  data: string;
+}
+
+export interface InsightsResult {
+  /** true면 저장된 결과 재사용 (1주 캐시) — API 호출 없음 */
+  cached: boolean;
+  /** 캐시가 1주를 넘겼지만 API 호출이 실패해 대신 내려준 경우 */
+  stale: boolean;
+  insights: Insights;
 }
 
 export interface UserVisit {
@@ -92,10 +171,21 @@ export const adminApi = {
     request<{ ok: true }>('/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request<{ ok: true }>('/logout', { method: 'POST' }),
   me: () => request<AdminMe>('/me'),
+  config: () => request<AdminConfig>('/config'),
   overview: (days = 30) => request<Overview>(`/overview?days=${days}`),
   timeseries: (days = 30) => request<TimeseriesPoint[]>(`/timeseries?days=${days}`),
   geo: (days = 30) => request<GeoPoint[]>(`/geo?days=${days}`),
   geoStatus: (days = 30) => request<GeoStatus>(`/geo/status?days=${days}`),
   usersVisits: () => request<UserVisit[]>('/users/visits'),
   vitals: (metric = 'LCP', days = 30) => request<VitalsPoint[]>(`/vitals?metric=${metric}&days=${days}`),
+  sessions: (params: SessionsParams = {}) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<SessionsResult>(`/sessions?${qs.toString()}`);
+  },
+  insights: (ip: string) =>
+    request<InsightsResult>(`/geoip/insights/${encodeURIComponent(ip)}`, { method: 'POST' }),
+  geoipRefresh: () => request<GeoipRefreshInfo>('/geoip/refresh', { method: 'POST' }),
 };

@@ -9,9 +9,11 @@ import { ChatRoomView } from '@/components/chat-room-view';
 import { Glass } from '@/components/glass';
 import { useAuth } from '@/data/auth';
 import { useConversations } from '@/data/data';
-import { colors, spacing } from '@/theme/tokens';
+import { makeStyles } from '@/theme/theme';
+import { spacing } from '@/theme/tokens';
 
 export default function ChatRoomScreen() {
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const convId = Number(id);
   const { me } = useAuth();
@@ -48,7 +50,7 @@ export default function ChatRoomScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -82,4 +84,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkMute,
   },
-});
+}));

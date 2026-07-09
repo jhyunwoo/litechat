@@ -6,6 +6,7 @@
  */
 import type { Database } from 'bun:sqlite';
 import type { GeoResult } from './geoip';
+import type { InsightsRow } from './insights';
 
 export interface NewSessionInput {
   id: string;
@@ -16,6 +17,40 @@ export interface NewSessionInput {
   userAgent: string;
   referrer: string | null;
   geo: GeoResult | null;
+}
+
+/** 접속 기록 조회 필터/정렬/페이지 — 정렬 컬럼은 화이트리스트로만 받는다 */
+export interface SessionListFilter {
+  userId?: number;
+  platform?: string;
+  /** 부분 일치 (LIKE) */
+  ip?: string;
+  /** unix epoch 초 범위 */
+  from?: number;
+  to?: number;
+  sort: 'created_at' | 'last_seen_at';
+  dir: 'asc' | 'desc';
+  limit: number;
+  offset: number;
+}
+
+export interface SessionRow {
+  id: string;
+  visitorId: string;
+  userId: number | null;
+  username: string | null;
+  nickname: string | null;
+  platform: string;
+  ip: string;
+  userAgent: string;
+  referrer: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  lat: number | null;
+  lon: number | null;
+  createdAt: number;
+  lastSeenAt: number;
 }
 
 export class AnalyticsRepo {
@@ -166,6 +201,106 @@ export class AnalyticsRepo {
          LIMIT ?`,
       )
       .all(since, limit);
+  }
+
+  /**
+   * 접속 기록 데이터 탐색기 — 개별 세션 행을 사용자 정보와 함께 필터/정렬/페이지로 나열한다.
+   * WHERE 절은 채워진 필터만 조건부로 조립하고, 정렬은 타입으로 제한된 화이트리스트 값만
+   * 문자열에 넣는다 (사용자 입력을 SQL에 직접 잇지 않는다).
+   */
+  listSessions(filter: SessionListFilter): { rows: SessionRow[]; total: number } {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+    if (filter.userId !== undefined) {
+      where.push('s.user_id = ?');
+      params.push(filter.userId);
+    }
+    if (filter.platform) {
+      where.push('s.platform = ?');
+      params.push(filter.platform);
+    }
+    if (filter.ip) {
+      where.push('s.ip LIKE ?');
+      params.push(`%${filter.ip}%`);
+    }
+    if (filter.from !== undefined) {
+      where.push('s.created_at >= ?');
+      params.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      where.push('s.created_at <= ?');
+      params.push(filter.to);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const total =
+      this.db
+        .query<{ n: number }, (string | number)[]>(
+          `SELECT COUNT(*) AS n FROM analytics_sessions s ${whereSql}`,
+        )
+        .get(...params)?.n ?? 0;
+
+    const rows = this.db
+      .query<SessionRow, (string | number)[]>(
+        `SELECT s.id, s.visitor_id AS visitorId, s.user_id AS userId,
+                u.username, u.nickname,
+                s.platform, s.ip, s.user_agent AS userAgent, s.referrer,
+                s.geo_country AS country, s.geo_region AS region, s.geo_city AS city,
+                s.geo_lat AS lat, s.geo_lon AS lon,
+                s.created_at AS createdAt, s.last_seen_at AS lastSeenAt
+         FROM analytics_sessions s
+         LEFT JOIN users u ON u.id = s.user_id
+         ${whereSql}
+         ORDER BY s.${filter.sort} ${filter.dir === 'asc' ? 'ASC' : 'DESC'}
+         LIMIT ? OFFSET ?`,
+      )
+      .all(...params, filter.limit, filter.offset);
+
+    return { rows, total };
+  }
+
+  // ── GeoIP2 Insights 캐시 ─────────────────────────────────
+
+  getInsights(ip: string): InsightsRow | null {
+    return (
+      this.db
+        .query<InsightsRow, [string]>(
+          `SELECT ip, fetched_at AS fetchedAt, lat, lon, accuracy_radius AS accuracyRadius,
+                  city, region, country, isp, organization, user_type AS userType, data
+           FROM geoip_insights WHERE ip = ?`,
+        )
+        .get(ip) ?? null
+    );
+  }
+
+  upsertInsights(row: InsightsRow): void {
+    this.db
+      .query(
+        `INSERT INTO geoip_insights
+           (ip, fetched_at, lat, lon, accuracy_radius, city, region, country,
+            isp, organization, user_type, data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (ip) DO UPDATE SET
+           fetched_at = excluded.fetched_at, lat = excluded.lat, lon = excluded.lon,
+           accuracy_radius = excluded.accuracy_radius, city = excluded.city,
+           region = excluded.region, country = excluded.country, isp = excluded.isp,
+           organization = excluded.organization, user_type = excluded.user_type,
+           data = excluded.data`,
+      )
+      .run(
+        row.ip,
+        row.fetchedAt,
+        row.lat,
+        row.lon,
+        row.accuracyRadius,
+        row.city,
+        row.region,
+        row.country,
+        row.isp,
+        row.organization,
+        row.userType,
+        row.data,
+      );
   }
 
   userVisitCounts(): {

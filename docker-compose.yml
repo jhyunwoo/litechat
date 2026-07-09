@@ -29,6 +29,15 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: mailto:admin@moveto.kr
+      # 관리자 대시보드 지도(Google Maps JS API). 키가 비면 지도는 표시되지 않는다.
+      # HTTP 리퍼러(dash.moveto.kr)로 제한된 브라우저 키를 발급해 주입한다.
+      # GOOGLE_MAPS_MAP_ID는 AdvancedMarker 렌더링용 — 비우면 개발용 DEMO_MAP_ID 사용.
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      # MaxMind — GeoLite2 DB 주간 자동 갱신 + GeoIP2 Insights 온디맨드 조회.
+      # 비워 두면 자동 갱신/Insights만 꺼지고 로컬 mmdb 조회는 계속 동작한다.
+      MAXMIND_USER_NUM: ${MAXMIND_USER_NUM:-}
+      MAXMIND_API_KEY: ${MAXMIND_API_KEY:-}
     volumes:
       - litechat-data:/app/data        # SQLite DB + 업로드 이미지 영속화
     # Traefik(Dokploy)이 컨테이너에 도달하려면 외부 dokploy-network에 연결돼 있어야 한다.

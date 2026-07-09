@@ -154,4 +154,24 @@ export const MIGRATIONS: string[] = [
     created_at    INTEGER NOT NULL
   );
   `,
+
+  // v3 → v4: GeoIP2 Insights 결과 캐시 — 유료 API라 IP당 결과를 저장해 재사용한다
+  `
+  -- 같은 IP를 1주 안에 다시 조회하면 API를 부르지 않고 이 행을 그대로 쓴다 (fetched_at 기준).
+  -- 자주 쓰는 필드는 컬럼으로 추출하고, 응답 전문은 data(JSON)에 보관해 추후 필드 추가에 대비한다.
+  CREATE TABLE geoip_insights (
+    ip              TEXT    PRIMARY KEY,
+    fetched_at      INTEGER NOT NULL,               -- unix epoch 초
+    lat             REAL,
+    lon             REAL,
+    accuracy_radius INTEGER,                        -- km 단위 (MaxMind 표준)
+    city            TEXT,
+    region          TEXT,
+    country         TEXT,
+    isp             TEXT,
+    organization    TEXT,
+    user_type       TEXT,
+    data            TEXT    NOT NULL                -- 원본 JSON 응답 전문
+  );
+  `,
 ];

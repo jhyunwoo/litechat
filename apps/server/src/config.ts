@@ -40,6 +40,14 @@ export interface AppConfig {
   dashboardStaticDir: string;
   /** MaxMind GeoLite2-City.mmdb 경로 — 파일이 없으면 GeoIP 조회를 건너뛴다 */
   geoipDbPath: string;
+  /** MaxMind 계정 ID — GeoLite2 주간 자동 갱신 + GeoIP2 Insights 조회에 사용 (비우면 비활성화) */
+  maxmindAccountId: string;
+  /** MaxMind 라이선스 키 */
+  maxmindLicenseKey: string;
+  /** 관리자 대시보드 지도에 쓰는 Google Maps JavaScript API 키 (비어 있으면 지도 비활성화) */
+  googleMapsApiKey: string;
+  /** Google Maps Map ID — AdvancedMarker 렌더링에 필요. 기본은 개발용 'DEMO_MAP_ID' */
+  googleMapsMapId: string;
   /** argon2id 메모리 비용 (KiB) — 테스트에서는 낮춰 빠르게 실행 */
   passwordMemoryCost: number;
   /** argon2id 반복 횟수 */
@@ -68,6 +76,10 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     dashboardHost: env.DASHBOARD_HOST ?? 'dash.moveto.kr',
     dashboardStaticDir: env.DASHBOARD_STATIC_DIR ?? '../dashboard/dist',
     geoipDbPath: env.GEOIP_DB_PATH ?? 'data/GeoLite2-City.mmdb',
+    maxmindAccountId: env.MAXMIND_USER_NUM ?? '',
+    maxmindLicenseKey: env.MAXMIND_API_KEY ?? '',
+    googleMapsApiKey: env.GOOGLE_MAPS_API_KEY ?? '',
+    googleMapsMapId: env.GOOGLE_MAPS_MAP_ID ?? 'DEMO_MAP_ID',
     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),
     ...overrides,

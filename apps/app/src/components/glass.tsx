@@ -5,8 +5,8 @@
  */
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors } from '@/theme/tokens';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { makeStyles } from '@/theme/theme';
 
 const glassAvailable = isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
 
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export function Glass({ style, children }: Props) {
+  const styles = useStyles();
   if (glassAvailable) {
     return <GlassView style={style}>{children}</GlassView>;
   }
@@ -23,9 +24,9 @@ export function Glass({ style, children }: Props) {
   return <View style={[styles.fallback, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ scheme, colors }) => ({
   fallback: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: scheme === 'dark' ? 'rgba(18,22,36,0.92)' : 'rgba(255,255,255,0.92)',
     borderColor: colors.hairline,
   },
-});
+}));

@@ -13,7 +13,7 @@ import type { FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   KeyboardAvoidingView,
   useKeyboardHandler,
@@ -24,7 +24,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
 import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
 import { errorMessage } from '@/lib/api';
-import { colors, spacing } from '@/theme/tokens';
+import { makeStyles } from '@/theme/theme';
+import { spacing } from '@/theme/tokens';
 import { Composer } from './composer';
 import { ImageViewer } from './image-viewer';
 import { MessageList, type Row } from './message-list';
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function ChatRoomView({ convId, meId }: Props) {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
@@ -123,7 +125,7 @@ export function ChatRoomView({ convId, meId }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -139,4 +141,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.ruby,
   },
-});
+}));

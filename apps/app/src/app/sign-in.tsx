@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -19,9 +18,12 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/data/auth';
 import { errorMessage } from '@/lib/api';
-import { colors, meshStops, rounded, spacing, type } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { meshStops, rounded, spacing } from '@/theme/tokens';
 
 export default function SignIn() {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const { login, register } = useAuth();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -144,7 +146,7 @@ export default function SignIn() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, type }) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -230,4 +232,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
   },
-});
+}));

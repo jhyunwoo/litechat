@@ -16,6 +16,8 @@ type Msg = WireMessage & { _i?: string };
 const msgs = new Map<number, Msg[]>();
 /** 과거 메시지를 더 불러올 수 있는지 */
 const hasMore = new Map<number, boolean>();
+/** 대화별 작성 중 초안 — 재렌더가 textarea를 갈아치워도 입력을 보존한다 */
+const drafts = new Map<number, string>();
 let friends: { user: PublicUser; c: number }[] = [];
 let requests: { incoming: { id: number; user: PublicUser }[]; outgoing: { id: number; user: PublicUser }[] } = {
   incoming: [],
@@ -219,8 +221,8 @@ function authView(signup: boolean): HTMLElement {
         })();
       },
     },
-    h('h1', {}, 'litechat'),
-    h('p', {}, '초경량 · 데이터 절약 채팅'),
+    h('h1', {}, 'Excel'),
+    h('p', {}, '계속하려면 로그인하세요'),
     username,
     signup ? nickname : null,
     password,
@@ -240,23 +242,34 @@ function authView(signup: boolean): HTMLElement {
   return form;
 }
 
-/* ---------- 화면: 셸 (데스크탑 nav 레일 + 목록 컬럼 + 대화 컬럼) ---------- */
+/* ---------- 화면: 셸 — Excel 크롬(제목줄/리본/시트 탭/상태줄) + 목록/대화 컬럼 ---------- */
+/** A/B/C 열 머리글 행 */
+function colHead(): HTMLElement {
+  return h('div', { class: 'ch' }, h('span', {}), h('span', {}, 'A'), h('span', {}, 'B'), h('span', {}, 'C'));
+}
+
 function shell(section: string, body: HTMLElement, detail: HTMLElement, inChat: boolean): HTMLElement {
   const unread = convs.reduce((sum, c) => sum + c.unread, 0);
-  const title = section === 'friends' ? '친구' : section === 'profile' ? '내정보' : '채팅';
   return h(
     'div',
     { class: `layout${inChat ? ' chat' : ''}` },
+    h('div', { class: 'tbar' }, h('span', { class: 'grow' }, 'message.xlsx - Excel'), h('span', {}, '—  ▢  ✕')),
     h(
-      'aside',
-      { class: 'listcol' },
-      h('header', {}, h('h1', {}, title), h('span', { class: 'use' }, fmtBytes(totalBytes()))),
-      h('main', {}, errorText ? h('div', { class: 'err' }, errorText) : null, body),
+      'div',
+      { class: 'ribbon' },
+      ...['파일', '홈', '삽입', '수식', '데이터', '보기'].map((tab) =>
+        h('span', { class: tab === '홈' ? 'on' : '' }, tab),
+      ),
     ),
-    h('main', { class: 'detailcol' }, detail),
+    h(
+      'div',
+      { class: 'main' },
+      h('aside', { class: 'listcol' }, colHead(), h('main', { class: 'grid' }, body)),
+      h('main', { class: 'detailcol' }, detail),
+    ),
     h(
       'nav',
-      {},
+      { class: 'sheets' },
       h(
         'button',
         { class: section === 'chats' ? 'on' : '', onclick: () => go('chats') },
@@ -268,13 +281,20 @@ function shell(section: string, body: HTMLElement, detail: HTMLElement, inChat: 
         `친구${requests.incoming.length ? ` (${requests.incoming.length})` : ''}`,
       ),
       h('button', { class: section === 'profile' ? 'on' : '', onclick: () => go('profile') }, '내정보'),
+      h('span', {}, '+'),
+    ),
+    h(
+      'div',
+      { class: 'sbar' },
+      h('span', { class: errorText ? 'err' : '' }, errorText || '준비'),
+      h('span', { class: 'use' }, fmtBytes(totalBytes())),
     ),
   );
 }
 
-/** 데스크탑 빈 대화 컬럼 플레이스홀더 (모바일에선 CSS로 숨겨진다) */
+/** 데스크탑 빈 대화 컬럼 — 빈 시트처럼 보이게 (모바일에선 CSS로 숨겨진다) */
 function emptyView(): HTMLElement {
-  return h('div', { class: 'stat dim', style: 'margin:auto' }, '대화를 선택하세요');
+  return h('div', { class: 'col' }, colHead(), h('div', { class: 'blank' }));
 }
 
 /* ---------- 화면: 채팅 목록 ---------- */
@@ -288,14 +308,15 @@ function chatsView(): HTMLElement {
     list.append(
       h(
         'div',
-        { class: `row${conv.id === currentConv() ? ' on' : ''}`, onclick: () => go(`c/${conv.id}`) },
+        { class: `gr${conv.id === currentConv() ? ' on' : ''}`, onclick: () => go(`c/${conv.id}`) },
+        h('span', { class: 'el' }, h('b', {}, conv.peer.nickname)),
+        h('span', { class: 'el dim' }, previewText),
         h(
-          'div',
-          { class: 'grow' },
-          h('div', {}, h('b', {}, conv.peer.nickname), ' ', h('span', { class: 'dim' }, conv.last ? fmtTime(conv.last.ts) : '')),
-          h('div', { class: 'dim', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, previewText),
+          'span',
+          { class: 'cc' },
+          conv.unread ? h('span', { class: 'un' }, `${conv.unread} `) : null,
+          conv.last ? fmtTime(conv.last.ts) : '',
         ),
-        conv.unread ? h('span', { class: 'badge' }, String(conv.unread)) : null,
       ),
     );
   }
@@ -321,31 +342,36 @@ function friendsView(): HTMLElement {
       `/api/friends/search?q=${encodeURIComponent(query)}`,
     );
     results.replaceChildren();
-    if (users.length === 0) results.append(h('p', { class: 'dim', style: 'padding:8px 2px' }, '결과 없음'));
+    if (users.length === 0) results.append(h('p', { class: 'dim', style: 'padding:6px 2px' }, '결과 없음'));
     for (const user of users) {
       const relText: Record<string, string> = { self: '나', friends: '친구', pending_out: '요청됨', pending_in: '받은 요청' };
       results.append(
         h(
           'div',
-          { class: 'row', style: 'padding:8px 2px' },
-          h('div', { class: 'grow' }, h('b', {}, user.nickname), ' ', h('span', { class: 'dim' }, `@${user.username}`)),
+          { class: 'gr' },
+          h('span', { class: 'el' }, h('b', {}, user.nickname)),
+          h('span', { class: 'el dim' }, `@${user.username}`),
           user.rel === 'none'
             ? h(
-                'button',
-                {
-                  class: 'btn2',
-                  onclick: async () => {
-                    try {
-                      await req('/api/friends/requests', 'POST', { userId: user.id });
-                      // 전체 재렌더 대신 검색 결과만 갱신한다 (검색어/포커스 유지).
-                      await loadFriends();
-                      await doSearch();
-                    } catch (error) {
-                      showError(errMsg(error));
-                    }
+                'span',
+                {},
+                h(
+                  'button',
+                  {
+                    class: 'btn2',
+                    onclick: async () => {
+                      try {
+                        await req('/api/friends/requests', 'POST', { userId: user.id });
+                        // 전체 재렌더 대신 검색 결과만 갱신한다 (검색어/포커스 유지).
+                        await loadFriends();
+                        await doSearch();
+                      } catch (error) {
+                        showError(errMsg(error));
+                      }
+                    },
                   },
-                },
-                '친구 추가',
+                  '추가',
+                ),
               )
             : h('span', { class: 'dim' }, relText[user.rel] ?? ''),
         ),
@@ -355,50 +381,57 @@ function friendsView(): HTMLElement {
 
   const incoming = h('div', {});
   if (requests.incoming.length) {
-    incoming.append(h('p', { class: 'dim', style: 'padding:8px 14px 0' }, '받은 요청'));
+    incoming.append(h('p', { class: 'gh' }, '받은 요청'));
     for (const request of requests.incoming) {
       incoming.append(
         h(
           'div',
-          { class: 'row' },
-          h('div', { class: 'grow' }, h('b', {}, request.user.nickname), ' ', h('span', { class: 'dim' }, `@${request.user.username}`)),
+          { class: 'gr' },
+          h('span', { class: 'el' }, h('b', {}, request.user.nickname)),
+          h('span', { class: 'el dim' }, `@${request.user.username}`),
           h(
-            'button',
-            {
-              class: 'btn2',
-              style: 'background:#533afd;color:#fff',
-              onclick: async () => {
-                await req(`/api/friends/requests/${request.id}/respond`, 'POST', { accept: true });
-                await Promise.all([loadFriends(), loadConvs()]);
-                render();
+            'span',
+            {},
+            h(
+              'button',
+              {
+                class: 'btn2 my',
+                onclick: async () => {
+                  await req(`/api/friends/requests/${request.id}/respond`, 'POST', { accept: true });
+                  await Promise.all([loadFriends(), loadConvs()]);
+                  render();
+                },
               },
-            },
-            '수락',
-          ),
-          h(
-            'button',
-            {
-              class: 'btn2',
-              onclick: async () => {
-                await req(`/api/friends/requests/${request.id}/respond`, 'POST', { accept: false });
-                await loadFriends();
-                render();
+              '✓',
+            ),
+            ' ',
+            h(
+              'button',
+              {
+                class: 'btn2',
+                onclick: async () => {
+                  await req(`/api/friends/requests/${request.id}/respond`, 'POST', { accept: false });
+                  await loadFriends();
+                  render();
+                },
               },
-            },
-            '거절',
+              '✕',
+            ),
           ),
         ),
       );
     }
   }
 
-  const friendList = h('div', {}, h('p', { class: 'dim', style: 'padding:8px 14px 0' }, `친구 ${friends.length}`));
+  const friendList = h('div', {}, h('p', { class: 'gh' }, `친구 ${friends.length}`));
   for (const friend of friends) {
     friendList.append(
       h(
         'div',
-        { class: 'row', onclick: () => go(`c/${friend.c}`) },
-        h('div', { class: 'grow' }, h('b', {}, friend.user.nickname), ' ', h('span', { class: 'dim' }, `@${friend.user.username}`)),
+        { class: 'gr', onclick: () => go(`c/${friend.c}`) },
+        h('span', { class: 'el' }, h('b', {}, friend.user.nickname)),
+        h('span', { class: 'el dim' }, `@${friend.user.username}`),
+        h('span', {}),
       ),
     );
   }
@@ -406,7 +439,7 @@ function friendsView(): HTMLElement {
   return h(
     'div',
     {},
-    h('div', { style: 'padding:10px 14px 0' }, search, results),
+    h('div', { class: 'pad' }, search, results),
     incoming,
     friendList,
   );
@@ -417,22 +450,23 @@ function profileView(): HTMLElement {
   return h(
     'div',
     {},
-    h('div', { class: 'stat' }, h('b', {}, me?.nickname ?? ''), h('span', { class: 'dim' }, `@${me?.username}`)),
+    h('div', { class: 'gr' }, h('span', { class: 'dim' }, '이름'), h('span', { class: 'el' }, h('b', {}, me?.nickname ?? '')), h('span', {})),
+    h('div', { class: 'gr' }, h('span', { class: 'dim' }, '아이디'), h('span', { class: 'el' }, `@${me?.username}`), h('span', {})),
     h(
       'div',
-      { class: 'stat' },
-      h('span', { class: 'dim' }, '지금까지 사용한 데이터'),
-      h('b', {}, fmtBytes(totalBytes())),
-      h('button', { class: 'btn2', style: 'margin-top:6px', onclick: () => { resetBytes(); render(); } }, '측정 초기화'),
+      { class: 'gr' },
+      h('span', { class: 'dim' }, '사용 데이터'),
+      h('span', { class: 'use' }, fmtBytes(totalBytes())),
+      h('span', {}, h('button', { class: 'btn2', onclick: () => { resetBytes(); render(); } }, '초기화')),
     ),
     h(
       'div',
-      { style: 'padding:14px' },
+      { class: 'pad' },
       h(
         'button',
         {
-          class: 'btn',
-          style: 'background:#ea2261',
+          class: 'btn2',
+          style: 'width:100%',
           onclick: async () => {
             await req('/api/auth/logout', 'POST', {});
             stopSocket();
@@ -443,7 +477,7 @@ function profileView(): HTMLElement {
         '로그아웃',
       ),
     ),
-    h('p', { class: 'dim', style: 'text-align:center;padding:8px 14px' }, '서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.'),
+    h('p', { class: 'dim stat' }, '서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.'),
   );
 }
 
@@ -452,12 +486,15 @@ const QUICK_EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', 
 /** 재렌더 직전 포커스가 입력바 안에 있었으면, 새로 그린 입력창에 포커스를 복원한다.
     (전송 시 낙관적 렌더 + ack 렌더가 연달아 일어나도 포커스가 유지된다) */
 let keepBarFocus = false;
+/** IME(한글) 조합 중이면 재렌더를 미룬다 — DOM 교체가 조합 중인 글자를 날리기 때문 */
+let composing = false;
+let renderQueued = false;
 
 function chatView(convId: number): HTMLElement {
   const conv = convs.find((c) => c.id === convId);
   const list = msgs.get(convId) ?? [];
 
-  const msgList = h('div', { class: 'msgs' });
+  const msgList = h('div', { class: 'msgs grid' });
 
   // 과거 메시지 버튼 — 자동 로드 대신 명시적 버튼 (예상치 못한 데이터 사용 방지)
   if (hasMore.get(convId)) {
@@ -491,14 +528,13 @@ function chatView(convId: number): HTMLElement {
     }
   }
 
-  list.forEach((message, index) => {
+  list.forEach((message) => {
     const mine = message.s === me?.id;
-    const next = list[index + 1];
-    const isTail = !next || next.s !== message.s || next.ts - message.ts > 60;
 
-    let body: HTMLElement;
+    // 메시지 = 그리드 한 행: A 보낸이 / B 내용 / C 시간·읽음
+    let body: string | HTMLElement = message.x;
     if (message.k === 'i' && message.im) {
-      // 이미지: 크기를 보여주고 탭해야 로드한다 (데이터 절약 핵심 UX)
+      // 이미지: 크기를 보여주고 탭해야 로드한다 (데이터 절약 핵심 UX) — 하이퍼링크 셀처럼 보인다
       const image = message.im;
       body = h(
         'button',
@@ -508,32 +544,25 @@ function chatView(convId: number): HTMLElement {
             const btn = e.currentTarget as HTMLElement;
             const img = h('img', { src: `/img/${image.id}/thumb`, width: image.w, height: image.h, alt: '사진' });
             img.onclick = () => showImageOverlay(image);
-            const holder = h('div', { class: 'b imgb' }, img);
-            btn.replaceWith(holder);
+            btn.replaceWith(img);
           },
         },
         `[사진 ${fmtBytes(image.tb)}] 탭해서 보기`,
       );
-    } else if (message.k === 'e' || isEmojiOnly(message.x)) {
-      body = h('div', { class: 'b big' }, message.x);
-    } else {
-      body = h('div', { class: 'b' }, message.x);
     }
-
-    const meta = isTail
-      ? h(
-          'span',
-          { class: 'meta' },
-          mine && message.id > 0 && message.id === lastReadMine ? h('span', { class: 'rd' }, '읽음') : null,
-          fmtTime(message.ts),
-        )
-      : null;
 
     msgList.append(
       h(
         'div',
-        { class: `m${mine ? ' me' : ''}${message._i ? ' pend' : ''}`, style: isTail ? 'margin-bottom:7px' : '' },
-        ...(mine ? [meta, body] : [body, meta]),
+        { class: `gr${message._i ? ' pend' : ''}` },
+        h('span', { class: `el${mine ? ' my' : ''}` }, mine ? '나' : conv?.peer.nickname ?? ''),
+        h('span', { class: `cb${message.k === 'e' || isEmojiOnly(message.x) ? ' big' : ''}` }, body),
+        h(
+          'span',
+          { class: 'cc' },
+          mine && message.id > 0 && message.id === lastReadMine ? h('span', { class: 'rd' }, '읽음 ') : null,
+          fmtTime(message.ts),
+        ),
       ),
     );
   });
@@ -543,20 +572,33 @@ function chatView(convId: number): HTMLElement {
   // 입력 바
   const input = h('textarea', {
     rows: 1,
-    placeholder: '메시지',
     onkeydown: (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         submit();
       }
     },
+    oninput: () => drafts.set(convId, input.value),
+    oncompositionstart: () => {
+      composing = true;
+    },
+    oncompositionend: () => {
+      composing = false;
+      drafts.set(convId, input.value);
+      if (renderQueued) {
+        renderQueued = false;
+        render();
+      }
+    },
   });
-  const sendBtn = h('button', { class: 'send', onclick: () => submit() }, '↑');
+  input.value = drafts.get(convId) ?? '';
+  const sendBtn = h('button', { class: 'send', onclick: () => submit() }, '✓');
 
   function submit(): void {
     const text = input.value.trim();
     if (!text || !me) return;
     input.value = '';
+    drafts.delete(convId);
     const tempKey = `t${Date.now()}`;
     const optimistic: Msg = {
       id: -Date.now(), c: convId, s: me.id,
@@ -670,30 +712,42 @@ function chatView(convId: number): HTMLElement {
 
   const view = h(
     'div',
-    { style: 'display:flex;flex-direction:column;height:100%' },
+    { class: 'col' },
     h(
       'header',
       {},
-      h('button', { class: 'chat-back', onclick: () => go('chats'), style: 'font-size:20px;color:#533afd;padding:0 6px' }, '‹'),
+      h('button', { class: 'chat-back', onclick: () => go('chats') }, '‹'),
       h('h1', {}, conv?.peer.nickname ?? '대화'),
-      h('span', { class: 'use' }, fmtBytes(totalBytes())),
     ),
-    errorText ? h('div', { class: 'err' }, errorText) : null,
+    colHead(),
     msgList,
     h(
       'div',
       { class: 'emo' },
       ...QUICK_EMOJIS.map((emoji) =>
-        h('button', { onclick: () => { input.value += emoji; input.focus(); } }, emoji),
+        h('button', { onclick: () => { input.value += emoji; drafts.set(convId, input.value); input.focus(); } }, emoji),
       ),
     ),
-    h('div', { class: 'bar' }, h('button', { class: 'btn2', onclick: () => photoMenu() }, '사진'), file, input, sendBtn),
+    h(
+      'div',
+      { class: 'bar' },
+      h('span', { class: 'ref' }, `B${list.length + 1}`),
+      h('span', { class: 'fx' }, 'fx'),
+      file,
+      input,
+      sendBtn,
+      h('button', { class: 'btn2', onclick: () => photoMenu() }, '사진'),
+    ),
   );
 
   // 렌더 후 맨 아래로 스크롤 + (직전에 입력바에 있던) 포커스 복원
   requestAnimationFrame(() => {
     msgList.scrollTop = msgList.scrollHeight;
-    if (keepBarFocus) input.focus();
+    if (keepBarFocus) {
+      input.focus();
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    }
   });
   return view;
 }
@@ -716,6 +770,10 @@ function showImageOverlay(image: NonNullable<WireMessage['im']>): void {
 
 /* ---------- 렌더 ---------- */
 function render(): void {
+  if (composing) {
+    renderQueued = true;
+    return;
+  }
   const current = route();
   if (!me) {
     app.replaceChildren(current === 'signup' ? authView(true) : authView(false));

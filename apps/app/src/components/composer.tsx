@@ -13,7 +13,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { authHeaders, unwrap } from '@/lib/api';
 import { API_URL } from '@/lib/env';
 import { isEmojiOnly } from '@/lib/format';
-import { colors, rounded, spacing } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/theme';
+import { rounded, spacing } from '@/theme/tokens';
 import { EmojiPicker } from './emoji-picker';
 import { Glass } from './glass';
 
@@ -23,6 +24,8 @@ interface Props {
 }
 
 export function Composer({ onSend, onError }: Props) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [draft, setDraft] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -133,7 +136,7 @@ export function Composer({ onSend, onError }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   surface: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
@@ -185,4 +188,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 24,
   },
-});
+}));
