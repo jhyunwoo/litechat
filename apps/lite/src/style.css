@@ -59,7 +59,7 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 .mr .cc { flex: 0 0 auto; }
 .mine .cc { order: -1; margin-left: auto; }
 .cb { white-space: pre-wrap; word-break: break-word; border: 1px solid #d4d4d4; background: #fff; padding: 3px 8px; max-width: 80%; min-width: 0; }
-.mine .cb { border-color: #107c41; }
+.mine .cb { border-color: #9fcab3; }
 .cb.big { font-size: 18px; }
 .cc { color: #666; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 .rd { color: #107c41; }
