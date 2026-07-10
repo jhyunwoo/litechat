@@ -14,13 +14,14 @@
  * 지도가 비는 "조용한 실패"를 진단할 수 있도록, GeoIP DB 로드 상태와 위치 조회에
  * 실패한 IP 표본을 함께 보여준다(원인이 mmdb 누락인지 프록시 IP인지 한눈에 구분).
  */
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { AdvancedMarker, APIProvider, Circle, Map, Pin, useMap } from '@vis.gl/react-google-maps';
 import {
   adminApi,
   type AdminConfig,
   type GeoPoint,
   type GeoStatus,
+  type Insights,
   type InsightsResult,
   type SessionRow,
   type UserVisit,
@@ -78,12 +79,22 @@ export default function MapPage() {
   const [insightsError, setInsightsError] = useState('');
   const [target, setTarget] = useState<MapTarget | null>(null);
 
+  // Insights 상시 수집 대상 + 선택한 사용자의 수집된 Insights
+  const [watched, setWatched] = useState<Set<number>>(new Set());
+  const [watchBusy, setWatchBusy] = useState(false);
+  const [userInsights, setUserInsights] = useState<Insights[]>([]);
+
   useEffect(() => {
     void adminApi.geo(30).then(setPoints);
     void adminApi.geoStatus(30).then(setStatus);
     void adminApi.config().then(setConfig);
     void adminApi.usersVisits().then(setUsers);
+    void adminApi.watchList().then((r) => setWatched(new Set(r.watched)));
   }, []);
+
+  function loadUserInsights(userId: number) {
+    void adminApi.insightsByUser(userId).then((r) => setUserInsights(r.insights));
+  }
 
   function selectUser(user: UserVisit) {
     setSelectedUser(user);
@@ -91,6 +102,8 @@ export default function MapPage() {
     setInsights(null);
     setInsightsError('');
     setSessions([]);
+    setUserInsights([]);
+    loadUserInsights(user.userId);
     void adminApi
       .sessions({ userId: user.userId, pageSize: 100, sort: 'created_at', dir: 'desc' })
       .then((result) => {
@@ -99,6 +112,25 @@ export default function MapPage() {
         const located = result.rows.find((row) => row.lat !== null);
         if (located) setTarget({ lat: located.lat!, lng: located.lon!, zoom: 6 });
       });
+  }
+
+  /** 상시 수집 토글 — 켜면 서버가 최근 IP를 백필하므로 잠시 후 결과를 다시 불러온다 */
+  function toggleWatch(user: UserVisit) {
+    if (watchBusy) return;
+    setWatchBusy(true);
+    const isOn = watched.has(user.userId);
+    void (isOn ? adminApi.watchRemove(user.userId) : adminApi.watchAdd(user.userId))
+      .then(() => {
+        setWatched((prev) => {
+          const next = new Set(prev);
+          if (isOn) next.delete(user.userId);
+          else next.add(user.userId);
+          return next;
+        });
+        if (!isOn) setTimeout(() => loadUserInsights(user.userId), 4000);
+      })
+      .catch((err: Error) => setInsightsError(err.message))
+      .finally(() => setWatchBusy(false));
   }
 
   function selectSession(row: SessionRow) {
@@ -206,6 +238,11 @@ export default function MapPage() {
                     : 'text-ink-mute hover:bg-shell/60 hover:text-white'
                 }`}
               >
+                {watched.has(user.userId) && (
+                  <span className="mr-1 text-amber-400" title="Insights 상시 수집 중">
+                    ★
+                  </span>
+                )}
                 {user.nickname}
                 <span className="ml-1 text-xs opacity-70">@{user.username}</span>
                 <span className="tnum float-right text-xs opacity-70">{user.sessionCount}</span>
@@ -221,6 +258,55 @@ export default function MapPage() {
               ? `${selectedUser.nickname}의 접속 기록 (최근 ${sessions.length}건)`
               : '접속 기록 — 왼쪽에서 사용자를 선택하거나 지도의 핀을 클릭하세요'}
           </h2>
+
+          {selectedUser && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => toggleWatch(selectedUser)}
+                disabled={watchBusy}
+                className={`rounded-md border px-3 py-1.5 text-xs disabled:opacity-40 ${
+                  watched.has(selectedUser.userId)
+                    ? 'border-amber-400/60 text-amber-400'
+                    : 'border-hairline text-ink-mute hover:text-white'
+                }`}
+                title="켜면 이 사용자의 모든 새 접속에 대해 GeoIP2 Insights를 자동 수집합니다 (같은 IP는 1주 캐시 재사용)"
+              >
+                {watched.has(selectedUser.userId)
+                  ? '★ Insights 상시 수집 중 — 해제'
+                  : '☆ Insights 상시 수집 켜기'}
+              </button>
+              <span className="text-xs text-ink-mute">
+                수집된 Insights {userInsights.length}건
+              </span>
+            </div>
+          )}
+
+          {/* 이 사용자의 접속 IP에 대해 저장된 Insights — 클릭하면 상세 카드 + 지도 이동 */}
+          {selectedUser && userInsights.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {userInsights.map((row) => (
+                <button
+                  key={row.ip}
+                  onClick={() => {
+                    setInsights({ cached: true, stale: false, insights: row });
+                    if (row.lat !== null && row.lon !== null) {
+                      setTarget({ lat: row.lat, lng: row.lon, zoom: 11 });
+                    }
+                  }}
+                  className={`rounded-full border px-2.5 py-1 text-xs ${
+                    insights?.insights.ip === row.ip
+                      ? 'border-primary text-white'
+                      : 'border-hairline text-ink-mute hover:text-white'
+                  }`}
+                >
+                  <span className="tnum">{row.ip}</span>
+                  <span className="ml-1 opacity-70">
+                    {[row.city, row.country].filter(Boolean).join(', ') || '위치 없음'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {insightsError !== '' && (
             <p className="mb-3 rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">
@@ -315,9 +401,43 @@ function PointMarker({ point, max }: { point: GeoPoint; max: number }) {
   );
 }
 
-/** Insights 상세 카드 — ISP/조직/반경/캐시 여부 */
+/**
+ * Insights 원본 응답을 "키 경로 → 값" 목록으로 평탄화한다.
+ * names 다국어 객체는 ko(없으면 en) 하나만 남겨 노이즈를 줄인다.
+ */
+function flattenInsights(value: unknown, prefix: string, out: [string, string][]): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenInsights(item, `${prefix}[${index}]`, out));
+  } else if (value !== null && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (key === 'names' && child !== null && typeof child === 'object') {
+        const names = child as Record<string, string>;
+        out.push([
+          prefix ? `${prefix}.name` : 'name',
+          names.ko ?? names.en ?? Object.values(names)[0] ?? '',
+        ]);
+        continue;
+      }
+      flattenInsights(child, prefix ? `${prefix}.${key}` : key, out);
+    }
+  } else if (value !== undefined) {
+    out.push([prefix, String(value)]);
+  }
+}
+
+/** Insights 상세 카드 — 요약(ISP/조직/반경/캐시 여부) + 응답 전체 필드 */
 function InsightsCard({ result }: { result: InsightsResult }) {
   const i = result.insights;
+  // 저장된 원본 JSON 전문 → 모든 필드 (traits의 익명성 플래그, 대륙/등록 국가, 시간대 등 포함)
+  const fields = useMemo(() => {
+    try {
+      const out: [string, string][] = [];
+      flattenInsights(JSON.parse(i.data), '', out);
+      return out;
+    } catch {
+      return [] as [string, string][];
+    }
+  }, [i.data]);
   return (
     <div className="mb-3 rounded-md border border-hairline/70 bg-shell/40 px-4 py-3 text-xs">
       <div className="mb-2 flex items-center gap-2">
@@ -355,6 +475,24 @@ function InsightsCard({ result }: { result: InsightsResult }) {
           {i.organization ?? '—'}
         </span>
       </div>
+      {fields.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer select-none text-ink-mute hover:text-white">
+            전체 응답 필드 보기 ({fields.length})
+          </summary>
+          <div className="mt-2 grid gap-x-8 gap-y-0.5 sm:grid-cols-2">
+            {fields.map(([key, value], index) => (
+              <div
+                key={`${key}-${index}`}
+                className="flex justify-between gap-3 border-b border-hairline/30 py-1"
+              >
+                <span className="shrink-0 text-ink-mute">{key}</span>
+                <span className="tnum break-all text-right">{value}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

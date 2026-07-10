@@ -13,7 +13,8 @@ import type { AppDeps } from '../../deps';
 import { requireAdmin } from '../../middleware/admin-auth';
 import { probeGeoip } from '../analytics/geoip';
 import { geoipRefreshEnabled, geoipRefreshInfo, refreshGeoipDb } from '../analytics/geoip-updater';
-import { fetchInsights, normalizeIp } from '../analytics/insights';
+import { fetchInsights, INSIGHTS_TTL_SECONDS, normalizeIp } from '../analytics/insights';
+import { backfillUserInsights } from '../analytics/insights-collector';
 import type { AnalyticsService } from '../analytics/service';
 import { AdminRepo } from './repo';
 import {
@@ -123,7 +124,7 @@ export function adminRoutes(deps: AppDeps, analyticsService: AnalyticsService) {
       if (!ip) return c.json({ error: 'INVALID_IP' }, 400);
 
       const cachedRow = analyticsService.queries.getInsights(ip);
-      const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
+      const weekAgo = Math.floor(Date.now() / 1000) - INSIGHTS_TTL_SECONDS;
       if (cachedRow && cachedRow.fetchedAt >= weekAgo) {
         return c.json({ cached: true, stale: false, insights: cachedRow }, 200);
       }
@@ -135,6 +136,34 @@ export function adminRoutes(deps: AppDeps, analyticsService: AnalyticsService) {
       }
       analyticsService.queries.upsertInsights(result.row);
       return c.json({ cached: false, stale: false, insights: result.row }, 200);
+    })
+    /**
+     * Insights 상시 수집 대상(워치) — 등록된 사용자의 새 접속은 자동으로 Insights를
+     * 수집한다. 등록 즉시 최근 고유 IP 몇 개를 백그라운드로 백필해 바로 볼 수 있게 한다.
+     */
+    .get('/geoip/watch', requireAdmin(deps), (c) => {
+      return c.json({ watched: analyticsService.queries.listInsightsWatch() }, 200);
+    })
+    .post('/geoip/watch/:userId', requireAdmin(deps), (c) => {
+      const userId = Number(c.req.param('userId'));
+      if (!Number.isInteger(userId) || userId <= 0) return c.json({ error: 'INVALID_USER' }, 400);
+      analyticsService.queries.addInsightsWatch(userId);
+      void backfillUserInsights(deps.config, analyticsService.queries, userId).catch((err) =>
+        console.error('Insights 백필 실패:', err),
+      );
+      return c.json({ ok: true }, 200);
+    })
+    .delete('/geoip/watch/:userId', requireAdmin(deps), (c) => {
+      const userId = Number(c.req.param('userId'));
+      if (!Number.isInteger(userId) || userId <= 0) return c.json({ error: 'INVALID_USER' }, 400);
+      analyticsService.queries.removeInsightsWatch(userId);
+      return c.json({ ok: true }, 200);
+    })
+    // 사용자의 접속 IP들에 대해 저장된 Insights 전부 — 지도의 사용자 상세에 쓴다
+    .get('/geoip/insights/by-user/:userId', requireAdmin(deps), (c) => {
+      const userId = Number(c.req.param('userId'));
+      if (!Number.isInteger(userId) || userId <= 0) return c.json({ error: 'INVALID_USER' }, 400);
+      return c.json({ insights: analyticsService.queries.insightsForUser(userId) }, 200);
     })
     // 접속 기록 데이터 탐색기 — 개별 세션을 필터/정렬/페이지로 나열한다
     .get('/sessions', requireAdmin(deps), (c) => {

@@ -18,6 +18,7 @@ import { getSessionUserId } from '../auth/session';
 import { ensureVisitorCookies, hasVisitorCookies, type VisitorIdentity } from './cookies';
 import { clientIp } from './ip';
 import { lookupGeo } from './geoip';
+import { collectInsights } from './insights-collector';
 import { AnalyticsRepo } from './repo';
 
 export class AnalyticsService {
@@ -76,9 +77,16 @@ export class AnalyticsService {
         referrer: body.referrer ?? null,
         geo,
       });
+      this.collectIfWatched(userId, ip);
     } catch (err) {
       console.error('analytics.recordSession failed:', err);
     }
+  }
+
+  /** 워치 대상 사용자의 접속이면 Insights를 백그라운드로 수집한다 (1주 IP 캐시 준수) */
+  private collectIfWatched(userId: number | null, ip: string): void {
+    if (userId === null || !this.repo.isInsightsWatched(userId)) return;
+    void collectInsights(this.deps.config, this.repo, ip);
   }
 
   async recordEvent(c: Context<AppEnv>, body: AnalyticsEventInput): Promise<void> {
@@ -124,6 +132,7 @@ export class AnalyticsService {
         geo,
       });
       this.repo.insertEvent(identity.sessionId, path);
+      this.collectIfWatched(userId, ip);
     } catch (err) {
       console.error('analytics.recordLiteDocumentLoad failed:', err);
     }

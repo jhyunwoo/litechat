@@ -10,7 +10,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getActiveConversation } from '@/data/active-conversation';
 import { api, unwrap } from './api';
 
@@ -75,10 +75,22 @@ export async function isPushEnabled(): Promise<boolean> {
 /**
  * 알림 탭 → 대화방 딥링크. 루트 레이아웃에서 한 번 마운트한다.
  * 콜드 스타트(종료 상태에서 알림 탭으로 실행)도 처리한다.
+ *
+ * @param ready 내비게이터(Stack)가 마운트된 뒤에만 true — 그 전의 push는 유실된다.
  */
-export function useNotificationDeepLink(): void {
+export function useNotificationDeepLink(ready: boolean): void {
+  // iOS는 리스너가 붙기 전에 도착한 알림 응답을 리스너가 붙는 순간 다시 쏜다
+  // (expo/expo#34850). getLastNotificationResponse와 리스너가 같은 응답을 두 번
+  // 전달하면 같은 방이 두 번 push되고, 그 리마운트가 막 입력을 시작한 컴포저
+  // (키보드·초안)를 날린다 → 알림 ID로 응답당 한 번만 연다.
+  const handledId = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!ready) return;
+
     function open(notification: Notifications.Notification) {
+      if (notification.request.identifier === handledId.current) return;
+      handledId.current = notification.request.identifier;
       const conversationId = notification.request.content.data?.c;
       if (typeof conversationId === 'number') {
         router.push(`/chat/${conversationId}`);
@@ -92,7 +104,7 @@ export function useNotificationDeepLink(): void {
       open(response.notification),
     );
     return () => subscription.remove();
-  }, []);
+  }, [ready]);
 }
 
 /**

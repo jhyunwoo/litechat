@@ -187,5 +187,11 @@ export const adminApi = {
   },
   insights: (ip: string) =>
     request<InsightsResult>(`/geoip/insights/${encodeURIComponent(ip)}`, { method: 'POST' }),
+  insightsByUser: (userId: number) =>
+    request<{ insights: Insights[] }>(`/geoip/insights/by-user/${userId}`),
+  watchList: () => request<{ watched: number[] }>('/geoip/watch'),
+  watchAdd: (userId: number) => request<{ ok: true }>(`/geoip/watch/${userId}`, { method: 'POST' }),
+  watchRemove: (userId: number) =>
+    request<{ ok: true }>(`/geoip/watch/${userId}`, { method: 'DELETE' }),
   geoipRefresh: () => request<GeoipRefreshInfo>('/geoip/refresh', { method: 'POST' }),
 };

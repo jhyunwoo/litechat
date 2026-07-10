@@ -52,14 +52,19 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 .gh { background: #e8e8e8; border-bottom: 1px solid #d4d4d4; padding: 3px 8px; font-size: 11px; color: #555; }
 .el { white-space: nowrap; text-overflow: ellipsis; }
 .my { color: #107c41; font-weight: 600; }
-.cb { white-space: pre-wrap; word-break: break-word; }
+/* 메시지 행 — 상대 왼쪽 / 내 것 오른쪽, 시간은 셀 바로 옆 */
+.mr { display: flex; align-items: baseline; gap: 5px; margin-bottom: 4px; }
+.mr .cc { flex: 0 0 auto; }
+.mine .cc { order: -1; margin-left: auto; }
+.cb { white-space: pre-wrap; word-break: break-word; border: 1px solid #d4d4d4; background: #fff; padding: 3px 8px; max-width: 80%; min-width: 0; }
+.mine .cb { border-color: #107c41; }
 .cb.big { font-size: 18px; }
 .cc { color: #666; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 .rd { color: #107c41; }
 .un { color: #c00; font-weight: 700; }
 .pend { opacity: .55; }
-/* 빈 시트 배경 — 반복 그라데이션으로 빈 행 눈금 표현 */
-.blank, .msgs, .listcol main { background: repeating-linear-gradient(#fff 0 21px, #d4d4d4 21px 22px); }
+/* 빈 시트 배경 — 반복 그라데이션으로 빈 행 눈금 표현 (채팅방은 어지러워 제외) */
+.blank, .listcol main { background: repeating-linear-gradient(#fff 0 21px, #d4d4d4 21px 22px); }
 .blank { flex: 1; }
 
 /* 컨트롤 */
@@ -76,7 +81,7 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid #d4d4d4; background: #f9f9f9; }
 header h1 { font-size: 13px; font-weight: 600; color: #444; flex: 1; }
 .chat-back { font-size: 16px; color: #555; padding: 0 6px; }
-.msgs { flex: 1; overflow-y: auto; min-height: 0; }
+.msgs { flex: 1; overflow-y: auto; min-height: 0; padding: 6px; }
 /* 이미지 메시지 = 하이퍼링크 셀처럼 */
 .imgbtn { color: #0563c1; text-decoration: underline; font-size: 12px; text-align: left; }
 .cb img { max-width: 100%; max-height: 120px; height: auto; display: block; }

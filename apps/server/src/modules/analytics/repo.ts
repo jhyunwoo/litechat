@@ -303,6 +303,59 @@ export class AnalyticsRepo {
       );
   }
 
+  // ── Insights 상시 수집(워치) ─────────────────────────────
+
+  addInsightsWatch(userId: number): void {
+    this.db
+      .query('INSERT INTO insights_watch (user_id, created_at) VALUES (?, ?) ON CONFLICT DO NOTHING')
+      .run(userId, Math.floor(Date.now() / 1000));
+  }
+
+  removeInsightsWatch(userId: number): void {
+    this.db.query('DELETE FROM insights_watch WHERE user_id = ?').run(userId);
+  }
+
+  isInsightsWatched(userId: number): boolean {
+    return (
+      this.db.query<{ user_id: number }, [number]>('SELECT user_id FROM insights_watch WHERE user_id = ?').get(userId) !==
+      null
+    );
+  }
+
+  listInsightsWatch(): number[] {
+    return this.db
+      .query<{ userId: number }, []>('SELECT user_id AS userId FROM insights_watch ORDER BY created_at')
+      .all()
+      .map((row) => row.userId);
+  }
+
+  /** 사용자의 최근 고유 IP — 워치 등록 직후 백필 대상 (최근 접속 순) */
+  recentUserIps(userId: number, limit: number): string[] {
+    return this.db
+      .query<{ ip: string }, [number, number]>(
+        `SELECT ip FROM analytics_sessions WHERE user_id = ?
+         GROUP BY ip ORDER BY MAX(last_seen_at) DESC LIMIT ?`,
+      )
+      .all(userId, limit)
+      .map((row) => row.ip);
+  }
+
+  /** 사용자의 접속 IP들에 대해 저장된 Insights 전부 — 세션 ip는 ::ffff: 접두사가 붙을 수 있어 정규화해 조인한다 */
+  insightsForUser(userId: number): InsightsRow[] {
+    return this.db
+      .query<InsightsRow, [number]>(
+        `SELECT gi.ip, gi.fetched_at AS fetchedAt, gi.lat, gi.lon,
+                gi.accuracy_radius AS accuracyRadius, gi.city, gi.region, gi.country,
+                gi.isp, gi.organization, gi.user_type AS userType, gi.data
+         FROM geoip_insights gi
+         WHERE gi.ip IN (
+           SELECT DISTINCT REPLACE(ip, '::ffff:', '') FROM analytics_sessions WHERE user_id = ?
+         )
+         ORDER BY gi.fetched_at DESC`,
+      )
+      .all(userId);
+  }
+
   userVisitCounts(): {
     userId: number;
     username: string;

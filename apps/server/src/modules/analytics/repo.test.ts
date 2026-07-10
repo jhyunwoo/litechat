@@ -92,3 +92,51 @@ describe('geoip_insights 캐시', () => {
     expect(second?.accuracyRadius).toBe(5);
   });
 });
+
+describe('insights_watch', () => {
+  const insightsRow = (ip: string, fetchedAt: number) => ({
+    ip, fetchedAt, lat: 0, lon: 0, accuracyRadius: null,
+    city: null, region: null, country: null, isp: null, organization: null, userType: null,
+    data: '{}',
+  });
+
+  test('등록/해제/조회 — 중복 등록은 무시된다', () => {
+    const repo = seed(openTestDatabase());
+    expect(repo.isInsightsWatched(1)).toBe(false);
+
+    repo.addInsightsWatch(1);
+    repo.addInsightsWatch(1); // 중복
+    repo.addInsightsWatch(2);
+    expect(repo.isInsightsWatched(1)).toBe(true);
+    expect(repo.listInsightsWatch()).toEqual([1, 2]);
+
+    repo.removeInsightsWatch(1);
+    expect(repo.isInsightsWatched(1)).toBe(false);
+    expect(repo.listInsightsWatch()).toEqual([2]);
+  });
+
+  test('recentUserIps — 고유 IP를 최근 접속 순으로 제한 개수만큼', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    // s1(1.1.1.1, last_seen 2000), s2(2.2.2.2, 2001) 모두 user 1 — s2가 최신
+    expect(repo.recentUserIps(1, 10)).toEqual(['2.2.2.2', '1.1.1.1']);
+    expect(repo.recentUserIps(1, 1)).toEqual(['2.2.2.2']);
+    expect(repo.recentUserIps(999, 10)).toEqual([]);
+  });
+
+  test('insightsForUser — 세션의 ::ffff: IP도 정규화해 조인한다', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    db.query(
+      `INSERT INTO analytics_sessions
+         (id, visitor_id, user_id, platform, ip, user_agent, created_at, last_seen_at)
+       VALUES ('s5', 'v-s5', 1, 'web', '::ffff:4.4.4.4', 'UA', 1010, 2010)`,
+    ).run();
+    repo.upsertInsights(insightsRow('1.1.1.1', 100)); // user 1의 s1
+    repo.upsertInsights(insightsRow('4.4.4.4', 300)); // user 1의 s5 (mapped)
+    repo.upsertInsights(insightsRow('3.3.3.3', 200)); // 비로그인 세션 — 제외
+
+    expect(repo.insightsForUser(1).map((r) => r.ip)).toEqual(['4.4.4.4', '1.1.1.1']);
+    expect(repo.insightsForUser(2)).toEqual([]);
+  });
+});

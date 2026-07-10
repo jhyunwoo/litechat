@@ -37,8 +37,8 @@ function Root() {
 
   // 실시간 프레임 → 캐시 반영 (로그인 트리 전체에서 한 번만)
   useRealtimeSync();
-  // 알림 탭 → 대화방 딥링크 (콜드 스타트 포함)
-  useNotificationDeepLink();
+  // 알림 탭 → 대화방 딥링크 (콜드 스타트 포함) — Stack이 마운트된 뒤에만 push
+  useNotificationDeepLink(ready);
   // OTA 업데이트 — 포그라운드 복귀 시 백그라운드 다운로드, 다음 실행에 적용
   useOTAUpdates();
   // 사용자 분석 — 콜드 스타트/포그라운드 복귀/화면 전환마다 접속 정보를 기록한다

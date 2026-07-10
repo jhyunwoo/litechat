@@ -174,4 +174,13 @@ export const MIGRATIONS: string[] = [
     data            TEXT    NOT NULL                -- 원본 JSON 응답 전문
   );
   `,
+
+  // v4 → v5: Insights 상시 수집 대상 사용자 — 여기 등록된 사용자의 새 접속은
+  // (1주 IP 캐시를 지키면서) GeoIP2 Insights를 자동으로 수집해 저장한다
+  `
+  CREATE TABLE insights_watch (
+    user_id    INTEGER PRIMARY KEY,
+    created_at INTEGER NOT NULL
+  );
+  `,
 ];

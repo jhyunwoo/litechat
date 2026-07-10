@@ -6,9 +6,13 @@
  *  - 결과를 geoip_insights 테이블에 저장해 1주 안의 재조회는 캐시로 응답한다
  *    (캐시 판정은 admin 라우트에서 fetched_at으로 수행).
  */
+import { isIP } from 'node:net';
 import type { AppConfig } from '../../config';
 
 const INSIGHTS_URL = 'https://geoip.maxmind.com/geoip/v2.1/insights/';
+
+/** 같은 IP의 Insights 결과를 재사용하는 기간 (1주) — 이 안에는 API를 부르지 않는다 */
+export const INSIGHTS_TTL_SECONDS = 7 * 86400;
 
 /** geoip_insights 테이블 한 행 — 대시보드에 그대로 내려준다 */
 export interface InsightsRow {
@@ -41,9 +45,15 @@ export type InsightsResult =
   | { ok: true; row: InsightsRow }
   | { ok: false; error: string; status?: number };
 
-/** IPv6-mapped IPv4(::ffff:1.2.3.4)를 정규화한다 — API와 캐시 키 양쪽에 사용 */
+/**
+ * IPv6-mapped IPv4(::ffff:1.2.3.4)를 정규화한다 — API와 캐시 키 양쪽에 사용.
+ *
+ * 세션 IP는 클라이언트가 보낸 X-Forwarded-For에서 오므로(ip.ts) 형식을 신뢰할 수 없다.
+ * IP가 아니면 빈 문자열을 돌려주고, 호출부는 이를 무효로 보고 유료 API 호출을 건너뛴다.
+ */
 export function normalizeIp(ip: string): string {
-  return ip.replace(/^::ffff:/i, '');
+  const normalized = ip.replace(/^::ffff:/i, '');
+  return isIP(normalized) === 0 ? '' : normalized;
 }
 
 export async function fetchInsights(config: AppConfig, ip: string): Promise<InsightsResult> {

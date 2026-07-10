@@ -494,7 +494,7 @@ function chatView(convId: number): HTMLElement {
   const conv = convs.find((c) => c.id === convId);
   const list = msgs.get(convId) ?? [];
 
-  const msgList = h('div', { class: 'msgs grid' });
+  const msgList = h('div', { class: 'msgs' });
 
   // 과거 메시지 버튼 — 자동 로드 대신 명시적 버튼 (예상치 못한 데이터 사용 방지)
   if (hasMore.get(convId)) {
@@ -551,11 +551,11 @@ function chatView(convId: number): HTMLElement {
       );
     }
 
+    // 상대는 왼쪽, 내 메시지는 오른쪽(활성 셀처럼 녹색 테두리) — 시간은 셀 바로 옆
     msgList.append(
       h(
         'div',
-        { class: `gr${message._i ? ' pend' : ''}` },
-        h('span', { class: `el${mine ? ' my' : ''}` }, mine ? '나' : conv?.peer.nickname ?? ''),
+        { class: `mr${mine ? ' mine' : ''}${message._i ? ' pend' : ''}` },
         h('span', { class: `cb${message.k === 'e' || isEmojiOnly(message.x) ? ' big' : ''}` }, body),
         h(
           'span',
@@ -719,7 +719,6 @@ function chatView(convId: number): HTMLElement {
       h('button', { class: 'chat-back', onclick: () => go('chats') }, '‹'),
       h('h1', {}, conv?.peer.nickname ?? '대화'),
     ),
-    colHead(),
     msgList,
     h(
       'div',
