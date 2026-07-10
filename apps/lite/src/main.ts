@@ -719,6 +719,7 @@ function chatView(convId: number): HTMLElement {
       h('button', { class: 'chat-back', onclick: () => go('chats') }, '‹'),
       h('h1', {}, conv?.peer.nickname ?? '대화'),
     ),
+    colHead(),
     msgList,
     h(
       'div',
