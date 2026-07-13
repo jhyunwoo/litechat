@@ -46,7 +46,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   // Web Push(브라우저/PWA)와 Expo Push(네이티브 앱)를 하나의 훅으로 합성한다.
   const notificationLogRepo = new NotificationLogRepo(deps.db);
   const pushService = new PushService(deps, notificationLogRepo, options.pushSender);
-  const expoPushService = new ExpoPushService(deps, options.expoPushSender);
+  const expoPushService = new ExpoPushService(deps, notificationLogRepo, options.expoPushSender);
   const offlineHook: typeof pushService.offlineHook = (peerId, sender, message) => {
     pushService.offlineHook(peerId, sender, message);
     expoPushService.offlineHook(peerId, sender, message);

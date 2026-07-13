@@ -8,6 +8,7 @@ import { createApp, type AppType } from '../../app';
 import { createTestDeps, type AppDeps } from '../../deps';
 import { fakeSocket, jsonRequest, signup } from '../../test/helpers';
 import type { ExpoPushMessage, ExpoPushSender } from './expo-service';
+import { NotificationLogRepo } from './notification-log-repo';
 
 const TOKEN = 'ExponentPushToken[bob-iphone-000000000000]';
 
@@ -151,6 +152,21 @@ describe('오프라인 Expo 푸시 발송', () => {
     expect(sent).toHaveLength(0);
   });
 
+  test('발송 성공 시 notification_log에 expo 채널로 기록되고 영수증 대기 상태가 된다', async () => {
+    await registerBob();
+    await aliceSends('기록됨');
+
+    const log = new NotificationLogRepo(deps.db);
+    const { rows } = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 });
+    expect(rows[0]).toMatchObject({
+      userId: bob.user.id,
+      channel: 'expo',
+      sentStatus: 'ok',
+      bodyPreview: '기록됨',
+      receiptStatus: 'pending',
+    });
+  });
+
   test('DeviceNotRegistered 티켓을 받으면 토큰이 삭제된다', async () => {
     let calls = 0;
     const failing: ExpoPushSender = async (messages) => {
@@ -192,6 +208,10 @@ describe('오프라인 Expo 푸시 발송', () => {
     await send();
     await new Promise((r) => setTimeout(r, 10));
     expect(calls).toBe(1);
+
+    const log = new NotificationLogRepo(deps.db);
+    const { rows } = log.list({ sort: 'sent_at', dir: 'desc', limit: 10, offset: 0 });
+    expect(rows.filter((r) => r.sentStatus === 'expired')).toHaveLength(1);
   });
 
   test('웹푸시와 Expo 푸시 훅이 함께 동작한다', async () => {

@@ -9,6 +9,7 @@
 import type { AppDeps } from '../../deps';
 import type { OfflineMessageHook } from '../chat/service';
 import { ExpoPushRepo } from './expo-repo';
+import { NotificationLogRepo } from './notification-log-repo';
 import { previewOf } from './preview';
 
 /** Expo Push API 요청 메시지 */
@@ -16,8 +17,8 @@ export interface ExpoPushMessage {
   to: string;
   title: string;
   body: string;
-  /** 알림 탭 시 딥링크에 쓰는 데이터 — c: 대화방 ID */
-  data: { c: number };
+  /** 알림 탭 시 딥링크에 쓰는 데이터 — c: 대화방 ID, n: notification_log.id(ACK용) */
+  data: { c: number; n: number };
   sound: 'default';
   /** iOS 앱 아이콘 배지 수 (전체 안읽음) */
   badge: number;
@@ -60,11 +61,10 @@ function createExpoSender(accessToken: string): ExpoPushSender {
 export class ExpoPushService {
   private repo: ExpoPushRepo;
   private sender: ExpoPushSender;
-  /** 영수증 확인 대기 중인 티켓: id → { token, at } */
-  private pendingReceipts = new Map<string, { token: string; at: number }>();
 
   constructor(
     private deps: AppDeps,
+    private log: NotificationLogRepo,
     sender?: ExpoPushSender,
   ) {
     this.repo = new ExpoPushRepo(deps.db);
@@ -103,11 +103,14 @@ export class ExpoPushService {
     }
 
     const badge = this.repo.countUnread(userId);
-    const messages: ExpoPushMessage[] = rows.map((row) => ({
+    const logIds = rows.map(() =>
+      this.log.insert({ userId, channel: 'expo', conversationId, bodyPreview: body }),
+    );
+    const messages: ExpoPushMessage[] = rows.map((row, i) => ({
       to: row.token,
       title,
       body,
-      data: { c: conversationId },
+      data: { c: conversationId, n: logIds[i]! },
       sound: 'default',
       badge,
     }));
@@ -118,23 +121,29 @@ export class ExpoPushService {
       let ok = 0;
       tickets.forEach((ticket, index) => {
         const token = rows[index]?.token;
-        if (!token) return;
+        const logId = logIds[index];
+        if (!token || logId === undefined) return;
         if (ticket.status === 'error') {
           if (ticket.details?.error === 'DeviceNotRegistered') {
-            // 앱 삭제 등으로 무효해진 토큰 — 더 이상 보낼 수 없으니 정리한다.
             this.repo.deleteByToken(token);
+            this.log.markFailed(logId, 'expired', 'DeviceNotRegistered');
             console.log(`[expo-push] user=${userId} pruned unregistered token`);
           } else {
+            this.log.markFailed(logId, 'error', ticket.details?.error ?? ticket.message ?? 'unknown');
             console.error(`[expo-push] user=${userId} ticket error: ${ticket.details?.error}`);
           }
         } else {
           ok += 1;
           // APNs 단계의 실패(DeviceNotRegistered)는 영수증으로만 알 수 있다.
-          if (ticket.id) this.pendingReceipts.set(ticket.id, { token, at: Date.now() });
+          if (ticket.id) this.log.markTicketPending(logId, ticket.id, token);
         }
       });
       console.log(`[expo-push] user=${userId} done: ok=${ok}/${tickets.length}`);
     } catch (error) {
+      // 발송 요청 자체가 실패 — 이번에 만든 로그 행 전부를 실패로 마감한다.
+      for (const logId of logIds) {
+        this.log.markFailed(logId, 'error', String((error as Error)?.message ?? error));
+      }
       console.error(`[expo-push] user=${userId} send failed:`, error);
     }
 
@@ -142,10 +151,9 @@ export class ExpoPushService {
     await this.checkPendingReceipts();
   }
 
-  /** 15분 이상 지난 티켓의 영수증을 확인하고 무효 토큰을 정리한다. */
+  /** 15분 이상 지난 로그의 영수증을 확인하고 무효 토큰을 정리한다. */
   private async checkPendingReceipts(): Promise<void> {
-    const now = Date.now();
-    const due = [...this.pendingReceipts.entries()].filter(([, v]) => now - v.at > RECEIPT_DELAY_MS);
+    const due = this.log.listPendingExpoReceipts(RECEIPT_DELAY_MS);
     if (due.length === 0) return;
 
     try {
@@ -157,19 +165,22 @@ export class ExpoPushService {
             ? { Authorization: `Bearer ${this.deps.config.expoPushAccessToken}` }
             : {}),
         },
-        body: JSON.stringify({ ids: due.map(([id]) => id) }),
+        body: JSON.stringify({ ids: due.map((d) => d.expoTicketId) }),
       });
       if (!res.ok) return;
       const { data } = (await res.json()) as {
         data: Record<string, { status: 'ok' | 'error'; details?: { error?: string } }>;
       };
-      for (const [id, { token }] of due) {
-        const receipt = data[id];
-        if (receipt?.details?.error === 'DeviceNotRegistered') {
-          this.repo.deleteByToken(token);
+      for (const { id: logId, expoTicketId, expoToken } of due) {
+        const receipt = data[expoTicketId];
+        if (!receipt) continue;
+        if (receipt.details?.error === 'DeviceNotRegistered') {
+          this.repo.deleteByToken(expoToken);
+          this.log.markReceiptDeviceGone(logId);
           console.log('[expo-push] pruned token via receipt');
+        } else {
+          this.log.updateReceiptStatus(logId, receipt.status);
         }
-        this.pendingReceipts.delete(id);
       }
     } catch (error) {
       // 영수증 확인 실패는 다음 발송 때 재시도된다.
