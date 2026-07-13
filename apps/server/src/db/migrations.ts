@@ -183,4 +183,31 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+
+  // v5 → v6: 알림 발송/수신 로그 — 웹/앱 푸시가 실제로 나갔는지, 클라이언트가 받았는지 추적한다
+  `
+  -- 발송 시도 하나당 한 행. channel로 web/expo를 구분해 하나의 테이블로 통합한다
+  -- (analytics_sessions가 platform 컬럼으로 web/lite/app을 통합하는 것과 같은 패턴).
+  CREATE TABLE notification_log (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id            INTEGER NOT NULL REFERENCES users(id),   -- 수신자
+    channel            TEXT    NOT NULL CHECK (channel IN ('web', 'expo')),
+    conversation_id    INTEGER REFERENCES conversations(id),
+    body_preview       TEXT    NOT NULL DEFAULT '',             -- previewOf() 결과 (디버깅용)
+    sent_at            INTEGER NOT NULL,
+    sent_status        TEXT    NOT NULL CHECK (sent_status IN ('ok', 'error', 'expired')),
+    sent_error         TEXT,                                    -- 실패 사유 (nullable)
+    -- Expo 전용: APNs 접수 확인(영수증). web은 확인 API가 없어 항상 NULL.
+    receipt_status     TEXT    CHECK (receipt_status IN ('pending', 'ok', 'error')),
+    receipt_checked_at INTEGER,
+    expo_ticket_id     TEXT,                                    -- Expo 티켓 id (영수증 확인용 상관키)
+    expo_token         TEXT,                                    -- 영수증이 DeviceNotRegistered일 때 토큰 정리용
+    -- 클라이언트 ACK(서비스워커 push 핸들러 / addNotificationReceivedListener)가 채운다.
+    -- 클라이언트 프로세스가 완전히 종료된 상태로 도착한 알림은 영영 NULL로 남는다(플랫폼 한계).
+    received_at        INTEGER,
+    received_meta      TEXT                                     -- ACK 요청의 User-Agent 등 (선택)
+  );
+  CREATE INDEX ix_notification_log_user ON notification_log (user_id, sent_at);
+  CREATE INDEX ix_notification_log_sent ON notification_log (sent_at);
+  `,
 ];
