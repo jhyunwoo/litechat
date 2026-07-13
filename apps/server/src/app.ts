@@ -19,6 +19,7 @@ import { friendsRoutes } from './modules/friends/routes';
 import { imagesRoutes, imgRoutes } from './modules/images/routes';
 import { ImagesService } from './modules/images/service';
 import { ExpoPushService, type ExpoPushSender } from './modules/push/expo-service';
+import { NotificationLogRepo } from './modules/push/notification-log-repo';
 import { pushRoutes } from './modules/push/routes';
 import { PushService, type PushSender } from './modules/push/service';
 import { wsRoutes } from './ws/routes';
@@ -43,7 +44,8 @@ export interface CreateAppOptions {
 export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   // 상대가 오프라인일 때 푸시를 쏘는 훅을 ChatService에 주입한다.
   // Web Push(브라우저/PWA)와 Expo Push(네이티브 앱)를 하나의 훅으로 합성한다.
-  const pushService = new PushService(deps, options.pushSender);
+  const notificationLogRepo = new NotificationLogRepo(deps.db);
+  const pushService = new PushService(deps, notificationLogRepo, options.pushSender);
   const expoPushService = new ExpoPushService(deps, options.expoPushSender);
   const offlineHook: typeof pushService.offlineHook = (peerId, sender, message) => {
     pushService.offlineHook(peerId, sender, message);

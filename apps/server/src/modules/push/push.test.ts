@@ -8,6 +8,7 @@ import { createApp, type AppType } from '../../app';
 import { createTestDeps, type AppDeps } from '../../deps';
 import { fakeSocket, jsonRequest, signup } from '../../test/helpers';
 import type { PushSender } from './service';
+import { NotificationLogRepo } from './notification-log-repo';
 
 let deps: AppDeps;
 let sent: { endpoint: string; payload: Record<string, unknown> }[];
@@ -103,6 +104,20 @@ describe('오프라인 푸시 발송', () => {
     expect(sent[0]?.payload.body).toBe('텍스트');
   });
 
+  test('발송 성공 시 notification_log에 ok로 기록된다', async () => {
+    await subscribeBob();
+    await aliceSends('기록됨');
+
+    const log = new NotificationLogRepo(deps.db);
+    const { rows } = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 });
+    expect(rows[0]).toMatchObject({
+      userId: bob.user.id,
+      channel: 'web',
+      sentStatus: 'ok',
+      bodyPreview: '기록됨',
+    });
+  });
+
   test('만료된 구독(410)은 자동으로 삭제된다', async () => {
     await subscribeBob();
     // 다음 발송이 410으로 실패하도록 sender를 바꾼다.
@@ -137,6 +152,11 @@ describe('오프라인 푸시 발송', () => {
     });
     await new Promise((r) => setTimeout(r, 10));
     expect(calls).toBe(1);
+
+    // 실패한 발송도 로그에는 expired로 남는다 (조용히 사라지지 않는다).
+    const log = new NotificationLogRepo(deps.db);
+    const { rows } = log.list({ sort: 'sent_at', dir: 'desc', limit: 10, offset: 0 });
+    expect(rows.filter((r) => r.sentStatus === 'expired')).toHaveLength(1);
   });
 });
 
