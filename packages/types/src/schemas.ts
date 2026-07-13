@@ -112,6 +112,15 @@ export const expoPushUnregisterSchema = z.object({
   token: expoPushTokenSchema,
 });
 
+/**
+ * 클라이언트 알림 수신 ACK — 서비스워커 push 핸들러 / Expo
+ * addNotificationReceivedListener가 보낸다. n은 notification_log.id.
+ */
+export const pushAckSchema = z.object({
+  n: z.number().int().positive(),
+});
+export type PushAckInput = z.infer<typeof pushAckSchema>;
+
 /** 분석 클라이언트가 보내는 방문자/세션 상관관계 키 — 쿠키가 없는 앱 클라이언트만 사용 */
 const analyticsCorrelationSchema = {
   visitorId: z.string().uuid().optional(),
