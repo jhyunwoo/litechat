@@ -1,8 +1,13 @@
 /**
- * 개요 — KPI 카드 + 방문/이벤트 시계열
+ * 개요 — KPI 카드 + 방문/이벤트 시계열 + 플랫폼 분포
+ *
+ * 와이드 화면 활용: KPI를 한 행(최대 6칸)으로 펼치고, 시계열(2/3)과
+ * 플랫폼 막대(1/3)를 나란히 배치한다.
  */
 import { useEffect, useState } from 'react';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -13,6 +18,7 @@ import {
   YAxis,
 } from 'recharts';
 import { adminApi, type Overview, type TimeseriesPoint } from '../api';
+import { chart, tooltipLabelStyle, tooltipStyle } from '../chart';
 import { KpiCard } from '../components/KpiCard';
 
 export default function OverviewPage() {
@@ -26,46 +32,69 @@ export default function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="전체 세션 (30일)" value={overview?.sessions ?? '–'} />
         <KpiCard label="순 방문자 (30일)" value={overview?.visitors ?? '–'} />
         <KpiCard label="로그인 세션" value={overview?.loggedInSessions ?? '–'} />
-        <KpiCard
-          label="플랫폼"
-          value={overview?.byPlatform.map((p) => `${p.platform} ${p.count}`).join(' · ') ?? '–'}
-        />
+        {/* 플랫폼별 세션 — 한 칸에 욱여넣던 것을 카드 하나씩으로 펼친다 */}
+        {(overview?.byPlatform ?? []).map((p) => (
+          <KpiCard key={p.platform} label={`${p.platform} 세션`} value={p.count} />
+        ))}
       </div>
 
-      <div className="rounded-xl border border-hairline bg-card p-5">
-        <h2 className="mb-4 text-sm text-ink-mute">일별 방문/이벤트 추이 (30일)</h2>
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={series} margin={{ left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#34366e" />
-            <XAxis dataKey="day" stroke="#a3a6d1" fontSize={12} />
-            <YAxis stroke="#a3a6d1" fontSize={12} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ background: '#24275f', border: '1px solid #34366e', borderRadius: 8 }}
-              labelStyle={{ color: '#ffffff' }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="sessions"
-              name="세션"
-              stroke="#8b7bff"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="events"
-              name="이벤트(페이지뷰)"
-              stroke="#1f9d6e"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-hairline bg-card p-5 xl:col-span-2">
+          <h2 className="mb-4 text-sm text-ink-mute">일별 방문/이벤트 추이 (30일)</h2>
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={series} margin={{ left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="day" stroke={chart.axis} fontSize={12} />
+              <YAxis stroke={chart.axis} fontSize={12} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="sessions"
+                name="세션"
+                stroke={chart.series1}
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="events"
+                name="이벤트(페이지뷰)"
+                stroke={chart.series2}
+                strokeWidth={2}
+                strokeDasharray={chart.series2Dash}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-xl border border-hairline bg-card p-5">
+          <h2 className="mb-4 text-sm text-ink-mute">플랫폼별 세션 (30일)</h2>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={overview?.byPlatform ?? []} margin={{ left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
+              <XAxis dataKey="platform" stroke={chart.axis} fontSize={12} />
+              <YAxis stroke={chart.axis} fontSize={12} allowDecimals={false} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                labelStyle={tooltipLabelStyle}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.06)' }}
+              />
+              <Bar
+                dataKey="count"
+                name="세션"
+                fill={chart.series1}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

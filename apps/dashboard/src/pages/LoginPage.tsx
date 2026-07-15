@@ -55,7 +55,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 rounded-full bg-primary py-2.5 font-normal text-white transition disabled:opacity-50"
+            className="mt-2 rounded-full bg-primary py-2.5 font-normal text-black transition active:scale-95 disabled:opacity-50"
           >
             {busy ? '로그인 중…' : '로그인'}
           </button>

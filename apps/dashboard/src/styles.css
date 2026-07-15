@@ -1,21 +1,23 @@
 /**
- * 관리자 대시보드 스타일 — DESIGN.md의 "dashboard track" 다크 셸을 따른다.
- * (마케팅 페이지는 흰 캔버스지만, 대시보드/제품 UI는 딥 네이비로 극성이 뒤집힌다)
+ * 관리자 대시보드 스타일 — B&W 디자인 시스템의 다크 트랙.
+ * (마케팅/웹은 흰 캔버스, 관리 도구는 순수 블랙으로 극성이 뒤집힌다 — PLAN.md 결정)
+ * 표면 회색 단계는 DESIGN.md의 near-black tile 값(#272729 계열)을 따른다.
  */
 @import 'tailwindcss';
 
 @theme {
-  --color-primary: #533afd;
-  --color-primary-soft: #8b7bff;
-  --color-shell: #1c1e54;
-  --color-card: #24275f;
-  --color-hairline: #34366e;
+  /* 블랙 셸 위에서 "인터랙티브"는 흰색 — bg-primary에는 반드시 text-black을 짝지을 것 */
+  --color-primary: #ffffff;
+  --color-primary-soft: #a1a1a6;
+  --color-shell: #000000;
+  --color-card: #272729;
+  --color-hairline: #3a3a3c;
   --color-ink: #ffffff;
-  --color-ink-mute: #a3a6d1;
-  --color-series-sessions: #8b7bff;
-  --color-series-events: #1f9d6e;
-  /* 브랜드 ruby(#ea2261)를 다크 셸(#1c1e54) 위에서 4.5:1 이상 나오도록 밝힌 변형 */
-  --color-danger: #ff6b95;
+  --color-ink-mute: #a1a1a6;
+  --color-series-sessions: #ffffff;
+  --color-series-events: #86868b;
+  /* 상태(에러) 기능색 — 모노크롬 시스템에서 유일한 유채색, 블랙 위 4.5:1 확보 */
+  --color-danger: #ff5f57;
 }
 
 html,
@@ -30,7 +32,8 @@ body {
   font-family:
     'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
     'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
-  font-weight: 300;
+  /* DESIGN.md 웨이트 사다리 — 본문 400, 300은 드문 에어리 강조 전용 */
+  font-weight: 400;
   font-feature-settings: 'ss01';
 }
 
@@ -40,6 +43,14 @@ body {
 }
 
 .display {
-  font-weight: 300;
-  letter-spacing: -0.026em;
+  /* 헤드라인 600 + 네거티브 트래킹 — "Apple tight" */
+  font-weight: 600;
+  letter-spacing: -0.022em;
+}
+
+/* 지도 위 글래스모피즘 패널/frosted 바 — 지도가 흐릿하게 비쳐 보인다 */
+.glass {
+  background: rgb(0 0 0 / 0.45);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
 }
