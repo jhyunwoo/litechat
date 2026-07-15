@@ -19,24 +19,32 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-/** 푸시 수신 — 서버가 보낸 { title, body, c } 페이로드를 알림으로 표시한다 */
+/** 푸시 수신 — 서버가 보낸 { title, body, c, n } 페이로드를 알림으로 표시하고, 받았다고 서버에 알린다 */
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  let payload: { title?: string; body?: string; c?: number };
+  let payload: { title?: string; body?: string; c?: number; n?: number };
   try {
     payload = event.data.json() as typeof payload;
   } catch {
     return;
   }
-  event.waitUntil(
-    self.registration.showNotification(payload.title ?? 'litechat', {
-      body: payload.body ?? '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      tag: `conv-${payload.c ?? 0}`, // 같은 대화방 알림은 하나로 합친다
-      data: { c: payload.c },
-    }),
-  );
+  const showNotification = self.registration.showNotification(payload.title ?? 'litechat', {
+    body: payload.body ?? '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: `conv-${payload.c ?? 0}`, // 같은 대화방 알림은 하나로 합친다
+    data: { c: payload.c },
+  });
+  // 수신 ACK — 같은 오리진 요청이라 세션 쿠키가 자동으로 실린다. 실패해도 알림 표시는 막지 않는다.
+  const ack =
+    typeof payload.n === 'number'
+      ? fetch('/api/push/ack', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ n: payload.n }),
+        }).catch(() => {})
+      : Promise.resolve();
+  event.waitUntil(Promise.all([showNotification, ack]));
 });
 
 /** 알림 클릭 — 해당 대화방을 연다 (이미 열린 탭이 있으면 재사용) */
