@@ -1,7 +1,7 @@
 /**
  * 아이콘/스플래시 미리보기 합성 — 사용자 확인용 한 장짜리 시트
  *
- * 실행: cd apps/server && bun ../app/scripts/preview-icons.ts <출력경로.png>
+ * 실행: cd apps/app && bun scripts/preview-icons.ts <출력경로.png>
  */
 import sharp from 'sharp';
 import path from 'node:path';
@@ -31,9 +31,9 @@ async function iosIcon(file: string, size: number, bg?: string): Promise<Buffer>
     .toBuffer();
 }
 
-/** 스플래시 목업 — 배경색 캔버스 중앙에 로고 */
-async function splashMock(bg: string, w: number, h: number): Promise<Buffer> {
-  const logo = await sharp(path.join(IMAGES, 'splash-icon.png')).resize(160, 160).png().toBuffer();
+/** 스플래시 목업 — 배경색 캔버스 중앙에 로고 (다크는 흰 글리프 전용 파일) */
+async function splashMock(bg: string, w: number, h: number, file = 'splash-icon.png'): Promise<Buffer> {
+  const logo = await sharp(path.join(IMAGES, file)).resize(160, 160).png().toBuffer();
   return sharp({ create: { width: w, height: h, channels: 4, background: bg } })
     .composite([{ input: logo, top: Math.round(h / 2 - 80), left: Math.round(w / 2 - 80) }])
     .png()
@@ -51,7 +51,7 @@ const [light, dark, tinted, splashLight, splashDark] = await Promise.all([
   iosIcon('icon-dark.png', 220, '#1c1c1e'),
   iosIcon('icon-tinted.png', 220, '#8e8e93'),
   splashMock('#ffffff', 280, 560),
-  splashMock('#0d253d', 280, 560),
+  splashMock('#000000', 280, 560, 'splash-icon-dark.png'),
 ]);
 
 const label = (text: string, x: number, y: number) =>
