@@ -166,6 +166,51 @@ export interface VitalsPoint {
   count: number;
 }
 
+export interface NotificationLogRow {
+  id: number;
+  userId: number;
+  username: string | null;
+  nickname: string | null;
+  channel: 'web' | 'expo';
+  conversationId: number | null;
+  bodyPreview: string;
+  sentAt: number;
+  sentStatus: 'ok' | 'error' | 'expired';
+  sentError: string | null;
+  receiptStatus: 'pending' | 'ok' | 'error' | null;
+  receiptCheckedAt: number | null;
+  receivedAt: number | null;
+  receivedStatus: 'received' | 'pending' | 'presumed_lost' | 'n-a';
+}
+
+export interface NotificationsResult {
+  rows: NotificationLogRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface NotificationsParams {
+  userId?: number;
+  channel?: string;
+  sentStatus?: string;
+  receivedStatus?: string;
+  from?: number;
+  to?: number;
+  sort?: 'sent_at' | 'received_at';
+  dir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface NotificationSummary {
+  totalSent: number;
+  byStatus: { status: string; count: number }[];
+  receivedCount: number;
+  receivedRate: number;
+  avgLatencySeconds: number | null;
+}
+
 export const adminApi = {
   login: (username: string, password: string) =>
     request<{ ok: true }>('/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -185,6 +230,15 @@ export const adminApi = {
     }
     return request<SessionsResult>(`/sessions?${qs.toString()}`);
   },
+  notifications: (params: NotificationsParams = {}) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<NotificationsResult>(`/notifications?${qs.toString()}`);
+  },
+  notificationsSummary: (days = 30) =>
+    request<NotificationSummary>(`/notifications/summary?days=${days}`),
   insights: (ip: string) =>
     request<InsightsResult>(`/geoip/insights/${encodeURIComponent(ip)}`, { method: 'POST' }),
   insightsByUser: (userId: number) =>
