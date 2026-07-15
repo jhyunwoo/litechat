@@ -168,7 +168,7 @@ export default function SessionsPage() {
 
       {/* 데이터 그리드 */}
       <div className="rounded-xl border border-hairline bg-card">
-        <div className="max-h-[600px] overflow-auto">
+        <div className="max-h-[70dvh] overflow-auto">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-card text-ink-mute">
               <tr className="border-b border-hairline">
@@ -213,12 +213,16 @@ export default function SessionsPage() {
                   <td className="tnum whitespace-nowrap px-4 py-2">{row.ip}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-ink-mute">{locationOf(row)}</td>
                   <td
-                    className="max-w-40 truncate px-4 py-2 text-ink-mute"
+                    className="max-w-40 truncate px-4 py-2 text-ink-mute xl:max-w-72"
                     title={row.referrer ?? ''}
                   >
                     {row.referrer ?? '—'}
                   </td>
-                  <td className="max-w-72 truncate px-4 py-2 text-ink-mute" title={row.userAgent}>
+                  {/* 와이드 화면에서는 UA를 더 길게 노출한다 */}
+                  <td
+                    className="max-w-72 truncate px-4 py-2 text-ink-mute xl:max-w-[36rem]"
+                    title={row.userAgent}
+                  >
                     {row.userAgent || '—'}
                   </td>
                 </tr>
