@@ -54,3 +54,9 @@ body {
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
 }
+
+/* 글래스 패널 안의 얇은 스크롤바 */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline) transparent;
+}

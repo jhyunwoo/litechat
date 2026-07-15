@@ -1,21 +1,17 @@
 /**
- * 지도 — 세션의 GeoIP 위치를 원형 마커로 표시한다 (Google Maps JavaScript API).
+ * 지도 — 뷰포트 전체 지도 + 왼쪽 글래스모피즘 접속 기록 패널.
  *
- * - 접속 수에 비례해 커지는 원형 AdvancedMarker로 지점별 밀도를 나타낸다.
- * - 사용자를 선택하면 그 사용자의 접속 기록별 위치가 핀으로 표시되고, 기록을
- *   클릭하면 지도가 해당 위치로 이동한다.
- * - 선택한 기록의 IP는 GeoIP2 Insights로 상세 조회(ISP/조직/정확도 반경)할 수 있고,
- *   반경 데이터가 있으면 지도에 원으로 그려진다. 같은 IP는 1주간 캐시를 재사용한다
- *   (Insights는 쿼리당 과금되는 비싼 API).
+ * 지도 중심의 레이아웃: 지도가 화면을 가득 채우고, 접속 기록/사용자/진단은
+ * 반투명 blur 패널로 지도 위에 떠서 지도가 비쳐 보인다 (PLAN.md).
+ *  - 패널의 기록을 클릭하면 지도가 그 위치로 이동하고 해당 핀이 잉크 블랙으로 강조된다.
+ *  - 지점 밀도/반경 원은 미터 기반이라 줌과 무관하게 정확한 지리 반경을 나타낸다.
+ *  - 선택한 기록의 IP는 GeoIP2 Insights로 상세 조회(ISP/조직/정확도 반경)할 수 있고,
+ *    같은 IP는 1주간 캐시를 재사용한다 (Insights는 쿼리당 과금되는 비싼 API).
  *
- * API 키는 빌드 시점이 아니라 서버 환경변수(GOOGLE_MAPS_API_KEY)에서 런타임에 받아온다
- * (키 교체 시 재빌드가 필요 없고, Dokploy가 서버 컨테이너에만 환경변수를 주입하기 때문).
- *
- * 지도가 비는 "조용한 실패"를 진단할 수 있도록, GeoIP DB 로드 상태와 위치 조회에
- * 실패한 IP 표본을 함께 보여준다(원인이 mmdb 누락인지 프록시 IP인지 한눈에 구분).
+ * 상태와 데이터 로딩은 전부 이 컨테이너가 소유하고, 하위(MapCanvas/AccessPanel)는
+ * props로만 동작하는 표현 컴포넌트다.
  */
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { AdvancedMarker, APIProvider, Circle, Map, Pin, useMap } from '@vis.gl/react-google-maps';
+import { useEffect, useState } from 'react';
 import {
   adminApi,
   type AdminConfig,
@@ -26,50 +22,20 @@ import {
   type SessionRow,
   type UserVisit,
 } from '../api';
-
-/** 접속 수에 비례해 마커 지름을 키운다 (14~52px) */
-function diameterFor(count: number, max: number): number {
-  if (max <= 0) return 14;
-  return 14 + (count / max) * 38;
-}
-
-/** 사설(프록시 내부) IP 여부 — true면 프록시가 X-Forwarded-For를 안 넘긴 것으로 진단한다. */
-function isPrivateIp(ip: string): boolean {
-  const v = ip.replace(/^::ffff:/i, ''); // IPv6-mapped IPv4 정규화
-  if (/^10\./.test(v)) return true;
-  if (/^192\.168\./.test(v)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(v)) return true;
-  if (/^127\./.test(v) || v === '0.0.0.0') return true;
-  if (/^(fc|fd)/i.test(v) || v === '::1') return true; // IPv6 ULA/loopback
-  return false;
-}
-
-function formatDate(epochSeconds: number): string {
-  return new Date(epochSeconds * 1000).toLocaleString('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
-const DB_STATUS_LABEL: Record<GeoStatus['dbStatus'], string> = {
-  ok: '정상 로드됨',
-  missing: '파일 없음',
-  error: '열기 실패',
-  unopened: '미확인',
-};
-
-interface MapTarget {
-  lat: number;
-  lng: number;
-  zoom?: number;
-}
+import { AccessPanel, type PanelTab } from './map/AccessPanel';
+import { MapCanvas } from './map/MapCanvas';
+import type { MapTarget, SelectedCircle } from './map/shared';
 
 export default function MapPage() {
   const [points, setPoints] = useState<GeoPoint[]>([]);
   const [status, setStatus] = useState<GeoStatus | null>(null);
   const [config, setConfig] = useState<AdminConfig | null>(null);
 
-  // 사용자 선택 → 접속 기록 → 기록 선택 → Insights
+  // 패널 UI 상태
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [tab, setTab] = useState<PanelTab>('sessions');
+
+  // 접속 기록(기본 전체 최근순, 사용자 선택 시 필터) → 기록 선택 → Insights
   const [users, setUsers] = useState<UserVisit[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserVisit | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -90,7 +56,22 @@ export default function MapPage() {
     void adminApi.config().then(setConfig);
     void adminApi.usersVisits().then(setUsers);
     void adminApi.watchList().then((r) => setWatched(new Set(r.watched)));
+    loadSessions(); // 기본: 전체 최근 접속 기록
   }, []);
+
+  /** 접속 기록 로드 — userId를 주면 그 사용자로 필터, 없으면 전체 최근순 */
+  function loadSessions(userId?: number) {
+    void adminApi
+      .sessions({ userId, pageSize: 100, sort: 'created_at', dir: 'desc' })
+      .then((result) => {
+        setSessions(result.rows);
+        if (userId !== undefined) {
+          // 위치가 있는 가장 최근 기록으로 지도를 이동한다.
+          const located = result.rows.find((row) => row.lat !== null);
+          if (located) setTarget({ lat: located.lat!, lng: located.lon!, zoom: 6 });
+        }
+      });
+  }
 
   function loadUserInsights(userId: number) {
     void adminApi.insightsByUser(userId).then((r) => setUserInsights(r.insights));
@@ -103,15 +84,19 @@ export default function MapPage() {
     setInsightsError('');
     setSessions([]);
     setUserInsights([]);
+    setTab('sessions'); // 선택 결과(필터된 기록)가 바로 보이도록 기록 탭으로 전환
     loadUserInsights(user.userId);
-    void adminApi
-      .sessions({ userId: user.userId, pageSize: 100, sort: 'created_at', dir: 'desc' })
-      .then((result) => {
-        setSessions(result.rows);
-        // 위치가 있는 가장 최근 기록으로 지도를 이동한다.
-        const located = result.rows.find((row) => row.lat !== null);
-        if (located) setTarget({ lat: located.lat!, lng: located.lon!, zoom: 6 });
-      });
+    loadSessions(user.userId);
+  }
+
+  /** 사용자 필터 해제 — 전체 최근 기록으로 되돌린다 */
+  function clearUser() {
+    setSelectedUser(null);
+    setSelectedSession(null);
+    setInsights(null);
+    setInsightsError('');
+    setUserInsights([]);
+    loadSessions();
   }
 
   /** 상시 수집 토글 — 켜면 서버가 최근 IP를 백필하므로 잠시 후 결과를 다시 불러온다 */
@@ -157,487 +142,74 @@ export default function MapPage() {
       .finally(() => setInsightsBusy(false));
   }
 
-  const max = Math.max(0, ...points.map((p) => p.count));
-  const circle = insights?.insights;
+  /** 수집된 Insights 칩 클릭 — 상세 카드 표시 + 지도 이동 */
+  function selectInsights(row: Insights) {
+    setInsights({ cached: true, stale: false, insights: row });
+    setTab('sessions'); // 상세 카드는 기록 탭에 표시된다
+    if (row.lat !== null && row.lon !== null) {
+      setTarget({ lat: row.lat, lng: row.lon, zoom: 11 });
+    }
+  }
+
   const locatedSessions = sessions.filter((row) => row.lat !== null && row.lon !== null);
 
+  // 선택한 기록의 정확도 원 — Insights(유료, 더 정확) 우선, 없으면 세션의 GeoLite2 반경
+  const selectedCircle: SelectedCircle | null = (() => {
+    const i = insights?.insights;
+    if (i && i.lat !== null && i.lon !== null && i.accuracyRadius !== null) {
+      return { lat: i.lat, lng: i.lon, radiusKm: i.accuracyRadius };
+    }
+    const s = selectedSession;
+    if (s && s.lat !== null && s.lon !== null && s.accuracyKm !== null) {
+      return { lat: s.lat, lng: s.lon, radiusKm: s.accuracyKm };
+    }
+    return null;
+  })();
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-xl border border-hairline bg-card p-5">
-        <h2 className="mb-4 text-sm text-ink-mute">
-          접속 위치 (최근 30일, {points.length}개 지점
-          {selectedUser ? ` · ${selectedUser.nickname} 기록 ${locatedSessions.length}건 핀 표시` : ''})
-        </h2>
-        {config && !config.googleMapsApiKey ? (
-          <div className="flex h-[420px] items-center justify-center rounded-xl border border-hairline/50 px-6 text-center text-xs text-ink-mute">
-            Google Maps API 키가 설정되지 않았습니다. 서버 환경변수 GOOGLE_MAPS_API_KEY를 지정하세요.
-          </div>
-        ) : config ? (
-          <APIProvider apiKey={config.googleMapsApiKey}>
-            <Map
-              className="h-[420px] w-full overflow-hidden rounded-xl"
-              defaultCenter={{ lat: 20, lng: 10 }}
-              defaultZoom={2}
-              mapId={config.googleMapsMapId}
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-            >
-              <MapController target={target} />
-              {points.map((p) => (
-                <PointMarker key={`${p.lat},${p.lon}`} point={p} max={max} />
-              ))}
-              {/* 선택한 사용자의 접속 기록 핀 — 클릭하면 해당 기록이 선택된다 */}
-              {locatedSessions.map((row) => (
-                <AdvancedMarker
-                  key={row.id}
-                  position={{ lat: row.lat!, lng: row.lon! }}
-                  title={`${formatDate(row.createdAt)} · ${row.ip}`}
-                  onClick={() => selectSession(row)}
-                >
-                  <Pin
-                    background={selectedSession?.id === row.id ? '#ea2261' : '#8b7bff'}
-                    borderColor="#ffffff"
-                    glyphColor="#ffffff"
-                    scale={selectedSession?.id === row.id ? 1.1 : 0.8}
-                  />
-                </AdvancedMarker>
-              ))}
-              {/* Insights 정확도 반경 (km → m) */}
-              {circle && circle.lat !== null && circle.lon !== null && circle.accuracyRadius !== null && (
-                <Circle
-                  center={{ lat: circle.lat, lng: circle.lon }}
-                  radius={circle.accuracyRadius * 1000}
-                  strokeColor="#8b7bff"
-                  strokeOpacity={0.8}
-                  strokeWeight={1.5}
-                  fillColor="#8b7bff"
-                  fillOpacity={0.15}
-                />
-              )}
-            </Map>
-          </APIProvider>
-        ) : (
-          <div className="flex h-[420px] items-center justify-center rounded-xl border border-hairline/50 text-xs text-ink-mute">
-            지도 불러오는 중…
-          </div>
-        )}
-      </div>
-
-      {/* 사용자 선택 + 접속 기록 브라우저 */}
-      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-        <div className="rounded-xl border border-hairline bg-card p-4">
-          <h2 className="mb-3 text-sm text-ink-mute">사용자 ({users.length})</h2>
-          <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto">
-            {users.map((user) => (
-              <button
-                key={user.userId}
-                onClick={() => selectUser(user)}
-                className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                  selectedUser?.userId === user.userId
-                    ? 'bg-primary text-white'
-                    : 'text-ink-mute hover:bg-shell/60 hover:text-white'
-                }`}
-              >
-                {watched.has(user.userId) && (
-                  <span className="mr-1 text-amber-400" title="Insights 상시 수집 중">
-                    ★
-                  </span>
-                )}
-                {user.nickname}
-                <span className="ml-1 text-xs opacity-70">@{user.username}</span>
-                <span className="tnum float-right text-xs opacity-70">{user.sessionCount}</span>
-              </button>
-            ))}
-            {users.length === 0 && <p className="py-4 text-center text-xs text-ink-mute">없음</p>}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-hairline bg-card p-4">
-          <h2 className="mb-3 text-sm text-ink-mute">
-            {selectedUser
-              ? `${selectedUser.nickname}의 접속 기록 (최근 ${sessions.length}건)`
-              : '접속 기록 — 왼쪽에서 사용자를 선택하거나 지도의 핀을 클릭하세요'}
-          </h2>
-
-          {selectedUser && (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => toggleWatch(selectedUser)}
-                disabled={watchBusy}
-                className={`rounded-md border px-3 py-1.5 text-xs disabled:opacity-40 ${
-                  watched.has(selectedUser.userId)
-                    ? 'border-amber-400/60 text-amber-400'
-                    : 'border-hairline text-ink-mute hover:text-white'
-                }`}
-                title="켜면 이 사용자의 모든 새 접속에 대해 GeoIP2 Insights를 자동 수집합니다 (같은 IP는 1주 캐시 재사용)"
-              >
-                {watched.has(selectedUser.userId)
-                  ? '★ Insights 상시 수집 중 — 해제'
-                  : '☆ Insights 상시 수집 켜기'}
-              </button>
-              <span className="text-xs text-ink-mute">
-                수집된 Insights {userInsights.length}건
-              </span>
-            </div>
-          )}
-
-          {/* 이 사용자의 접속 IP에 대해 저장된 Insights — 클릭하면 상세 카드 + 지도 이동 */}
-          {selectedUser && userInsights.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {userInsights.map((row) => (
-                <button
-                  key={row.ip}
-                  onClick={() => {
-                    setInsights({ cached: true, stale: false, insights: row });
-                    if (row.lat !== null && row.lon !== null) {
-                      setTarget({ lat: row.lat, lng: row.lon, zoom: 11 });
-                    }
-                  }}
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    insights?.insights.ip === row.ip
-                      ? 'border-primary text-white'
-                      : 'border-hairline text-ink-mute hover:text-white'
-                  }`}
-                >
-                  <span className="tnum">{row.ip}</span>
-                  <span className="ml-1 opacity-70">
-                    {[row.city, row.country].filter(Boolean).join(', ') || '위치 없음'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {insightsError !== '' && (
-            <p className="mb-3 rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">
-              Insights 조회 실패: {insightsError}
-            </p>
-          )}
-
-          {insights && <InsightsCard result={insights} />}
-
-          {selectedUser && (
-            <div className="max-h-[320px] overflow-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-card text-ink-mute">
-                  <tr className="border-b border-hairline">
-                    <th className="py-2 pr-4 font-normal">접속 시간</th>
-                    <th className="py-2 pr-4 font-normal">플랫폼</th>
-                    <th className="py-2 pr-4 font-normal">IP</th>
-                    <th className="py-2 pr-4 font-normal">위치</th>
-                    <th className="py-2 pr-4 font-normal" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessions.map((row) => (
-                    <tr
-                      key={row.id}
-                      onClick={() => selectSession(row)}
-                      className={`cursor-pointer border-b border-hairline/50 ${
-                        selectedSession?.id === row.id ? 'bg-shell/70' : 'hover:bg-shell/40'
-                      }`}
-                    >
-                      <td className="tnum whitespace-nowrap py-2 pr-4">
-                        {formatDate(row.createdAt)}
-                      </td>
-                      <td className="py-2 pr-4">{row.platform}</td>
-                      <td className="tnum whitespace-nowrap py-2 pr-4">{row.ip}</td>
-                      <td className="whitespace-nowrap py-2 pr-4 text-ink-mute">
-                        {[row.city, row.country].filter(Boolean).join(', ') || '—'}
-                      </td>
-                      <td className="py-2 pr-2 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectSession(row);
-                            lookupInsights(row.ip);
-                          }}
-                          disabled={insightsBusy}
-                          className="rounded-md border border-hairline px-2 py-1 text-ink-mute hover:text-white disabled:opacity-40"
-                          title="GeoIP2 Insights 상세 조회 (유료 API — 같은 IP는 1주 캐시)"
-                        >
-                          상세 조회
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {sessions.length === 0 && (
-                <p className="py-6 text-center text-xs text-ink-mute">접속 기록이 없어요.</p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {status && <GeoDiagnostics status={status} onRefreshed={setStatus} />}
-    </div>
-  );
-}
-
-/** 지도 이동 컨트롤러 — target이 바뀌면 해당 위치로 팬/줌한다 (Map 자식으로만 동작) */
-function MapController({ target }: { target: MapTarget | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map || !target) return;
-    map.panTo({ lat: target.lat, lng: target.lng });
-    if (target.zoom) map.setZoom(target.zoom);
-  }, [map, target]);
-  return null;
-}
-
-/** 접속 수에 비례한 원형 마커 — 브라우저 기본 title로 툴팁을 표시한다. */
-function PointMarker({ point, max }: { point: GeoPoint; max: number }) {
-  const size = diameterFor(point.count, max);
-  const label = `${[point.city, point.country].filter(Boolean).join(', ') || '알 수 없음'} · ${point.count}건`;
-  return (
-    <AdvancedMarker position={{ lat: point.lat, lng: point.lon }} title={label}>
-      <div
-        style={{ width: size, height: size }}
-        className="rounded-full border border-primary-soft bg-primary-soft/50"
+    <div className="relative h-full w-full">
+      <MapCanvas
+        config={config}
+        target={target}
+        points={points}
+        locatedSessions={locatedSessions}
+        selectedSessionId={selectedSession?.id ?? null}
+        selectedCircle={selectedCircle}
+        onSelectSession={selectSession}
       />
-    </AdvancedMarker>
-  );
-}
-
-/**
- * Insights 원본 응답을 "키 경로 → 값" 목록으로 평탄화한다.
- * names 다국어 객체는 ko(없으면 en) 하나만 남겨 노이즈를 줄인다.
- */
-function flattenInsights(value: unknown, prefix: string, out: [string, string][]): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => flattenInsights(item, `${prefix}[${index}]`, out));
-  } else if (value !== null && typeof value === 'object') {
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      if (key === 'names' && child !== null && typeof child === 'object') {
-        const names = child as Record<string, string>;
-        out.push([
-          prefix ? `${prefix}.name` : 'name',
-          names.ko ?? names.en ?? Object.values(names)[0] ?? '',
-        ]);
-        continue;
-      }
-      flattenInsights(child, prefix ? `${prefix}.${key}` : key, out);
-    }
-  } else if (value !== undefined) {
-    out.push([prefix, String(value)]);
-  }
-}
-
-/** Insights 상세 카드 — 요약(ISP/조직/반경/캐시 여부) + 응답 전체 필드 */
-function InsightsCard({ result }: { result: InsightsResult }) {
-  const i = result.insights;
-  // 저장된 원본 JSON 전문 → 모든 필드 (traits의 익명성 플래그, 대륙/등록 국가, 시간대 등 포함)
-  const fields = useMemo(() => {
-    try {
-      const out: [string, string][] = [];
-      flattenInsights(JSON.parse(i.data), '', out);
-      return out;
-    } catch {
-      return [] as [string, string][];
-    }
-  }, [i.data]);
-  return (
-    <div className="mb-3 rounded-md border border-hairline/70 bg-shell/40 px-4 py-3 text-xs">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-sm">Insights · {i.ip}</span>
-        {result.cached && (
-          <span className="rounded-full border border-hairline px-2 py-0.5 text-ink-mute">
-            캐시됨 · {formatDate(i.fetchedAt)}
-          </span>
-        )}
-        {result.stale && (
-          <span className="rounded-full border border-danger/40 px-2 py-0.5 text-danger">
-            오래된 캐시 (API 실패)
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
-        <span>
-          <span className="text-ink-mute">위치 </span>
-          {[i.city, i.region, i.country].filter(Boolean).join(', ') || '—'}
-        </span>
-        <span>
-          <span className="text-ink-mute">정확도 반경 </span>
-          <span className="tnum">{i.accuracyRadius !== null ? `${i.accuracyRadius}km` : '—'}</span>
-        </span>
-        <span>
-          <span className="text-ink-mute">사용자 유형 </span>
-          {i.userType ?? '—'}
-        </span>
-        <span>
-          <span className="text-ink-mute">ISP </span>
-          {i.isp ?? '—'}
-        </span>
-        <span className="col-span-2">
-          <span className="text-ink-mute">조직 </span>
-          {i.organization ?? '—'}
-        </span>
-      </div>
-      {fields.length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer select-none text-ink-mute hover:text-white">
-            전체 응답 필드 보기 ({fields.length})
-          </summary>
-          <div className="mt-2 grid gap-x-8 gap-y-0.5 sm:grid-cols-2">
-            {fields.map(([key, value], index) => (
-              <div
-                key={`${key}-${index}`}
-                className="flex justify-between gap-3 border-b border-hairline/30 py-1"
-              >
-                <span className="shrink-0 text-ink-mute">{key}</span>
-                <span className="tnum break-all text-right">{value}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
-  );
-}
-
-/** 위치 조회 진단 패널 — DB 상태, 자동 갱신, 확보율, 실패 IP 표본으로 원인을 안내한다. */
-function GeoDiagnostics({
-  status,
-  onRefreshed,
-}: {
-  status: GeoStatus;
-  onRefreshed: (status: GeoStatus) => void;
-}) {
-  const [refreshBusy, setRefreshBusy] = useState(false);
-  const [refreshError, setRefreshError] = useState('');
-  const ok = status.dbStatus === 'ok';
-  const privateIps = status.ungeolocated.filter((r) => isPrivateIp(r.ip)).length;
-  const publicIps = status.ungeolocated.length - privateIps;
-
-  function refreshDb() {
-    if (refreshBusy) return;
-    setRefreshBusy(true);
-    setRefreshError('');
-    void adminApi
-      .geoipRefresh()
-      .then((info) => {
-        if (!info.ok) setRefreshError(info.error ?? 'UNKNOWN');
-        return adminApi.geoStatus(30).then(onRefreshed);
-      })
-      .catch((err: Error) => setRefreshError(err.message))
-      .finally(() => setRefreshBusy(false));
-  }
-
-  // 원인 추정: DB가 안 열렸으면 mmdb 문제, 열렸는데 실패 IP가 대부분 사설이면 프록시 문제.
-  let hint: string | null = null;
-  if (!ok) {
-    hint =
-      status.dbStatus === 'missing'
-        ? `GeoIP DB 파일이 없습니다. MaxMind 자격 증명(MAXMIND_USER_NUM/MAXMIND_API_KEY)을 설정하면 자동으로 내려받거나, GeoLite2-City.mmdb를 ${status.dbPath} 에 직접 배치하세요.`
-        : `GeoIP DB를 열지 못했습니다(${status.dbPath}). 파일 손상/권한 또는 Country 에디션(위·경도 없음) 여부를 확인하세요.`;
-  } else if (status.withGeo === 0 && privateIps > 0 && publicIps === 0) {
-    hint =
-      '실패 IP가 모두 사설(프록시 내부) 주소입니다. Traefik이 X-Forwarded-For를 앱으로 전달하도록 프록시 설정을 확인하세요.';
-  }
-
-  return (
-    <div className="rounded-xl border border-hairline bg-card p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm text-ink-mute">위치 조회 진단</h2>
+      {panelOpen ? (
+        <AccessPanel
+          tab={tab}
+          onTab={setTab}
+          onClose={() => setPanelOpen(false)}
+          sessions={sessions}
+          selectedSession={selectedSession}
+          selectedUser={selectedUser}
+          insights={insights}
+          insightsBusy={insightsBusy}
+          insightsError={insightsError}
+          onSelectSession={selectSession}
+          onLookupInsights={lookupInsights}
+          onClearUser={clearUser}
+          users={users}
+          watched={watched}
+          watchBusy={watchBusy}
+          userInsights={userInsights}
+          onSelectUser={selectUser}
+          onToggleWatch={toggleWatch}
+          onSelectInsights={selectInsights}
+          status={status}
+          onStatusRefreshed={setStatus}
+        />
+      ) : (
         <button
-          onClick={refreshDb}
-          disabled={refreshBusy || !status.autoRefresh}
-          className="rounded-md border border-hairline px-3 py-1.5 text-xs text-ink-mute hover:text-white disabled:opacity-40"
-          title={
-            status.autoRefresh
-              ? 'MaxMind에서 최신 GeoLite2 DB를 즉시 내려받아 교체합니다'
-              : 'MAXMIND_USER_NUM/MAXMIND_API_KEY가 설정돼야 사용할 수 있어요'
-          }
+          onClick={() => setPanelOpen(true)}
+          className="glass absolute left-4 top-16 z-10 rounded-full border border-hairline/70 px-4 py-2 text-sm text-ink hover:text-white"
+          title="접속 기록 패널 열기"
         >
-          {refreshBusy ? '갱신 중…' : 'DB 새로고침'}
+          › 접속 기록
         </button>
-      </div>
-
-      {refreshError !== '' && (
-        <p className="mb-4 rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">
-          DB 갱신 실패: {refreshError}
-        </p>
       )}
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <Stat label="GeoIP DB">
-          <span className={ok ? 'text-white' : 'text-danger'}>
-            {DB_STATUS_LABEL[status.dbStatus]}
-          </span>
-        </Stat>
-        <Stat label="주간 자동 갱신">
-          {status.autoRefresh ? (
-            <span className="text-white">
-              켜짐
-              {status.lastRefresh && (
-                <span className="tnum block text-xs text-ink-mute">
-                  최근: {formatDate(status.lastRefresh.at)}{' '}
-                  {status.lastRefresh.ok ? '성공' : `실패(${status.lastRefresh.error})`}
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-ink-mute">꺼짐 (자격 증명 없음)</span>
-          )}
-        </Stat>
-        <Stat label="위치 확보 세션">
-          <span className="tnum">
-            {status.withGeo} / {status.total}
-          </span>
-        </Stat>
-        <Stat label="실패 IP · 사설">
-          <span className="tnum">{privateIps}</span>
-        </Stat>
-        <Stat label="실패 IP · 공인">
-          <span className="tnum">{publicIps}</span>
-        </Stat>
-      </div>
-
-      {hint && (
-        <p className="mt-4 rounded-md border border-hairline/50 px-3 py-2 text-xs text-ink-mute">
-          {hint}
-        </p>
-      )}
-
-      {status.ungeolocated.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="text-ink-mute">
-              <tr>
-                <th className="py-2 pr-4">실패 IP (위치 조회 안 됨)</th>
-                <th className="py-2 pr-4">구분</th>
-                <th className="py-2 pr-4">세션 수</th>
-              </tr>
-            </thead>
-            <tbody>
-              {status.ungeolocated.map((r) => (
-                <tr key={r.ip} className="border-b border-hairline/50">
-                  <td className="py-2 pr-4 font-normal">{r.ip}</td>
-                  <td className="py-2 pr-4">
-                    {isPrivateIp(r.ip) ? (
-                      <span className="text-danger">사설(프록시)</span>
-                    ) : (
-                      <span className="text-ink-mute">공인(mmdb 확인)</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 tnum">{r.count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="rounded-md border border-hairline/50 px-4 py-2.5">
-      <div className="text-xs text-ink-mute">{label}</div>
-      <div className="mt-1 text-sm">{children}</div>
     </div>
   );
 }
