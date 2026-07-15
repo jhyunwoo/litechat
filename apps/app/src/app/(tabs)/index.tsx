@@ -253,7 +253,8 @@ const useStyles = makeStyles(({ colors, type }) => ({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.ruby,
+    // 모노크롬 잉크 배지 — onPrimary 텍스트와 짝
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,

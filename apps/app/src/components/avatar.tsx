@@ -1,35 +1,24 @@
 /**
- * 아바타 — 닉네임 첫 글자 + 인디고 그라디언트 원
+ * 아바타 — 닉네임 첫 글자 + 잉크 단색 원 (모노크롬: 장식 그라디언트 금지)
  */
-import { LinearGradient } from 'expo-linear-gradient';
-import { Text } from 'react-native';
-import { makeStyles, useTheme } from '@/theme/theme';
+import { Text, View } from 'react-native';
+import { makeStyles } from '@/theme/theme';
 
 interface Props {
   nickname: string;
   size?: number;
-  /** 친구 목록 등에서 쓰는 어두운 변형 */
+  /** 예전 그라디언트 시절의 변형 구분 — 모노크롬에선 동일하게 그린다 (호출부 호환용) */
   variant?: 'primary' | 'dark';
 }
 
-export function Avatar({ nickname, size = 48, variant = 'primary' }: Props) {
+export function Avatar({ nickname, size = 48 }: Props) {
   const styles = useStyles();
-  const { colors } = useTheme();
-  const gradient =
-    variant === 'dark'
-      ? ([colors.brandDark, colors.primaryDeep] as const)
-      : ([colors.primarySoft, colors.primaryDeep] as const);
   return (
-    <LinearGradient
-      colors={gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }]}
-    >
+    <View style={[styles.circle, { width: size, height: size, borderRadius: size / 2 }]}>
       <Text style={[styles.letter, { fontSize: size * 0.38 }]}>
         {nickname.charAt(0) || '?'}
       </Text>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -37,9 +26,10 @@ const useStyles = makeStyles(({ colors }) => ({
   circle: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.primary,
   },
   letter: {
     color: colors.onPrimary,
-    fontWeight: '300',
+    fontWeight: '600',
   },
 }));

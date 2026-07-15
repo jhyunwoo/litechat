@@ -1,9 +1,9 @@
 /**
  * 로그인 / 회원가입 화면 (웹 AuthPage 포팅 — 한 화면에서 모드 전환)
  *
- * 상단 1/3에 그라디언트 메시 밴드 — DESIGN.md의 브랜드 시그니처.
+ * 상단은 잉크 블랙 히어로 밴드(워드마크) — 웹 AuthPage의 블랙 타일과 같은 문법.
+ * 밴드 색은 스킴과 무관한 브랜드 블랙이라 팔레트가 아닌 상수로 둔다.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,7 +19,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/data/auth';
 import { errorMessage } from '@/lib/api';
 import { makeStyles, useTheme } from '@/theme/theme';
-import { meshStops, rounded, spacing } from '@/theme/tokens';
+import { rounded, spacing } from '@/theme/tokens';
+
+/* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md 잉크 블랙 + 화이트) */
+const HERO_BG = '#1d1d1f';
+const HERO_INK = '#ffffff';
+const HERO_INK_MUTE = 'rgba(255, 255, 255, 0.7)';
 
 export default function SignIn() {
   const styles = useStyles();
@@ -51,24 +56,19 @@ export default function SignIn() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.screen}>
-      {/* 그라디언트 메시 밴드 — 상단 1/3 */}
-      <LinearGradient
-        colors={meshStops}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.mesh}
-      />
+      {/* 브랜드 히어로 — 잉크 블랙 타일 (표면 색 전환이 곧 구획) */}
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
+        <Text style={styles.heroTitle}>litechat</Text>
+        <Text style={styles.heroTagline}>가볍고 빠른 채팅</Text>
+      </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.huge, paddingBottom: insets.bottom + spacing.xl },
+          { paddingBottom: insets.bottom + spacing.xl },
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>litechat</Text>
-        <Text style={styles.subtitle}>가볍고 빠른 채팅</Text>
-
         <View style={styles.form}>
           <TextInput
             style={styles.input}
@@ -151,34 +151,34 @@ const useStyles = makeStyles(({ colors, type }) => ({
     flex: 1,
     backgroundColor: colors.canvas,
   },
-  mesh: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '33%',
-    opacity: 0.35,
+  hero: {
+    backgroundColor: HERO_BG,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    alignItems: 'center',
+  },
+  heroTitle: {
+    ...type.displayLg,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -1,
+    color: HERO_INK,
+  },
+  heroTagline: {
+    /* 드문 300 웨이트 — 히어로 태그라인 전용 (DESIGN.md lead-airy) */
+    fontSize: 15,
+    fontWeight: '300',
+    color: HERO_INK_MUTE,
+    marginTop: spacing.xs,
   },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
     maxWidth: 420,
     width: '100%',
     alignSelf: 'center',
-  },
-  title: {
-    ...type.displayLg,
-    fontSize: 40,
-    lineHeight: 44,
-    letterSpacing: -1,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    ...type.caption,
-    textAlign: 'center',
-    marginBottom: spacing.xxl,
   },
   form: {
     gap: spacing.md,
@@ -223,9 +223,11 @@ const useStyles = makeStyles(({ colors, type }) => ({
     color: colors.inkMute,
   },
   switchLink: {
+    /* 모노크롬에선 색만으로 링크가 안 드러나서 웨이트+밑줄로 신호를 준다 */
     fontSize: 14,
     color: colors.primary,
-    fontWeight: '400',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   notice: {
     ...type.caption,
