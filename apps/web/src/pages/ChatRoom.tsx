@@ -141,7 +141,7 @@ export default function ChatRoom() {
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* 헤더 */}
-      <header className="pt-safe flex items-center gap-2 border-b border-hairline bg-white/95 px-2 py-2 backdrop-blur">
+      <header className="frosted pt-safe flex items-center gap-2 border-b border-hairline px-2 py-2">
         <button
           onClick={() => navigate('/')}
           aria-label="뒤로"
@@ -149,7 +149,7 @@ export default function ChatRoom() {
         >
           <Icon name="back" className="size-6" />
         </button>
-        <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-primary-soft to-primary-deep text-sm font-light text-white">
+        <div className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
           {conversation?.peer.nickname.charAt(0) ?? '?'}
         </div>
         <div>

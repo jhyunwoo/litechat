@@ -120,9 +120,6 @@ export default function Onboarding() {
 
   return (
     <div className="relative mx-auto flex h-full max-w-md flex-col overflow-y-auto scroll-thin px-6">
-      {/* 브랜드 시그니처 메시 밴드 */}
-      <div className="mesh pointer-events-none absolute inset-x-0 top-0 h-40" aria-hidden />
-
       {/* 닫기 */}
       <button
         onClick={() => navigate('/profile')}
@@ -135,7 +132,7 @@ export default function Onboarding() {
       <div className="pt-safe pb-safe relative">
         <div className="pt-10" />
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-soft to-primary-deep text-white shadow-sm">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-ink text-white">
             <Icon name="bell" className="size-8" />
           </div>
           <h1 className="display text-3xl text-ink">알림 받기</h1>

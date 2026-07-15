@@ -21,7 +21,7 @@ export default function ChatsTab() {
 
   return (
     <div>
-      <header className="pt-safe sticky top-0 z-10 border-b border-hairline bg-white/95 backdrop-blur">
+      <header className="pt-safe frosted sticky top-0 z-10 border-b border-hairline">
         <h1 className="px-4 py-3 display text-2xl">채팅</h1>
       </header>
 
@@ -49,7 +49,7 @@ export default function ChatsTab() {
                 }`}
               >
                 {/* 아바타 — 닉네임 첫 글자 */}
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-soft to-primary-deep text-lg font-light text-white">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-lg font-semibold text-white">
                   {conv.peer.nickname.charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -64,7 +64,7 @@ export default function ChatsTab() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm text-ink-mute">{preview(conv.last)}</p>
                     {conv.unread > 0 && (
-                      <span className="min-w-5 shrink-0 rounded-full bg-ruby px-1.5 text-center tnum text-xs leading-5 font-normal text-white">
+                      <span className="min-w-5 shrink-0 rounded-full bg-ink px-1.5 text-center tnum text-xs leading-5 font-normal text-white">
                         {conv.unread > 99 ? '99+' : conv.unread}
                       </span>
                     )}

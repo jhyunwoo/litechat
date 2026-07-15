@@ -1,35 +1,36 @@
 /**
- * 전역 스타일 — Tailwind CSS 4 + DESIGN.md(Stripi) 디자인 토큰
+ * 전역 스타일 — Tailwind CSS 4 + B&W 디자인 토큰 (DESIGN.md 모노크롬 적용)
  *
  * 핵심 규칙:
- *  - 인디고(#533afd)는 CTA/링크 전용, 본문 텍스트는 딥 네이비 잉크(#0d253d)
- *  - 디스플레이/헤딩은 weight 300 + 네거티브 트래킹, 버튼 라벨은 400
- *  - 버튼은 pill(9999px), 인풋은 6px, 카드는 12px 라운드
+ *  - 인터랙티브(CTA/링크)는 잉크 블랙(#1d1d1f) 하나 — 두 번째 액센트 색은 없다
+ *  - 본문 17px / weight 400 / 1.47 / 네거티브 트래킹, 디스플레이는 600 ("Apple tight")
+ *  - 버튼은 pill(9999px), 인풋도 pill(검색 인풋 문법), 카드는 12px 라운드
+ *  - 그라디언트/그림자 금지 — 표면 색 전환(화이트 ↔ 블랙 타일)이 구획을 만든다
  *  - 숫자(시간/카운트)에는 tnum, 본문 전체에 ss01 적용
  */
 @import 'tailwindcss';
 
 @theme {
-  /* DESIGN.md 색상 토큰 */
-  --color-primary: #533afd;
-  --color-primary-deep: #4434d4;
-  --color-primary-press: #2e2b8c;
-  --color-primary-soft: #665efd;
-  --color-primary-subdued: #b9b9f9;
-  --color-brand-dark: #1c1e54;
-  --color-ink: #0d253d;
-  --color-ink-secondary: #273951;
-  --color-ink-mute: #64748d;
-  --color-canvas-soft: #f6f9fc;
-  --color-cream: #f5e9d4;
-  --color-hairline: #e3e8ee;
-  --color-hairline-input: #a8c3de;
-  --color-ruby: #ea2261;
-  --color-magenta: #f96bee;
+  /* B&W 색상 토큰 — primary = 잉크 블랙 (모든 "클릭할 수 있음" 신호) */
+  --color-primary: #1d1d1f;
+  --color-primary-deep: #000000;
+  --color-primary-press: #000000;
+  --color-primary-soft: #7a7a7a;
+  --color-primary-subdued: #d2d2d7;
+  --color-brand-dark: #000000;
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #333333;
+  --color-ink-mute: #7a7a7a;
+  --color-canvas-soft: #f5f5f7;
+  --color-cream: #fafafc;
+  --color-hairline: #e0e0e0;
+  --color-hairline-input: #d2d2d7;
+  /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
+  --color-ruby: #d64545;
 
-  /* 채팅 말풍선 — 내 것은 primary 인디고, 상대는 soft canvas */
-  --color-bubble-me: #533afd;
-  --color-bubble-peer: #f0f4f9;
+  /* 채팅 말풍선 — 내 것은 잉크 블랙, 상대는 파치먼트 */
+  --color-bubble-me: #1d1d1f;
+  --color-bubble-peer: #f5f5f7;
 }
 
 html,
@@ -39,12 +40,15 @@ body,
 }
 
 body {
-  /* 시스템 폰트 스택 (Sohne 대체) — 웹폰트 다운로드 없이 브랜드 리듬 유지 */
+  /* 시스템 폰트 스택 (SF Pro 대체) — 웹폰트 다운로드 없이 브랜드 리듬 유지 */
   font-family:
     'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
     'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
-  /* DESIGN.md: 본문 weight 300 + ss01 전역 적용, 텍스트는 잉크 네이비 */
-  font-weight: 300;
+  /* DESIGN.md: 본문 17px/400/1.47 + 네거티브 트래킹, ss01 전역 적용 */
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.022em;
   font-feature-settings: 'ss01';
   color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
@@ -58,21 +62,23 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* 디스플레이 헤딩 — weight 300 + 네거티브 트래킹 */
+/* 디스플레이 헤딩 — weight 600 + 네거티브 트래킹 ("Apple tight") */
 .display {
-  font-weight: 300;
-  letter-spacing: -0.026em;
+  font-weight: 600;
+  letter-spacing: -0.024em;
 }
 
-/* 인증 화면 상단의 그라디언트 메시 밴드 — cream/lavender/indigo/ruby/magenta 스톱 */
-.mesh {
-  background:
-    radial-gradient(42% 60% at 12% 30%, #f5e9d4 0%, transparent 70%),
-    radial-gradient(38% 55% at 38% 20%, #f96bee66 0%, transparent 70%),
-    radial-gradient(45% 65% at 64% 35%, #533afd55 0%, transparent 72%),
-    radial-gradient(36% 55% at 88% 22%, #ea226155 0%, transparent 70%),
-    radial-gradient(60% 80% at 50% 0%, #b9b9f966 0%, transparent 75%);
-  filter: blur(2px);
+/* 에어리 서브카피 — 드물게 쓰는 weight 300 (히어로 태그라인 전용) */
+.display-airy {
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+/* frosted 스티키 바 — 파치먼트 80% + blur (서브내브/탭바/채팅 헤더) */
+.frosted {
+  background: rgb(255 255 255 / 0.8);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
 }
 
 /* iOS 노치/홈 인디케이터 safe-area 유틸리티 */
@@ -86,5 +92,5 @@ body {
 /* 스크롤바 최소화 (데스크탑) */
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgb(13 37 61 / 0.15) transparent;
+  scrollbar-color: rgb(29 29 31 / 0.15) transparent;
 }

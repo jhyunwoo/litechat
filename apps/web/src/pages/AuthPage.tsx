@@ -1,10 +1,13 @@
 /**
- * 로그인 / 회원가입 화면
+ * 로그인 / 회원가입 화면 — 갤러리 히어로 구성.
+ * 왼쪽(모바일은 상단)은 블랙 타일에 모노 버블 로고 + 워드마크, 오른쪽은 화이트 폼 패널.
+ * 표면 색 전환(블랙 ↔ 화이트)이 곧 구획이다 — 보더/그림자 없음 (DESIGN.md).
  */
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
 import { useAuth } from '../auth';
+import { Logo } from '../components/Logo';
 import type { PublicUser } from '@litechat/types';
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
@@ -35,19 +38,18 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     }
   }
 
-  // DESIGN.md text-input: 흰 배경 + hairline-input 보더 + 6px 라운드, 포커스 시 primary 보더
+  // 인풋도 pill — 검색 인풋과 같은 문법 (16px은 iOS 자동 줌 방지)
   const inputClass =
-    'w-full rounded-md border border-hairline-input bg-white px-3 py-2.5 text-[16px] outline-none focus:border-primary transition-colors';
+    'w-full rounded-full border border-hairline-input bg-white px-5 py-2.5 text-[16px] outline-none focus:border-primary transition-colors';
 
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
-      {/* 브랜드 패널 — 데스크탑에서는 좌측 히어로, 모바일에서는 상단 메시 밴드 */}
-      <div className="mesh pointer-events-none relative h-32 shrink-0 md:hidden" aria-hidden />
-      <div className="relative hidden shrink-0 overflow-hidden md:flex md:w-[45%] md:max-w-2xl md:flex-col md:justify-center md:px-16 lg:px-24">
-        <div className="mesh pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative">
-          <h1 className="display text-6xl text-ink">litechat</h1>
-          <p className="mt-4 max-w-sm text-lg text-ink-secondary">
+      {/* 브랜드 히어로 — 블랙 타일 (모바일은 상단 밴드, 데스크탑은 좌측 패널) */}
+      <div className="pt-safe flex shrink-0 items-center gap-3 bg-ink px-6 py-5 text-white md:w-[45%] md:max-w-2xl md:flex-col md:items-start md:justify-center md:gap-6 md:px-16 lg:px-24">
+        <Logo className="h-8 w-8 md:h-16 md:w-16" />
+        <div>
+          <h1 className="display text-3xl md:text-6xl">litechat</h1>
+          <p className="display-airy mt-4 hidden max-w-sm text-2xl text-white/70 md:block">
             가볍고 빠른 채팅.
             <br />
             친구와 지금 바로 대화를 시작하세요.
@@ -55,80 +57,78 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
       </div>
 
-      {/* 폼 패널 — 데스크탑에서는 우측, 세로 중앙 정렬 */}
+      {/* 폼 패널 — 화이트 캔버스, 세로 중앙 정렬 */}
       <div className="relative flex flex-1 flex-col justify-center px-6">
-      <div className="pt-safe pb-safe relative mx-auto w-full max-w-sm">
-        <h1 className="display mb-1 text-center text-4xl text-ink md:hidden">litechat</h1>
-        <p className="mb-8 text-center text-sm text-ink-mute md:hidden">가볍고 빠른 채팅</p>
-        <h2 className="display mb-8 hidden text-center text-2xl text-ink md:block">
-          {isRegister ? '회원가입' : '로그인'}
-        </h2>
+        <div className="pb-safe relative mx-auto w-full max-w-sm py-10">
+          <h2 className="display mb-8 text-center text-2xl text-ink">
+            {isRegister ? '회원가입' : '로그인'}
+          </h2>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <input
-          className={inputClass}
-          placeholder="아이디 (영문 소문자/숫자/_)"
-          value={username}
-          onChange={(e) => setUsername(e.target.value.toLowerCase())}
-          autoComplete="username"
-          autoCapitalize="none"
-          required
-          minLength={3}
-          maxLength={20}
-          pattern="[a-z0-9_]{3,20}"
-        />
-        {isRegister && (
-          <input
-            className={inputClass}
-            placeholder="닉네임"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            required
-            maxLength={20}
-          />
-        )}
-        <input
-          className={inputClass}
-          type="password"
-          placeholder="비밀번호 (8자 이상)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete={isRegister ? 'new-password' : 'current-password'}
-          required
-          minLength={8}
-          maxLength={72}
-        />
+          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            <input
+              className={inputClass}
+              placeholder="아이디 (영문 소문자/숫자/_)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              autoComplete="username"
+              autoCapitalize="none"
+              required
+              minLength={3}
+              maxLength={20}
+              pattern="[a-z0-9_]{3,20}"
+            />
+            {isRegister && (
+              <input
+                className={inputClass}
+                placeholder="닉네임"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                required
+                maxLength={20}
+              />
+            )}
+            <input
+              className={inputClass}
+              type="password"
+              placeholder="비밀번호 (8자 이상)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              required
+              minLength={8}
+              maxLength={72}
+            />
 
-        {error && <p className="text-center text-sm text-ruby">{error}</p>}
+            {error && <p className="text-center text-sm text-ruby">{error}</p>}
 
-        {/* button-primary-pill — 밴드당 하나뿐인 채워진 인디고 CTA */}
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-2 rounded-full bg-primary py-3 font-normal text-white transition active:scale-[0.98] active:bg-primary-press disabled:opacity-50"
-        >
-          {busy ? '잠시만요…' : isRegister ? '가입하기' : '로그인'}
-        </button>
-      </form>
+            {/* button-primary pill — 밴드당 하나뿐인 채워진 블랙 CTA */}
+            <button
+              type="submit"
+              disabled={busy}
+              className="mt-2 rounded-full bg-primary py-3 text-white transition active:scale-95 active:bg-primary-press disabled:opacity-50"
+            >
+              {busy ? '잠시만요…' : isRegister ? '가입하기' : '로그인'}
+            </button>
+          </form>
 
-      <p className="mt-6 text-center text-sm text-ink-mute">
-        {isRegister ? (
-          <>
-            이미 계정이 있나요?{' '}
-            <Link className="font-normal text-primary" to="/login">
-              로그인
-            </Link>
-          </>
-        ) : (
-          <>
-            처음이신가요?{' '}
-            <Link className="font-normal text-primary" to="/register">
-              가입하기
-            </Link>
-          </>
-        )}
-      </p>
-      </div>
+          <p className="mt-6 text-center text-sm text-ink-mute">
+            {isRegister ? (
+              <>
+                이미 계정이 있나요?{' '}
+                <Link className="font-semibold text-primary underline underline-offset-4" to="/login">
+                  로그인
+                </Link>
+              </>
+            ) : (
+              <>
+                처음이신가요?{' '}
+                <Link className="font-semibold text-primary underline underline-offset-4" to="/register">
+                  가입하기
+                </Link>
+              </>
+            )}
+          </p>
+        </div>
       </div>
     </div>
   );

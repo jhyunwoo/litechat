@@ -39,12 +39,12 @@ export default function ProfileTab() {
 
   return (
     <div>
-      <header className="pt-safe sticky top-0 z-10 border-b border-hairline bg-white/95 backdrop-blur">
+      <header className="pt-safe frosted sticky top-0 z-10 border-b border-hairline">
         <h1 className="px-4 py-3 display text-2xl">프로필</h1>
       </header>
 
       <div className="flex flex-col items-center gap-2 py-8">
-        <div className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-primary-soft to-primary-deep text-3xl font-light text-white">
+        <div className="flex size-20 items-center justify-center rounded-full bg-ink text-3xl font-semibold text-white">
           {me?.nickname.charAt(0)}
         </div>
         <p className="text-lg font-normal">{me?.nickname}</p>

@@ -22,11 +22,11 @@ const IOS_ONBOARD_SEEN = 'lc:ios-onboard-seen';
 /** 검색 입력 포커스를 요청하는 전역 커스텀 이벤트 이름 */
 export const SEARCH_EVENT = 'lc:focus-search';
 
-/** 좌측 세로 배치의 배지 (탭/레일 공용) */
+/** 좌측 세로 배치의 배지 (탭/레일 공용) — 모노크롬 잉크 칩 */
 function Badge({ count }: { count: number }) {
   if (!count) return null;
   return (
-    <span className="tnum min-w-4 rounded-full bg-ruby px-1 text-center text-[10px] leading-4 font-normal text-white">
+    <span className="tnum min-w-4 rounded-full bg-ink px-1 text-center text-[10px] leading-4 font-normal text-white">
       {count > 99 ? '99+' : count}
     </span>
   );
@@ -38,7 +38,7 @@ function Tab({ to, label, icon, active, badge }: { to: string; label: string; ic
     <Link
       to={to}
       className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
-        active ? 'text-primary' : 'text-ink-mute hover:text-ink-secondary'
+        active ? 'font-semibold text-primary' : 'text-ink-mute hover:text-ink-secondary'
       }`}
     >
       <Icon name={icon} className="size-6" />
@@ -58,7 +58,8 @@ function RailItem({ to, label, icon, active, badge }: { to: string; label: strin
     <Link
       to={to}
       className={`relative flex w-full flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] transition-colors ${
-        active ? 'bg-canvas-soft text-primary' : 'text-ink-mute hover:bg-canvas-soft hover:text-ink-secondary'
+        // 활성 = 잉크 블랙 필 — 파치먼트 레일 위의 유일한 강조
+        active ? 'bg-ink text-white' : 'text-ink-mute hover:bg-white/70 hover:text-ink-secondary'
       }`}
     >
       <Icon name={icon} className="size-7" />
@@ -138,8 +139,8 @@ export function Shell() {
 
   return (
     <div className="flex h-full w-full flex-col bg-white md:flex-row">
-      {/* 네비 레일 — 데스크탑 전용 */}
-      <nav className="hidden w-20 shrink-0 flex-col gap-1 border-r border-hairline p-2 md:flex">
+      {/* 네비 레일 — 데스크탑 전용, 파치먼트 표면 */}
+      <nav className="hidden w-20 shrink-0 flex-col gap-1 border-r border-hairline bg-canvas-soft p-2 md:flex">
         <RailItem to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
         <RailItem to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
         <RailItem to="/profile" label="프로필" icon="profile" active={section === 'profile'} />
@@ -161,7 +162,7 @@ export function Shell() {
 
       {/* 하단 탭 바 — 모바일 전용. 대화 중에는 숨긴다(ChatRoom 자체 뒤로가기 사용). */}
       {!inChat && (
-        <nav className="pb-safe flex shrink-0 border-t border-hairline bg-white/95 backdrop-blur md:hidden">
+        <nav className="frosted pb-safe flex shrink-0 border-t border-hairline md:hidden">
           <Tab to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
           <Tab to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
           <Tab to="/profile" label="프로필" icon="profile" active={section === 'profile'} />

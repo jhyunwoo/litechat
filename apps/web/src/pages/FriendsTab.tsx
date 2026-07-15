@@ -96,7 +96,7 @@ export default function FriendsTab() {
 
   return (
     <div>
-      <header className="pt-safe sticky top-0 z-10 border-b border-hairline bg-white/95 backdrop-blur">
+      <header className="pt-safe frosted sticky top-0 z-10 border-b border-hairline">
         <h1 className="px-4 pt-3 display text-2xl">친구</h1>
         <div className="p-3">
           <input
@@ -180,7 +180,7 @@ export default function FriendsTab() {
             to={`/chat/${c}`}
             className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-canvas-soft active:bg-canvas-soft"
           >
-            <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-dark to-primary-deep font-light text-white">
+            <div className="flex size-10 items-center justify-center rounded-full bg-ink font-semibold text-white">
               {user.nickname.charAt(0)}
             </div>
             <div className="min-w-0">
