@@ -13,15 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import { adminApi, type Overview, type TimeseriesPoint } from '../api';
-
-function KpiCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-hairline bg-card p-5">
-      <p className="text-sm text-ink-mute">{label}</p>
-      <p className="tnum display mt-1 text-3xl">{value}</p>
-    </div>
-  );
-}
+import { KpiCard } from '../components/KpiCard';
 
 export default function OverviewPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
