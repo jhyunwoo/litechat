@@ -5,6 +5,7 @@ import { validator as zValidator } from 'hono-openapi/zod';
 import {
   expoPushRegisterSchema,
   expoPushUnregisterSchema,
+  pushAckSchema,
   pushSubscribeSchema,
   pushUnsubscribeSchema,
 } from '@litechat/types';
@@ -13,9 +14,15 @@ import type { AppEnv } from '../../app';
 import type { AppDeps } from '../../deps';
 import { requireAuth } from '../../middleware/auth';
 import type { ExpoPushService } from './expo-service';
+import type { NotificationLogRepo } from './notification-log-repo';
 import type { PushService } from './service';
 
-export function pushRoutes(deps: AppDeps, service: PushService, expo: ExpoPushService) {
+export function pushRoutes(
+  deps: AppDeps,
+  service: PushService,
+  expo: ExpoPushService,
+  notificationLog: NotificationLogRepo,
+) {
   return (
     new Hono<AppEnv>()
       .use('*', requireAuth(deps))
@@ -39,6 +46,12 @@ export function pushRoutes(deps: AppDeps, service: PushService, expo: ExpoPushSe
       // 네이티브 앱 알림 끄기 — 본인 토큰만 해지된다
       .post('/expo/unregister', zValidator('json', expoPushUnregisterSchema), (c) => {
         expo.unregister(c.var.userId, c.req.valid('json').token);
+        return c.json({ ok: true }, 200);
+      })
+      // 클라이언트가 알림을 실제로 받았을 때 보내는 ACK — n은 notification_log.id
+      .post('/ack', zValidator('json', pushAckSchema), (c) => {
+        const ua = c.req.header('user-agent') ?? null;
+        notificationLog.markReceived(c.req.valid('json').n, c.var.userId, ua);
         return c.json({ ok: true }, 200);
       })
   );

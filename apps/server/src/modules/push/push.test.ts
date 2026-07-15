@@ -178,3 +178,45 @@ describe('구독 관리', () => {
     expect(sent).toHaveLength(0);
   });
 });
+
+describe('POST /api/push/ack', () => {
+  test('로그 id로 수신 시각을 기록한다', async () => {
+    await subscribeBob();
+    await aliceSends('안녕!');
+    const log = new NotificationLogRepo(deps.db);
+    const before = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 }).rows[0]!;
+    expect(before.receivedAt).toBeNull();
+
+    const res = await jsonRequest(app, '/api/push/ack', {
+      method: 'POST',
+      cookie: bob.cookie,
+      body: { n: before.id },
+    });
+    expect(res.status).toBe(200);
+
+    const after = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 }).rows[0]!;
+    expect(after.receivedAt).not.toBeNull();
+    expect(after.receivedStatus).toBe('received');
+  });
+
+  test('다른 사용자의 로그는 ACK로 갱신되지 않는다', async () => {
+    await subscribeBob();
+    await aliceSends('안녕!');
+    const log = new NotificationLogRepo(deps.db);
+    const logId = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 }).rows[0]!.id;
+
+    await jsonRequest(app, '/api/push/ack', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { n: logId },
+    });
+
+    const after = log.list({ sort: 'sent_at', dir: 'desc', limit: 1, offset: 0 }).rows[0]!;
+    expect(after.receivedAt).toBeNull();
+  });
+
+  test('인증 없이 호출하면 401', async () => {
+    const res = await jsonRequest(app, '/api/push/ack', { method: 'POST', body: { n: 1 } });
+    expect(res.status).toBe(401);
+  });
+});

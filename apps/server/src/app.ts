@@ -64,9 +64,9 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     .route('/api/friends', friendsRoutes(deps))
     .route('/api/chat', chatRoutes(deps, chatService))
     .route('/api/images', imagesRoutes(deps, imagesService))
-    .route('/api/push', pushRoutes(deps, pushService, expoPushService))
+    .route('/api/push', pushRoutes(deps, pushService, expoPushService, notificationLogRepo))
     .route('/api/analytics', analyticsRoutes(analyticsService))
-    .route('/api/admin', adminRoutes(deps, analyticsService))
+    .route('/api/admin', adminRoutes(deps, analyticsService, notificationLogRepo))
     .route('/img', imgRoutes(deps, imagesService))
     .route('/', wsRoutes(deps, chatService));
 

@@ -16,6 +16,7 @@ import { geoipRefreshEnabled, geoipRefreshInfo, refreshGeoipDb } from '../analyt
 import { fetchInsights, INSIGHTS_TTL_SECONDS, normalizeIp } from '../analytics/insights';
 import { backfillUserInsights } from '../analytics/insights-collector';
 import type { AnalyticsService } from '../analytics/service';
+import type { NotificationLogRepo } from '../push/notification-log-repo';
 import { AdminRepo } from './repo';
 import {
   ADMIN_SESSION_COOKIE,
@@ -40,7 +41,11 @@ function cookieOptions(deps: AppDeps) {
   };
 }
 
-export function adminRoutes(deps: AppDeps, analyticsService: AnalyticsService) {
+export function adminRoutes(
+  deps: AppDeps,
+  analyticsService: AnalyticsService,
+  notificationLog: NotificationLogRepo,
+) {
   const repo = new AdminRepo(deps.db);
 
   return new Hono<AppAdminEnv>()
@@ -190,5 +195,41 @@ export function adminRoutes(deps: AppDeps, analyticsService: AnalyticsService) {
       const metric = c.req.query('metric') ?? 'LCP';
       const days = Number(c.req.query('days') ?? 30);
       return c.json(analyticsService.queries.vitalsTrend(metric, days), 200);
+    })
+    // 알림 발송/수신 로그 데이터 탐색기 — 수신자/채널/발송상태/수신상태/기간 필터
+    .get('/notifications', requireAdmin(deps), (c) => {
+      const q = (name: string) => c.req.query(name);
+      const page = Math.max(1, Number(q('page') ?? 1) || 1);
+      const pageSize = Math.min(200, Math.max(1, Number(q('pageSize') ?? 50) || 50));
+      const channel = q('channel');
+      const sentStatus = q('sentStatus');
+      const receivedStatus = q('receivedStatus');
+      const result = notificationLog.list({
+        userId: q('userId') ? Number(q('userId')) : undefined,
+        channel: channel === 'web' || channel === 'expo' ? channel : undefined,
+        sentStatus:
+          sentStatus === 'ok' || sentStatus === 'error' || sentStatus === 'expired'
+            ? sentStatus
+            : undefined,
+        receivedStatus:
+          receivedStatus === 'received' ||
+          receivedStatus === 'pending' ||
+          receivedStatus === 'presumed_lost' ||
+          receivedStatus === 'n-a'
+            ? receivedStatus
+            : undefined,
+        from: q('from') ? Number(q('from')) : undefined,
+        to: q('to') ? Number(q('to')) : undefined,
+        sort: q('sort') === 'received_at' ? 'received_at' : 'sent_at',
+        dir: q('dir') === 'asc' ? 'asc' : 'desc',
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+      return c.json({ ...result, page, pageSize }, 200);
+    })
+    // 알림 발송 KPI 요약 — 대시보드 상단 카드용
+    .get('/notifications/summary', requireAdmin(deps), (c) => {
+      const days = Number(c.req.query('days') ?? 30);
+      return c.json(notificationLog.summary(days), 200);
     });
 }
