@@ -11,6 +11,7 @@ const MapPage = lazy(() => import('./pages/MapPage'));
 const SessionsPage = lazy(() => import('./pages/SessionsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const VitalsPage = lazy(() => import('./pages/VitalsPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 
 function Loading() {
   return (
@@ -59,6 +60,7 @@ function Shell() {
         <Tab to="/sessions" label="접속 기록" />
         <Tab to="/users" label="사용자별 방문" />
         <Tab to="/vitals" label="웹 바이탈" />
+        <Tab to="/notifications" label="알림 로그" />
       </nav>
       <main className="flex-1">
         <Outlet />
@@ -84,6 +86,7 @@ export default function App() {
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/vitals" element={<VitalsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
