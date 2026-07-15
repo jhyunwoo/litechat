@@ -49,6 +49,7 @@ export interface SessionRow {
   city: string | null;
   lat: number | null;
   lon: number | null;
+  accuracyKm: number | null;
   createdAt: number;
   lastSeenAt: number;
 }
@@ -70,8 +71,9 @@ export class AnalyticsRepo {
       .query(
         `INSERT INTO analytics_sessions
            (id, visitor_id, user_id, platform, ip, user_agent, referrer,
-            geo_country, geo_region, geo_city, geo_lat, geo_lon, created_at, last_seen_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            geo_country, geo_region, geo_city, geo_lat, geo_lon, geo_accuracy_km,
+            created_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
            last_seen_at = excluded.last_seen_at,
            user_id = COALESCE(analytics_sessions.user_id, excluded.user_id)`,
@@ -89,6 +91,7 @@ export class AnalyticsRepo {
         input.geo?.city ?? null,
         input.geo?.lat ?? null,
         input.geo?.lon ?? null,
+        input.geo?.accuracyKm ?? null,
         now,
         now,
       );
@@ -155,14 +158,30 @@ export class AnalyticsRepo {
       .all(since, since);
   }
 
-  geoPoints(days: number): { lat: number; lon: number; city: string | null; country: string | null; count: number }[] {
+  geoPoints(days: number): {
+    lat: number;
+    lon: number;
+    city: string | null;
+    country: string | null;
+    count: number;
+    accuracyKm: number | null;
+  }[] {
     const since = Math.floor(Date.now() / 1000) - days * 86400;
+    // MAX(정확도) = 그룹에서 가장 보수적인(넓은) 반경 — 원이 실제보다 작게 그려지는 것을 막는다.
     return this.db
       .query<
-        { lat: number; lon: number; city: string | null; country: string | null; count: number },
+        {
+          lat: number;
+          lon: number;
+          city: string | null;
+          country: string | null;
+          count: number;
+          accuracyKm: number | null;
+        },
         [number]
       >(
-        `SELECT geo_lat AS lat, geo_lon AS lon, geo_city AS city, geo_country AS country, COUNT(*) AS count
+        `SELECT geo_lat AS lat, geo_lon AS lon, geo_city AS city, geo_country AS country,
+                COUNT(*) AS count, MAX(geo_accuracy_km) AS accuracyKm
          FROM analytics_sessions
          WHERE created_at >= ? AND geo_lat IS NOT NULL
          GROUP BY geo_lat, geo_lon, geo_city, geo_country`,
@@ -246,7 +265,7 @@ export class AnalyticsRepo {
                 u.username, u.nickname,
                 s.platform, s.ip, s.user_agent AS userAgent, s.referrer,
                 s.geo_country AS country, s.geo_region AS region, s.geo_city AS city,
-                s.geo_lat AS lat, s.geo_lon AS lon,
+                s.geo_lat AS lat, s.geo_lon AS lon, s.geo_accuracy_km AS accuracyKm,
                 s.created_at AS createdAt, s.last_seen_at AS lastSeenAt
          FROM analytics_sessions s
          LEFT JOIN users u ON u.id = s.user_id

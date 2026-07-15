@@ -64,6 +64,8 @@ export interface GeoPoint {
   city: string | null;
   country: string | null;
   count: number;
+  /** 그룹 내 최대 위치 정확도 반경 (km) — 미터 기반 원의 반지름. 레거시 행뿐이면 null */
+  accuracyKm: number | null;
 }
 
 export interface GeoipRefreshInfo {
@@ -104,6 +106,8 @@ export interface SessionRow {
   city: string | null;
   lat: number | null;
   lon: number | null;
+  /** 위치 정확도 반경 (km) — 마이그레이션 이전 세션은 null */
+  accuracyKm: number | null;
   createdAt: number;
   lastSeenAt: number;
 }

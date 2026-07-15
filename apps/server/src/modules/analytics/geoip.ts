@@ -13,6 +13,8 @@ export interface GeoResult {
   city: string | null;
   lat: number | null;
   lon: number | null;
+  /** 위치 정확도 반경 (km, MaxMind 표준 단위) — 지도의 미터 기반 원에 쓴다 */
+  accuracyKm: number | null;
 }
 
 /**
@@ -85,5 +87,6 @@ export async function lookupGeo(dbPath: string, ip: string): Promise<GeoResult |
     city: result.city?.names?.en ?? null,
     lat: result.location?.latitude ?? null,
     lon: result.location?.longitude ?? null,
+    accuracyKm: result.location?.accuracy_radius ?? null,
   };
 }

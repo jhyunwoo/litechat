@@ -210,4 +210,10 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX ix_notification_log_user ON notification_log (user_id, sent_at);
   CREATE INDEX ix_notification_log_sent ON notification_log (sent_at);
   `,
+
+  // v6 → v7: GeoLite2의 위치 정확도 반경(km)을 세션에 저장 — 지도가 줌과 무관하게
+  // 정확한 지리 반경(미터 기반 원)을 그릴 수 있게 한다. 기존 행은 NULL로 남는다.
+  `
+  ALTER TABLE analytics_sessions ADD COLUMN geo_accuracy_km REAL;
+  `,
 ];

@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { openTestDatabase } from '../../db/database';
-import { AnalyticsRepo, type SessionListFilter } from './repo';
+import { AnalyticsRepo, type NewSessionInput, type SessionListFilter } from './repo';
 
 function seed(db: ReturnType<typeof openTestDatabase>): AnalyticsRepo {
   const repo = new AnalyticsRepo(db);
@@ -60,6 +60,51 @@ describe('listSessions', () => {
     expect(page2.rows.length).toBe(1);
     expect(page1.total).toBe(4);
     expect(page2.rows[0]?.id).toBe('s1');
+  });
+});
+
+describe('geo_accuracy_km — 지도 미터 기반 반경의 데이터 소스', () => {
+  /** GeoIP 조회 결과가 있는 세션 입력 헬퍼 — accuracyKm만 케이스별로 바꾼다 */
+  const geoInput = (
+    id: string,
+    accuracyKm: number | null,
+    lat = 37.5,
+  ): NewSessionInput => ({
+    id,
+    visitorId: `v-${id}`,
+    userId: null,
+    platform: 'web',
+    ip: '5.5.5.5',
+    userAgent: 'UA',
+    referrer: null,
+    geo: { country: 'KR', region: '11', city: 'Seoul', lat, lon: 127.0, accuracyKm },
+  });
+
+  test('insertSession이 accuracyKm을 저장하고 listSessions가 반환한다 (레거시 행은 null)', () => {
+    const db = openTestDatabase();
+    const repo = seed(db); // s1~s4 — geo 없이 삽입된 레거시 행
+    repo.insertSession(geoInput('s-geo', 10));
+
+    const withGeo = repo.listSessions({ ...base, ip: '5.5.5.5' });
+    expect(withGeo.rows[0]?.accuracyKm).toBe(10);
+
+    const legacy = repo.listSessions({ ...base, ip: '1.1.1.1' });
+    expect(legacy.rows[0]?.accuracyKm).toBeNull();
+  });
+
+  test('geoPoints — 같은 지점 그룹은 MAX(accuracyKm), 정확도가 전혀 없으면 null', () => {
+    const repo = new AnalyticsRepo(openTestDatabase());
+    repo.insertSession(geoInput('g1', 10));
+    repo.insertSession(geoInput('g2', 50)); // 같은 좌표 — 보수적으로 큰 반경을 채택
+    repo.insertSession(geoInput('g3', null, 35.1)); // 다른 좌표, 정확도 없음
+
+    const points = repo.geoPoints(30);
+    const seoul = points.find((p) => p.lat === 37.5);
+    const other = points.find((p) => p.lat === 35.1);
+    expect(seoul?.count).toBe(2);
+    expect(seoul?.accuracyKm).toBe(50);
+    expect(other?.count).toBe(1);
+    expect(other?.accuracyKm).toBeNull();
   });
 });
 
