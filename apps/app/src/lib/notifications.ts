@@ -108,6 +108,31 @@ export function useNotificationDeepLink(ready: boolean): void {
 }
 
 /**
+ * 알림 수신 ACK — 알림이 실제로 도착했을 때(포그라운드/백그라운드, 프로세스가 살아있는
+ * 동안) 서버에 수신 시각을 기록한다. 루트 레이아웃에서 한 번 마운트한다.
+ *
+ * 한계: 앱이 완전히 종료된 상태로 도착한 알림은 이 리스너가 붙어 있지 않아 ACK가
+ * 오지 않는다 — 딥링크(useNotificationDeepLink)와 달리 콜드 스타트 시점의 재발화가
+ * 없다(expo-notifications가 "받았다"는 과거 이벤트를 다시 쏴주지 않는다).
+ */
+export function useNotificationReceivedAck(): void {
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const logId = notification.request.content.data?.n;
+      if (typeof logId !== 'number') return;
+      void (async () => {
+        try {
+          await unwrap(await api.api.push.ack.$post({ json: { n: logId } }));
+        } catch {
+          /* ACK 실패는 무시 — 다음 알림 수신 때 재시도할 필요는 없다(수신 로그일 뿐) */
+        }
+      })();
+    });
+    return () => subscription.remove();
+  }, []);
+}
+
+/**
  * 앱 아이콘 배지 동기화 — 대화 목록 캐시의 안읽음 합계를 반영한다.
  * (앱이 종료된 동안은 서버가 push payload의 badge 필드로 유지한다)
  */
