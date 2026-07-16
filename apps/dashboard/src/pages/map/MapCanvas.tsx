@@ -6,9 +6,10 @@
  *    픽셀 고정 div 마커가 줌마다 반경이 달라 보이던 문제의 해결책. 접속 수는 원의
  *    채움 불투명도와 중앙 카운트 칩으로 인코딩한다.
  * 2. 접속 기록 핀: 현재 패널에 나열된 기록 중 위치가 있는 것들. 선택된 기록은
- *    잉크 블랙 + 확대로 강조되어 어느 핀인지 바로 보인다.
+ *    브랜드 인디고 + 확대로 강조되어 어느 핀인지 바로 보인다.
  * 3. 선택 기록의 정확도 원: Insights(유료) 반경이 있으면 그것을, 없으면 세션에
- *    저장된 GeoLite2 반경을 그린다.
+ *    저장된 GeoLite2 반경을 그린다. 핀과 같은 인디고 액센트로 그려 흰 밀도 원들과
+ *    즉시 구분되며, 그동안 밀도 원들은 흐려져 대비가 커진다.
  *
  * API 키는 빌드 시점이 아니라 서버 환경변수(GOOGLE_MAPS_API_KEY)에서 런타임에
  * 받아온다 (키 교체 시 재빌드가 필요 없고, Dokploy가 서버 컨테이너에만 환경변수를
@@ -17,7 +18,14 @@
 import { useEffect } from 'react';
 import { AdvancedMarker, APIProvider, Circle, Map, Pin, useMap } from '@vis.gl/react-google-maps';
 import type { AdminConfig, GeoPoint, SessionRow } from '../../api';
-import { DEFAULT_ACCURACY_KM, PIN, formatDate, type MapTarget, type SelectedCircle } from './shared';
+import {
+  DEFAULT_ACCURACY_KM,
+  PIN,
+  SELECTED_CIRCLE,
+  formatDate,
+  type MapTarget,
+  type SelectedCircle,
+} from './shared';
 
 interface MapCanvasProps {
   config: AdminConfig | null;
@@ -70,10 +78,15 @@ export function MapCanvas({
         <MapController target={target} />
 
         {points.map((p) => (
-          <GeoAreaCircle key={`${p.lat},${p.lon}`} point={p} max={max} />
+          <GeoAreaCircle
+            key={`${p.lat},${p.lon}`}
+            point={p}
+            max={max}
+            dimmed={selectedCircle !== null}
+          />
         ))}
 
-        {/* 접속 기록 핀 — 클릭하면 해당 기록이 선택된다 (선택 = 잉크 블랙 + 확대) */}
+        {/* 접속 기록 핀 — 클릭하면 해당 기록이 선택된다 (선택 = 인디고 + 확대) */}
         {locatedSessions.map((row) => {
           const selected = selectedSessionId === row.id;
           return (
@@ -94,16 +107,17 @@ export function MapCanvas({
           );
         })}
 
-        {/* 선택한 기록의 정확도 반경 (km → m) */}
+        {/* 선택한 기록의 정확도 반경 (km → m) — 핀과 같은 인디고 액센트, 밀도 원 위에 */}
         {selectedCircle && (
           <Circle
             center={{ lat: selectedCircle.lat, lng: selectedCircle.lng }}
             radius={selectedCircle.radiusKm * 1000}
-            strokeColor="#ffffff"
-            strokeOpacity={0.9}
-            strokeWeight={2}
-            fillColor="#ffffff"
-            fillOpacity={0.15}
+            strokeColor={SELECTED_CIRCLE.stroke}
+            strokeOpacity={0.95}
+            strokeWeight={2.5}
+            fillColor={SELECTED_CIRCLE.fill}
+            fillOpacity={0.22}
+            zIndex={20}
             clickable={false}
           />
         )}
@@ -126,12 +140,14 @@ function MapController({ target }: { target: MapTarget | null }) {
 /**
  * 밀도 지점 — 미터 기반 정확도 원 + 중앙 카운트 칩.
  * 정확도가 없는 레거시 지점은 기본 반경을 옅게 그려 "추정"임을 드러낸다.
+ * dimmed(선택 원이 떠 있는 동안)면 흐려져 선택 원의 대비를 키운다.
  */
-function GeoAreaCircle({ point, max }: { point: GeoPoint; max: number }) {
+function GeoAreaCircle({ point, max, dimmed }: { point: GeoPoint; max: number; dimmed: boolean }) {
   const estimated = point.accuracyKm === null;
   const radiusKm = point.accuracyKm ?? DEFAULT_ACCURACY_KM;
   // 접속 수 → 채움 불투명도 (0.08~0.22). 반경은 밀도가 아니라 실제 지리 정확도만 나타낸다.
   const density = max > 0 ? point.count / max : 0;
+  const dim = dimmed ? 0.4 : 1;
   const label = `${[point.city, point.country].filter(Boolean).join(', ') || '알 수 없음'} · ${point.count}건${estimated ? ' · 반경 추정' : ` · 반경 ${radiusKm}km`}`;
   return (
     <>
@@ -139,10 +155,10 @@ function GeoAreaCircle({ point, max }: { point: GeoPoint; max: number }) {
         center={{ lat: point.lat, lng: point.lon }}
         radius={radiusKm * 1000}
         strokeColor="#ffffff"
-        strokeOpacity={estimated ? 0.25 : 0.6}
+        strokeOpacity={(estimated ? 0.25 : 0.6) * dim}
         strokeWeight={1}
         fillColor="#ffffff"
-        fillOpacity={(estimated ? 0.5 : 1) * (0.08 + density * 0.14)}
+        fillOpacity={(estimated ? 0.5 : 1) * (0.08 + density * 0.14) * dim}
         clickable={false}
       />
       <AdvancedMarker position={{ lat: point.lat, lng: point.lon }} title={label}>
