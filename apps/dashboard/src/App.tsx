@@ -31,7 +31,7 @@ function Tab({ to, label }: { to: string; label: string }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `rounded-full px-4 py-2 text-sm transition-colors ${
+        `whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${
           // primary가 흰색이므로 활성 탭 텍스트는 검정 (white-on-white 방지)
           isActive ? 'bg-primary text-black' : 'text-ink-mute hover:text-white'
         }`
@@ -47,8 +47,9 @@ function Shell() {
   // 지도는 뷰포트 전체를 쓰는 풀블리드 라우트 — 네비게이션이 frosted 바로 지도 위에 뜬다
   const isMap = useLocation().pathname === '/map';
 
+  // 모바일에서는 탭이 줄바꿈 대신 한 줄 가로 스크롤로 흐른다 (세로 공간 절약)
   const nav = (
-    <nav className="flex flex-wrap gap-2">
+    <nav className="no-scrollbar flex gap-2 overflow-x-auto">
       <Tab to="/" label="개요" />
       <Tab to="/map" label="지도" />
       <Tab to="/sessions" label="접속 기록" />
@@ -72,19 +73,22 @@ function Shell() {
         <main className="absolute inset-0">
           <Outlet />
         </main>
-        <header className="glass absolute inset-x-0 top-0 z-20 flex items-center gap-6 border-b border-hairline/60 px-6 py-2.5">
-          <h1 className="display text-lg">litechat 대시보드</h1>
+        {/* 좁은 화면에서는 타이틀+계정 / 내비 두 줄로 쌓이고, lg부터 한 줄로 합쳐진다 */}
+        <header className="glass absolute inset-x-0 top-0 z-20 flex flex-col gap-2 border-b border-hairline/60 px-4 py-2.5 lg:flex-row lg:items-center lg:gap-6 lg:px-6">
+          <div className="flex items-center justify-between gap-4 lg:contents">
+            <h1 className="display text-base lg:text-lg">litechat 대시보드</h1>
+            <div className="lg:order-last lg:ml-auto">{account}</div>
+          </div>
           {nav}
-          <div className="ml-auto">{account}</div>
         </header>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col gap-6 px-8 py-8">
+    <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-8 sm:py-8">
       <header className="flex items-center justify-between">
-        <h1 className="display text-2xl">litechat 대시보드</h1>
+        <h1 className="display text-xl sm:text-2xl">litechat 대시보드</h1>
         {account}
       </header>
       {nav}

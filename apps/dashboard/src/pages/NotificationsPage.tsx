@@ -141,7 +141,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <KpiCard label="발송 건수 (30일)" value={summary?.totalSent ?? '–'} />
         <KpiCard
           label="발송 성공률"
@@ -157,15 +157,15 @@ export default function NotificationsPage() {
         />
       </div>
 
-      {/* 필터 바 */}
+      {/* 필터 바 — 모바일에서는 2칸 그리드로 쌓이고, sm부터 한 줄로 흐른다 */}
       <div className="rounded-xl border border-hairline bg-card p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs text-ink-mute">
+        <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-ink-mute sm:col-auto">
             수신자
             <select
               value={userId}
               onChange={(e) => withPageReset(setUserId)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               <option value="">전체</option>
               {users.map((user) => (
@@ -180,7 +180,7 @@ export default function NotificationsPage() {
             <select
               value={channel}
               onChange={(e) => withPageReset(setChannel)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               {CHANNEL_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -194,7 +194,7 @@ export default function NotificationsPage() {
             <select
               value={sentStatus}
               onChange={(e) => withPageReset(setSentStatus)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               {SENT_STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -208,7 +208,7 @@ export default function NotificationsPage() {
             <select
               value={receivedStatus}
               onChange={(e) => withPageReset(setReceivedStatus)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               {RECEIVED_STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -223,7 +223,7 @@ export default function NotificationsPage() {
               type="date"
               value={fromDate}
               onChange={(e) => withPageReset(setFromDate)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-mute">
@@ -232,19 +232,55 @@ export default function NotificationsPage() {
               type="date"
               value={toDate}
               onChange={(e) => withPageReset(setToDate)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             />
           </label>
-          <span className="ml-auto text-xs text-ink-mute tnum">
+          <span className="col-span-2 text-xs text-ink-mute tnum sm:col-auto sm:ml-auto">
             {result ? `총 ${result.total.toLocaleString()}건` : ''}
             {loading ? ' · 불러오는 중…' : ''}
           </span>
         </div>
       </div>
 
-      {/* 데이터 그리드 */}
+      {/* 데이터 그리드 — 모바일에서는 행당 카드, sm부터 테이블 */}
       <div className="rounded-xl border border-hairline bg-card">
-        <div className="max-h-[600px] overflow-auto">
+        <div className="max-h-[600px] overflow-y-auto sm:hidden">
+          {result?.rows.map((row) => (
+            <div key={row.id} className="border-b border-hairline/50 px-4 py-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="tnum">{formatDate(row.sentAt)}</span>
+                <span className="text-ink-mute">{CHANNEL_LABEL[row.channel] ?? row.channel}</span>
+              </div>
+              <div className="mt-1">
+                {row.nickname ?? '—'} <span className="text-ink-mute">@{row.username ?? '?'}</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5" title={row.sentError ?? ''}>
+                <Badge
+                  label={SENT_STATUS_LABEL[row.sentStatus] ?? row.sentStatus}
+                  className={sentBadgeClass(row.sentStatus)}
+                />
+                <Badge
+                  label={RECEIVED_STATUS_LABEL[row.receivedStatus] ?? row.receivedStatus}
+                  className={receivedBadgeClass(row.receivedStatus)}
+                />
+                {row.receivedAt !== null && (
+                  <span className="tnum text-[11px] text-ink-mute">
+                    지연 {formatLatency(row.receivedAt - row.sentAt)}
+                  </span>
+                )}
+              </div>
+              {row.receivedAt !== null && (
+                <div className="tnum mt-1 text-[11px] text-ink-mute">
+                  수신 {formatDate(row.receivedAt)}
+                </div>
+              )}
+              <div className="mt-1 truncate text-[11px] text-ink-mute" title={row.bodyPreview}>
+                {row.bodyPreview || '—'}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden max-h-[600px] overflow-auto sm:block">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-card text-ink-mute">
               <tr className="border-b border-hairline">
@@ -305,10 +341,10 @@ export default function NotificationsPage() {
               ))}
             </tbody>
           </table>
-          {result && result.rows.length === 0 && (
-            <p className="py-10 text-center text-ink-mute">조건에 맞는 알림 기록이 없어요.</p>
-          )}
         </div>
+        {result && result.rows.length === 0 && (
+          <p className="py-10 text-center text-ink-mute">조건에 맞는 알림 기록이 없어요.</p>
+        )}
 
         {/* 페이지네이션 */}
         <div className="flex items-center justify-between border-t border-hairline px-4 py-2.5 text-xs text-ink-mute">

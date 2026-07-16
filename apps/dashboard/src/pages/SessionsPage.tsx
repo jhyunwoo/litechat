@@ -100,15 +100,15 @@ export default function SessionsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 필터 바 */}
+      {/* 필터 바 — 모바일에서는 2칸 그리드로 쌓이고, sm부터 한 줄로 흐른다 */}
       <div className="rounded-xl border border-hairline bg-card p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs text-ink-mute">
+        <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-ink-mute sm:col-auto">
             사용자
             <select
               value={userId}
               onChange={(e) => withPageReset(setUserId)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               <option value="">전체</option>
               {users.map((user) => (
@@ -123,7 +123,7 @@ export default function SessionsPage() {
             <select
               value={platform}
               onChange={(e) => withPageReset(setPlatform)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             >
               {PLATFORM_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -138,7 +138,7 @@ export default function SessionsPage() {
               value={ip}
               onChange={(e) => withPageReset(setIp)(e.target.value)}
               placeholder="예: 121.128"
-              className={`${inputClass} w-36`}
+              className={`${inputClass} w-full sm:w-36`}
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-mute">
@@ -147,7 +147,7 @@ export default function SessionsPage() {
               type="date"
               value={fromDate}
               onChange={(e) => withPageReset(setFromDate)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-mute">
@@ -156,19 +156,55 @@ export default function SessionsPage() {
               type="date"
               value={toDate}
               onChange={(e) => withPageReset(setToDate)(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} w-full sm:w-auto`}
             />
           </label>
-          <span className="ml-auto text-xs text-ink-mute tnum">
+          <span className="col-span-2 text-xs text-ink-mute tnum sm:col-auto sm:ml-auto">
             {result ? `총 ${result.total.toLocaleString()}건` : ''}
             {loading ? ' · 불러오는 중…' : ''}
           </span>
         </div>
       </div>
 
-      {/* 데이터 그리드 */}
+      {/* 데이터 그리드 — 모바일에서는 행당 카드, sm부터 테이블 */}
       <div className="rounded-xl border border-hairline bg-card">
-        <div className="max-h-[70dvh] overflow-auto">
+        <div className="max-h-[70dvh] overflow-y-auto sm:hidden">
+          {result?.rows.map((row) => (
+            <div key={row.id} className="border-b border-hairline/50 px-4 py-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="tnum">{formatDate(row.createdAt)}</span>
+                <span className="rounded-full border border-hairline/70 px-1.5 py-0.5 text-[10px] text-ink-mute">
+                  {row.platform}
+                </span>
+              </div>
+              <div className="mt-1">
+                {row.userId ? (
+                  <>
+                    {row.nickname} <span className="text-ink-mute">@{row.username}</span>
+                  </>
+                ) : (
+                  <span className="text-ink-mute">비로그인</span>
+                )}
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-ink-mute">
+                <span className="tnum">{row.ip}</span>
+                <span>{locationOf(row)}</span>
+              </div>
+              <div className="tnum mt-1 text-[11px] text-ink-mute">
+                마지막 활동 {formatDate(row.lastSeenAt)}
+              </div>
+              {row.referrer && (
+                <div className="mt-1 truncate text-[11px] text-ink-mute" title={row.referrer}>
+                  리퍼러 {row.referrer}
+                </div>
+              )}
+              <div className="mt-1 truncate text-[11px] text-ink-mute" title={row.userAgent}>
+                {row.userAgent || '—'}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden max-h-[70dvh] overflow-auto sm:block">
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 z-10 bg-card text-ink-mute">
               <tr className="border-b border-hairline">
@@ -229,10 +265,10 @@ export default function SessionsPage() {
               ))}
             </tbody>
           </table>
-          {result && result.rows.length === 0 && (
-            <p className="py-10 text-center text-ink-mute">조건에 맞는 접속 기록이 없어요.</p>
-          )}
         </div>
+        {result && result.rows.length === 0 && (
+          <p className="py-10 text-center text-ink-mute">조건에 맞는 접속 기록이 없어요.</p>
+        )}
 
         {/* 페이지네이션 */}
         <div className="flex items-center justify-between border-t border-hairline px-4 py-2.5 text-xs text-ink-mute">

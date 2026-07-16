@@ -34,7 +34,7 @@ export default function UsersPage() {
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[1fr_420px]">
-      <div className="rounded-xl border border-hairline bg-card p-5">
+      <div className="rounded-xl border border-hairline bg-card p-4 sm:p-5">
         <h2 className="mb-4 text-sm text-ink-mute">사용자별 방문 횟수 ({rows.length}명)</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -62,7 +62,7 @@ export default function UsersPage() {
       </div>
 
       {top.length > 0 && (
-        <div className="rounded-xl border border-hairline bg-card p-5">
+        <div className="rounded-xl border border-hairline bg-card p-4 sm:p-5">
           <h2 className="mb-4 text-sm text-ink-mute">상위 방문자 (Top {top.length})</h2>
           <ResponsiveContainer width="100%" height={Math.max(220, top.length * 36)}>
             <BarChart data={top} layout="vertical" margin={{ left: 8, right: 16 }}>

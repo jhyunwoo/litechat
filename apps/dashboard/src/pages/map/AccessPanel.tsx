@@ -1,15 +1,18 @@
 /**
- * 접속 기록 글래스 패널 — 지도 왼쪽에 떠 있는 반투명(blur) 패널.
+ * 접속 기록 글래스 패널 — 지도 위에 떠 있는 반투명(blur) 패널.
+ * 데스크톱에서는 지도 왼쪽에 세로로 붙고, 모바일에서는 하단 시트가 되어
+ * 지도 위쪽 절반이 항상 보인다.
  *
  * 탭 3개로 기존 기능을 전부 담는다:
- *  - 접속 기록: 최근 세션 목록(기본 전체, 사용자 선택 시 필터) + Insights 상세
+ *  - 접속 기록: 최근 세션 목록 + 필터(사용자/플랫폼/IP/기간/조회 건수) +
+ *    새로고침/마지막 업데이트 + Insights 상세
  *  - 사용자: 사용자 목록 + Insights 상시 수집(★) 토글 + 수집된 Insights 칩
  *  - 진단: GeoIP DB 상태/실패 IP 표본
  *
- * 기록을 클릭하면 지도의 해당 핀이 잉크 블랙으로 강조되고, 핀을 클릭하면
+ * 기록을 클릭하면 지도의 해당 핀이 강조되고, 핀을 클릭하면
  * 목록의 해당 행이 하이라이트되며 화면 안으로 스크롤된다.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   GeoStatus,
   Insights,
@@ -19,7 +22,7 @@ import type {
 } from '../../api';
 import { GeoDiagnostics } from './GeoDiagnostics';
 import { InsightsCard } from './InsightsCard';
-import { formatDate } from './shared';
+import { formatDate, formatTime, LIMIT_OPTIONS, type SessionFilters } from './shared';
 
 export type PanelTab = 'sessions' | 'users' | 'diagnostics';
 
@@ -29,13 +32,29 @@ const TABS: { id: PanelTab; label: string }[] = [
   { id: 'diagnostics', label: '진단' },
 ];
 
+const PLATFORM_OPTIONS = ['', 'web', 'lite', 'app'] as const;
+
+/** 글래스 패널 위 폼 컨트롤 — 반투명 검정 배경으로 지도가 살짝 비친다 */
+const inputClass =
+  'w-full rounded-md border border-hairline bg-black/40 px-2.5 py-1.5 text-xs text-ink outline-none focus:border-primary-soft';
+
 interface AccessPanelProps {
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   onClose: () => void;
 
-  // 접속 기록 탭
+  // 접속 기록 탭 — 목록/필터/새로고침
   sessions: SessionRow[];
+  sessionsTotal: number;
+  sessionsBusy: boolean;
+  /** 마지막으로 접속 기록을 불러온 시각 (ms epoch) — 아직 없으면 null */
+  lastUpdated: number | null;
+  filters: SessionFilters;
+  onFilters: (patch: Partial<SessionFilters>) => void;
+  /** 사용자 필터는 Insights 로딩 등 부수효과가 있어 별도 핸들러를 쓴다 */
+  onUserFilter: (userId: string) => void;
+  onResetFilters: () => void;
+  onRefresh: () => void;
   selectedSession: SessionRow | null;
   selectedUser: UserVisit | null;
   insights: InsightsResult | null;
@@ -43,7 +62,6 @@ interface AccessPanelProps {
   insightsError: string;
   onSelectSession: (row: SessionRow) => void;
   onLookupInsights: (ip: string) => void;
-  onClearUser: () => void;
 
   // 사용자 탭
   users: UserVisit[];
@@ -62,7 +80,13 @@ interface AccessPanelProps {
 export function AccessPanel(props: AccessPanelProps) {
   const { tab, onTab, onClose } = props;
   return (
-    <aside className="glass pointer-events-auto absolute bottom-4 left-4 top-16 z-10 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-hairline/70">
+    <aside
+      className={
+        // 모바일: 하단 시트(높이 고정) / sm+: 왼쪽 세로 패널 (top은 헤더 높이를 따라 lg에서 한 번 더 올라간다)
+        'glass pointer-events-auto absolute bottom-2 left-2 right-2 z-10 flex h-[48dvh] flex-col overflow-hidden rounded-2xl border border-hairline/70 ' +
+        'sm:bottom-4 sm:left-4 sm:right-auto sm:top-24 sm:h-auto sm:w-[400px] sm:max-w-[calc(100vw-2rem)] lg:top-16'
+      }
+    >
       <div className="flex items-center gap-1 border-b border-hairline/60 px-3 py-2">
         {TABS.map((t) => (
           <button
@@ -81,7 +105,8 @@ export function AccessPanel(props: AccessPanelProps) {
           title="패널 접기"
           aria-label="패널 접기"
         >
-          ‹
+          <span className="sm:hidden">∨</span>
+          <span className="hidden sm:inline">‹</span>
         </button>
       </div>
       <div className="scroll-thin flex-1 overflow-y-auto p-3">
@@ -100,6 +125,14 @@ export function AccessPanel(props: AccessPanelProps) {
 
 function SessionsTab({
   sessions,
+  sessionsTotal,
+  sessionsBusy,
+  lastUpdated,
+  filters,
+  onFilters,
+  onUserFilter,
+  onResetFilters,
+  onRefresh,
   selectedSession,
   selectedUser,
   insights,
@@ -107,29 +140,141 @@ function SessionsTab({
   insightsError,
   onSelectSession,
   onLookupInsights,
-  onClearUser,
+  users,
 }: AccessPanelProps) {
   const selectedRef = useRef<HTMLButtonElement | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // 지도 핀 클릭 등으로 선택이 바뀌면 목록에서 해당 행이 보이도록 스크롤한다
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selectedSession?.id]);
 
+  const hasFilter =
+    filters.userId !== '' ||
+    filters.platform !== '' ||
+    filters.ip !== '' ||
+    filters.fromDate !== '' ||
+    filters.toDate !== '';
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-xs text-ink-mute">
+      {/* 헤더: 건수/필터 요약 + 필터 토글 + 새로고침 */}
+      <div className="flex items-center justify-between gap-2 text-xs text-ink-mute">
         <span>
-          {selectedUser
-            ? `${selectedUser.nickname}의 접속 기록 (최근 ${sessions.length}건)`
-            : `최근 접속 기록 ${sessions.length}건`}
+          {selectedUser ? `${selectedUser.nickname}의 접속 기록` : '접속 기록'}{' '}
+          <span className="tnum">
+            {sessions.length}건{sessionsTotal > sessions.length ? ` / 전체 ${sessionsTotal}건` : ''}
+          </span>
         </span>
-        {selectedUser && (
-          <button onClick={onClearUser} className="rounded-full border border-hairline px-2 py-0.5 hover:text-white">
-            필터 해제
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={`rounded-full border px-2.5 py-1 transition-colors ${
+              filtersOpen || hasFilter
+                ? 'border-primary/70 text-white'
+                : 'border-hairline hover:text-white'
+            }`}
+            title="접속 기록 필터"
+          >
+            필터{hasFilter ? ' ●' : ''}
           </button>
-        )}
+          <button
+            onClick={onRefresh}
+            disabled={sessionsBusy}
+            className="rounded-full border border-hairline px-2.5 py-1 hover:text-white disabled:opacity-40"
+            title="접속 기록과 지도 데이터를 다시 불러옵니다"
+          >
+            {sessionsBusy ? '갱신 중…' : '↻ 새로고침'}
+          </button>
+        </div>
       </div>
+      <div className="tnum text-[11px] text-ink-mute">
+        마지막 업데이트 {lastUpdated !== null ? formatTime(lastUpdated) : '—'}
+      </div>
+
+      {filtersOpen && (
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-hairline/60 bg-white/5 p-3">
+          <label className="col-span-2 flex flex-col gap-1 text-[11px] text-ink-mute">
+            사용자
+            <select
+              value={filters.userId}
+              onChange={(e) => onUserFilter(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">전체</option>
+              {users.map((user) => (
+                <option key={user.userId} value={user.userId}>
+                  {user.nickname} (@{user.username})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-ink-mute">
+            플랫폼
+            <select
+              value={filters.platform}
+              onChange={(e) => onFilters({ platform: e.target.value })}
+              className={inputClass}
+            >
+              {PLATFORM_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === '' ? '전체' : option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-ink-mute">
+            조회 건수
+            <select
+              value={filters.limit}
+              onChange={(e) => onFilters({ limit: Number(e.target.value) })}
+              className={inputClass}
+            >
+              {LIMIT_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}건
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="col-span-2 flex flex-col gap-1 text-[11px] text-ink-mute">
+            IP (부분 일치)
+            <input
+              value={filters.ip}
+              onChange={(e) => onFilters({ ip: e.target.value })}
+              placeholder="예: 121.128"
+              className={inputClass}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-ink-mute">
+            시작일
+            <input
+              type="date"
+              value={filters.fromDate}
+              onChange={(e) => onFilters({ fromDate: e.target.value })}
+              className={inputClass}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-ink-mute">
+            종료일
+            <input
+              type="date"
+              value={filters.toDate}
+              onChange={(e) => onFilters({ toDate: e.target.value })}
+              className={inputClass}
+            />
+          </label>
+          {hasFilter && (
+            <button
+              onClick={onResetFilters}
+              className="col-span-2 rounded-md border border-hairline px-3 py-1.5 text-xs text-ink-mute hover:text-white"
+            >
+              필터 초기화
+            </button>
+          )}
+        </div>
+      )}
 
       {insightsError !== '' && (
         <p className="rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">

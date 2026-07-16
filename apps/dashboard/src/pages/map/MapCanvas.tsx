@@ -34,6 +34,12 @@ interface MapCanvasProps {
   /** 패널에 나열된 접속 기록 중 위치가 있는 것들 — 핀으로 표시 */
   locatedSessions: SessionRow[];
   selectedSessionId: string | null;
+  /**
+   * Insights 상세 조회 위치 — 있으면 선택 핀 스타일로 표시한다.
+   * 같은 IP의 세션 핀은 컨테이너가 locatedSessions에서 이미 제외했으므로
+   * GeoLite2 위치의 옛 핀과 겹쳐 보이지 않는다.
+   */
+  insightsPin: { lat: number; lng: number } | null;
   selectedCircle: SelectedCircle | null;
   onSelectSession: (row: SessionRow) => void;
 }
@@ -44,6 +50,7 @@ export function MapCanvas({
   points,
   locatedSessions,
   selectedSessionId,
+  insightsPin,
   selectedCircle,
   onSelectSession,
 }: MapCanvasProps) {
@@ -106,6 +113,18 @@ export function MapCanvas({
             </AdvancedMarker>
           );
         })}
+
+        {/* Insights 상세 조회 위치 핀 — GeoLite2 세션 핀을 대체하는 정밀 위치 */}
+        {insightsPin && (
+          <AdvancedMarker position={insightsPin} title="Insights 상세 조회 위치" zIndex={40}>
+            <Pin
+              background={PIN.selectedBg}
+              borderColor={PIN.border}
+              glyphColor={PIN.glyph}
+              scale={1.15}
+            />
+          </AdvancedMarker>
+        )}
 
         {/* 선택한 기록의 정확도 반경 (km → m) — 핀과 같은 인디고 액센트, 밀도 원 위에 */}
         {selectedCircle && (

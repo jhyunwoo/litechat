@@ -23,7 +23,7 @@ type Metric = (typeof METRICS)[number];
 
 function MetricCard({ metric, series }: { metric: Metric; series: VitalsPoint[] | undefined }) {
   return (
-    <div className="rounded-xl border border-hairline bg-card p-5">
+    <div className="rounded-xl border border-hairline bg-card p-4 sm:p-5">
       <h2 className="mb-4 text-sm">
         <span className="display text-ink">{metric}</span>
         <span className="ml-2 text-ink-mute">일일 평균 · p75</span>

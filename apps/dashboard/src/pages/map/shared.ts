@@ -16,6 +16,23 @@ export interface SelectedCircle {
   radiusKm: number;
 }
 
+/** 접속 기록 조회 조건 — 패널 필터 UI와 컨테이너(MapPage)가 공유한다 */
+export interface SessionFilters {
+  /** 사용자 ID (select 바인딩용 문자열, '' = 전체) */
+  userId: string;
+  platform: string;
+  /** IP 부분 일치 검색 */
+  ip: string;
+  /** yyyy-mm-dd, '' = 제한 없음 */
+  fromDate: string;
+  toDate: string;
+  /** 조회할 접속 기록 수 (서버 pageSize 상한 200) */
+  limit: number;
+}
+
+/** 조회 건수 선택지 — 서버가 pageSize를 200으로 제한하므로 그 안에서 고른다 */
+export const LIMIT_OPTIONS = [50, 100, 200] as const;
+
 /** GeoLite2 정확도가 없는 레거시 밀도 지점에 쓰는 보수적 기본 반경 (도시 수준) */
 export const DEFAULT_ACCURACY_KM = 25;
 
@@ -49,4 +66,16 @@ export function formatDate(epochSeconds: number): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+/** 밀리초 epoch → HH:MM:SS — "마지막 업데이트" 표시용 */
+export function formatTime(epochMs: number): string {
+  return new Date(epochMs).toLocaleTimeString('ko-KR', { hour12: false });
+}
+
+/** yyyy-mm-dd(로컬) → epoch 초. endOfDay면 그날 23:59:59 */
+export function dateToEpoch(value: string, endOfDay: boolean): number | undefined {
+  if (!value) return undefined;
+  const date = new Date(`${value}T${endOfDay ? '23:59:59' : '00:00:00'}`);
+  return Math.floor(date.getTime() / 1000);
 }
