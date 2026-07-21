@@ -35,6 +35,26 @@ import {
   type SessionFilters,
 } from './map/shared';
 
+function isInsightsForSession(row: SessionRow, details: Insights): boolean {
+  return row.ip.replace(/^::ffff:/i, '') === details.ip;
+}
+
+/** 방금 조회한 Insights 위치를 새로고침 전에 같은 IP의 세션들에 즉시 반영한다. */
+function applyInsightsLocation(row: SessionRow, details: Insights): SessionRow {
+  if (!isInsightsForSession(row, details) || details.lat === null || details.lon === null)
+    return row;
+  return {
+    ...row,
+    country: details.country ?? row.country,
+    region: details.region ?? row.region,
+    city: details.city ?? row.city,
+    lat: details.lat,
+    lon: details.lon,
+    accuracyKm: details.accuracyRadius ?? row.accuracyKm,
+    locationSource: 'insights',
+  };
+}
+
 const EMPTY_FILTERS: SessionFilters = {
   userId: '',
   platform: '',
@@ -194,6 +214,10 @@ export default function MapPage() {
       .insights(ip)
       .then((result) => {
         setInsights(result);
+        setSessions((rows) => rows.map((row) => applyInsightsLocation(row, result.insights)));
+        setSelectedSession((row) => row && applyInsightsLocation(row, result.insights));
+        // 밀도 원도 방금 저장된 Insights 위치로 다시 집계한다.
+        void adminApi.geo(30).then(setPoints);
         const { lat, lon } = result.insights;
         if (lat !== null && lon !== null) setTarget({ lat, lng: lon, zoom: 11 });
       })
@@ -204,6 +228,9 @@ export default function MapPage() {
   /** 수집된 Insights 칩 클릭 — 상세 카드 표시 + 지도 이동 */
   function selectInsights(row: Insights) {
     setInsights({ cached: true, stale: false, insights: row });
+    setSessions((sessions) => sessions.map((session) => applyInsightsLocation(session, row)));
+    setSelectedSession((session) => session && applyInsightsLocation(session, row));
+    void adminApi.geo(30).then(setPoints);
     setTab('sessions'); // 상세 카드는 기록 탭에 표시된다
     if (row.lat !== null && row.lon !== null) {
       setTarget({ lat: row.lat, lng: row.lon, zoom: 11 });
@@ -213,7 +240,8 @@ export default function MapPage() {
   const selectedUser = users.find((u) => String(u.userId) === filters.userId) ?? null;
   const locatedSessions = sessions.filter((row) => row.lat !== null && row.lon !== null);
 
-  // Insights 상세 조회 결과의 좌표 — 있으면 세션의 GeoLite2 위치(핀+원)를 대체한다
+  // Insights 상세 조회 결과의 좌표 — 서버에서 이미 기본 지도 위치에도 우선 반영되며,
+  // 조회 직후에는 선택 위치를 별도 강조 핀으로 표시한다.
   const insightsData = insights?.insights ?? null;
   const insightsPin =
     insightsData && insightsData.lat !== null && insightsData.lon !== null
@@ -221,8 +249,10 @@ export default function MapPage() {
       : null;
   // 선택 세션의 IP를 상세 조회한 경우 — 기존(GeoLite2) 핀은 숨기고 Insights 핀만 남긴다
   const replacesSelectedPin =
-    insightsPin !== null && insightsData !== null && selectedSession !== null &&
-    insightsData.ip === selectedSession.ip;
+    insightsPin !== null &&
+    insightsData !== null &&
+    selectedSession !== null &&
+    isInsightsForSession(selectedSession, insightsData);
   const visibleSessions =
     replacesSelectedPin && selectedSession
       ? locatedSessions.filter((row) => row.id !== selectedSession.id)
@@ -233,7 +263,7 @@ export default function MapPage() {
     if (insightsData && insightsData.lat !== null && insightsData.lon !== null) {
       const radiusKm =
         insightsData.accuracyRadius ??
-        (selectedSession && selectedSession.ip === insightsData.ip
+        (selectedSession && isInsightsForSession(selectedSession, insightsData)
           ? selectedSession.accuracyKm
           : null);
       return radiusKm !== null

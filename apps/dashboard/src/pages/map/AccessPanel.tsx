@@ -309,7 +309,9 @@ function SessionsTab({
                 <span>
                   {row.lat === null
                     ? '위치 없음'
-                    : [row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}
+                    : `${[row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}${
+                        row.locationSource === 'insights' ? ' · Insights' : ''
+                      }`}
                 </span>
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-ink-mute">

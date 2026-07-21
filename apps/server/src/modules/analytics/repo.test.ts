@@ -61,6 +61,74 @@ describe('listSessions', () => {
     expect(page1.total).toBe(4);
     expect(page2.rows[0]?.id).toBe('s1');
   });
+
+  test('저장된 Insights 좌표와 반경이 기본 GeoLite2 위치보다 우선한다', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    db.query(
+      `UPDATE analytics_sessions
+       SET ip = '::ffff:1.1.1.1', geo_country = 'KR', geo_region = '11', geo_city = 'Seoul',
+           geo_lat = 37.5, geo_lon = 127.0, geo_accuracy_km = 25
+       WHERE id = 's1'`,
+    ).run();
+    repo.upsertInsights({
+      ip: '1.1.1.1',
+      fetchedAt: 100,
+      lat: 37.57,
+      lon: 126.98,
+      accuracyRadius: 5,
+      city: 'Jongno-gu',
+      region: null,
+      country: 'KR',
+      isp: null,
+      organization: null,
+      userType: null,
+      data: '{}',
+    });
+
+    const row = repo.listSessions({ ...base, ip: '1.1.1.1' }).rows[0];
+    expect(row).toMatchObject({
+      lat: 37.57,
+      lon: 126.98,
+      accuracyKm: 5,
+      city: 'Jongno-gu',
+      region: '11', // Insights에 없는 필드는 기본 데이터로 보완
+      locationSource: 'insights',
+    });
+  });
+
+  test('Insights 결과에 유효한 좌표가 없으면 기존 GeoLite2 위치를 유지한다', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    db.query(
+      `UPDATE analytics_sessions
+       SET geo_country = 'KR', geo_region = '26', geo_city = 'Busan',
+           geo_lat = 35.18, geo_lon = 129.08, geo_accuracy_km = 20
+       WHERE id = 's2'`,
+    ).run();
+    repo.upsertInsights({
+      ip: '2.2.2.2',
+      fetchedAt: 100,
+      lat: null,
+      lon: null,
+      accuracyRadius: 3,
+      city: 'Should not replace',
+      region: null,
+      country: null,
+      isp: null,
+      organization: null,
+      userType: null,
+      data: '{}',
+    });
+
+    expect(repo.listSessions({ ...base, ip: '2.2.2.2' }).rows[0]).toMatchObject({
+      lat: 35.18,
+      lon: 129.08,
+      accuracyKm: 20,
+      city: 'Busan',
+      locationSource: 'geoip',
+    });
+  });
 });
 
 describe('geo_accuracy_km — 지도 미터 기반 반경의 데이터 소스', () => {
@@ -105,6 +173,36 @@ describe('geo_accuracy_km — 지도 미터 기반 반경의 데이터 소스', 
     expect(seoul?.accuracyKm).toBe(50);
     expect(other?.count).toBe(1);
     expect(other?.accuracyKm).toBeNull();
+  });
+
+  test('geoPoints — 저장된 Insights 위치/반경으로 밀도 지점을 다시 집계한다', () => {
+    const repo = new AnalyticsRepo(openTestDatabase());
+    repo.insertSession(geoInput('insights-point', 25));
+    repo.upsertInsights({
+      ip: '5.5.5.5',
+      fetchedAt: 100,
+      lat: 37.57,
+      lon: 126.98,
+      accuracyRadius: 4,
+      city: 'Jongno-gu',
+      region: '11',
+      country: 'KR',
+      isp: null,
+      organization: null,
+      userType: null,
+      data: '{}',
+    });
+
+    expect(repo.geoPoints(30)).toEqual([
+      {
+        lat: 37.57,
+        lon: 126.98,
+        city: 'Jongno-gu',
+        country: 'KR',
+        count: 1,
+        accuracyKm: 4,
+      },
+    ]);
   });
 });
 
