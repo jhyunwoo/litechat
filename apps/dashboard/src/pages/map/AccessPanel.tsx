@@ -328,7 +328,9 @@ function SessionsTab({
                   <span>
                     {row.lat === null
                       ? '위치 없음'
-                      : [row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}
+                      : `${[row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}${
+                          row.locationSource === 'insights' ? ' · Insights' : ''
+                        }`}
                   </span>
                 </div>
                 {/* 우측은 형제 '상세 정보' 버튼이 덮으므로 그만큼 비워 둔다.

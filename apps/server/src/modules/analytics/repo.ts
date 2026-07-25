@@ -50,6 +50,8 @@ export interface SessionRow {
   lat: number | null;
   lon: number | null;
   accuracyKm: number | null;
+  /** 지도 좌표의 출처 — 저장된 Insights 좌표가 유효할 때만 insights */
+  locationSource: 'geoip' | 'insights';
   createdAt: number;
   lastSeenAt: number;
 }
@@ -167,6 +169,8 @@ export class AnalyticsRepo {
     accuracyKm: number | null;
   }[] {
     const since = Math.floor(Date.now() / 1000) - days * 86400;
+    // 저장된 Insights 좌표가 있으면 세션의 GeoLite2 좌표보다 우선한다. Insights가
+    // 위치를 주지 않은 결과라면 기존 좌표를 그대로 사용한다.
     // MAX(정확도) = 그룹에서 가장 보수적인(넓은) 반경 — 원이 실제보다 작게 그려지는 것을 막는다.
     return this.db
       .query<
@@ -180,11 +184,25 @@ export class AnalyticsRepo {
         },
         [number]
       >(
-        `SELECT geo_lat AS lat, geo_lon AS lon, geo_city AS city, geo_country AS country,
-                COUNT(*) AS count, MAX(geo_accuracy_km) AS accuracyKm
-         FROM analytics_sessions
-         WHERE created_at >= ? AND geo_lat IS NOT NULL
-         GROUP BY geo_lat, geo_lon, geo_city, geo_country`,
+        `WITH effective_locations AS (
+           SELECT
+             CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL THEN gi.lat ELSE s.geo_lat END AS lat,
+             CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL THEN gi.lon ELSE s.geo_lon END AS lon,
+             CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+               THEN COALESCE(gi.city, s.geo_city) ELSE s.geo_city END AS city,
+             CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+               THEN COALESCE(gi.country, s.geo_country) ELSE s.geo_country END AS country,
+             CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+               THEN COALESCE(gi.accuracy_radius, s.geo_accuracy_km)
+               ELSE s.geo_accuracy_km END AS accuracyKm
+           FROM analytics_sessions s
+           LEFT JOIN geoip_insights gi ON gi.ip = REPLACE(s.ip, '::ffff:', '')
+           WHERE s.created_at >= ?
+         )
+         SELECT lat, lon, city, country, COUNT(*) AS count, MAX(accuracyKm) AS accuracyKm
+         FROM effective_locations
+         WHERE lat IS NOT NULL AND lon IS NOT NULL
+         GROUP BY lat, lon, city, country`,
       )
       .all(since);
   }
@@ -196,8 +214,13 @@ export class AnalyticsRepo {
       this.db
         .query<{ total: number; withGeo: number }, [number]>(
           `SELECT COUNT(*) AS total,
-                  COUNT(*) FILTER (WHERE geo_lat IS NOT NULL) AS withGeo
-           FROM analytics_sessions WHERE created_at >= ?`,
+                  COUNT(*) FILTER (WHERE
+                    (gi.lat IS NOT NULL AND gi.lon IS NOT NULL) OR
+                    (s.geo_lat IS NOT NULL AND s.geo_lon IS NOT NULL)
+                  ) AS withGeo
+           FROM analytics_sessions s
+           LEFT JOIN geoip_insights gi ON gi.ip = REPLACE(s.ip, '::ffff:', '')
+           WHERE s.created_at >= ?`,
         )
         .get(since) ?? { total: 0, withGeo: 0 }
     );
@@ -212,10 +235,13 @@ export class AnalyticsRepo {
     const since = Math.floor(Date.now() / 1000) - days * 86400;
     return this.db
       .query<{ ip: string; count: number; lastAt: number }, [number, number]>(
-        `SELECT ip, COUNT(*) AS count, MAX(created_at) AS lastAt
-         FROM analytics_sessions
-         WHERE created_at >= ? AND geo_lat IS NULL
-         GROUP BY ip
+        `SELECT s.ip, COUNT(*) AS count, MAX(s.created_at) AS lastAt
+         FROM analytics_sessions s
+         LEFT JOIN geoip_insights gi ON gi.ip = REPLACE(s.ip, '::ffff:', '')
+         WHERE s.created_at >= ?
+           AND NOT (gi.lat IS NOT NULL AND gi.lon IS NOT NULL)
+           AND (s.geo_lat IS NULL OR s.geo_lon IS NULL)
+         GROUP BY s.ip
          ORDER BY lastAt DESC
          LIMIT ?`,
       )
@@ -224,6 +250,9 @@ export class AnalyticsRepo {
 
   /**
    * 접속 기록 데이터 탐색기 — 개별 세션 행을 사용자 정보와 함께 필터/정렬/페이지로 나열한다.
+   * 지도용 위치는 해당 IP에 저장된 Insights 좌표가 있으면 우선하고, 없으면 세션에
+   * 저장된 GeoLite2 값을 반환한다. Insights가 일부 지역 필드/반경을 생략하면 기존
+   * GeoLite2 값으로 보완한다.
    * WHERE 절은 채워진 필터만 조건부로 조립하고, 정렬은 타입으로 제한된 화이트리스트 값만
    * 문자열에 넣는다 (사용자 입력을 SQL에 직접 잇지 않는다).
    */
@@ -264,11 +293,25 @@ export class AnalyticsRepo {
         `SELECT s.id, s.visitor_id AS visitorId, s.user_id AS userId,
                 u.username, u.nickname,
                 s.platform, s.ip, s.user_agent AS userAgent, s.referrer,
-                s.geo_country AS country, s.geo_region AS region, s.geo_city AS city,
-                s.geo_lat AS lat, s.geo_lon AS lon, s.geo_accuracy_km AS accuracyKm,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN COALESCE(gi.country, s.geo_country) ELSE s.geo_country END AS country,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN COALESCE(gi.region, s.geo_region) ELSE s.geo_region END AS region,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN COALESCE(gi.city, s.geo_city) ELSE s.geo_city END AS city,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN gi.lat ELSE s.geo_lat END AS lat,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN gi.lon ELSE s.geo_lon END AS lon,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN COALESCE(gi.accuracy_radius, s.geo_accuracy_km)
+                  ELSE s.geo_accuracy_km END AS accuracyKm,
+                CASE WHEN gi.lat IS NOT NULL AND gi.lon IS NOT NULL
+                  THEN 'insights' ELSE 'geoip' END AS locationSource,
                 s.created_at AS createdAt, s.last_seen_at AS lastSeenAt
          FROM analytics_sessions s
          LEFT JOIN users u ON u.id = s.user_id
+         LEFT JOIN geoip_insights gi ON gi.ip = REPLACE(s.ip, '::ffff:', '')
          ${whereSql}
          ORDER BY s.${filter.sort} ${filter.dir === 'asc' ? 'ASC' : 'DESC'}
          LIMIT ? OFFSET ?`,

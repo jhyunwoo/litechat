@@ -106,8 +106,10 @@ export interface SessionRow {
   city: string | null;
   lat: number | null;
   lon: number | null;
-  /** 위치 정확도 반경 (km) — 마이그레이션 이전 세션은 null */
+  /** 지도에 표시할 위치 정확도 반경 (km) — Insights 우선, 없으면 GeoLite2 */
   accuracyKm: number | null;
+  /** 지도 위치가 저장된 Insights와 기본 GeoLite2 중 어디에서 왔는지 */
+  locationSource: 'geoip' | 'insights';
   createdAt: number;
   lastSeenAt: number;
 }
