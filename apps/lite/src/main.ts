@@ -58,6 +58,14 @@ const isEmojiOnly = (s: string) =>
     s.trim(),
   );
 
+/** 메시지 셀이 차지할 열 수 — 폭 실측이 불가하니 글자 폭(한글·이모지 2 / 그 외 1, 10px 기준 ≈5px)으로 어림한다.
+    한 열이 모자라면 Excel 자동 줄바꿈처럼 셀 안에서 줄이 늘어난다. 마지막 열은 시간용이라 8열까지만. */
+function cellCols(text: string): number {
+  let units = 0;
+  for (const ch of text) units += (ch.codePointAt(0) ?? 0) > 0x2e80 ? 2 : 1;
+  return Math.min(8, Math.ceil((units * 5 + 16) / 64));
+}
+
 /* ---------- 데이터 로딩 ---------- */
 async function loadConvs(): Promise<void> {
   convs = (await req<{ conversations: ConversationSummary[] }>('/api/chat')).conversations;
@@ -243,9 +251,14 @@ function authView(signup: boolean): HTMLElement {
 }
 
 /* ---------- 화면: 셸 — Excel 크롬(제목줄/리본/시트 탭/상태줄) + 목록/대화 컬럼 ---------- */
-/** A/B/C 열 머리글 행 */
+/** A/B/C 열 머리글 행 — 목록 컬럼용(.gr 3열과 폭이 같다) */
 function colHead(): HTMLElement {
   return h('div', { class: 'ch' }, h('span', {}), h('span', {}, 'A'), h('span', {}, 'B'), h('span', {}, 'C'));
+}
+
+/** 대화·빈 시트 머리글 — 균일 폭 A..T (메시지 행에 그리는 세로선과 열 경계가 일치한다) */
+function sheetHead(): HTMLElement {
+  return h('div', { class: 'ch cw' }, h('span', {}), ...[...'ABCDEFGHIJKLMNOPQRST'].map((c) => h('span', {}, c)));
 }
 
 function shell(section: string, body: HTMLElement, detail: HTMLElement, inChat: boolean): HTMLElement {
@@ -294,7 +307,7 @@ function shell(section: string, body: HTMLElement, detail: HTMLElement, inChat: 
 
 /** 데스크탑 빈 대화 컬럼 — 빈 시트처럼 보이게 (모바일에선 CSS로 숨겨진다) */
 function emptyView(): HTMLElement {
-  return h('div', { class: 'col' }, colHead(), h('div', { class: 'blank' }));
+  return h('div', { class: 'col' }, sheetHead(), h('div', { class: 'blank' }));
 }
 
 /* ---------- 화면: 채팅 목록 ---------- */
@@ -544,6 +557,7 @@ function chatView(convId: number): HTMLElement {
             const btn = e.currentTarget as HTMLElement;
             const img = h('img', { src: `/img/${image.id}/thumb`, width: image.w, height: image.h, alt: '사진' });
             img.onclick = () => showImageOverlay(image);
+            btn.parentElement?.style.setProperty('--s', '8'); // 사진이 들어갈 만큼 셀을 넓힌다
             btn.replaceWith(img);
           },
         },
@@ -551,16 +565,23 @@ function chatView(convId: number): HTMLElement {
       );
     }
 
-    // 상대는 왼쪽, 내 메시지는 오른쪽(활성 셀처럼 녹색 테두리) — 시간은 셀 바로 옆
+    // 상대는 왼쪽 / 내 것은 오른쪽 — 색 구분 없이 셀 위치로만 나뉜다. 셀 폭은 열 단위로 맞춘다
     msgList.append(
       h(
         'div',
         { class: `mr${mine ? ' mine' : ''}${message._i ? ' pend' : ''}` },
-        h('span', { class: `cb${message.k === 'e' || isEmojiOnly(message.x) ? ' big' : ''}` }, body),
+        h(
+          'span',
+          {
+            class: `cb${message.k === 'e' || isEmojiOnly(message.x) ? ' big' : ''}`,
+            style: `--s:${cellCols(typeof body === 'string' ? body : (body.textContent ?? ''))}`,
+          },
+          body,
+        ),
         h(
           'span',
           { class: 'cc' },
-          mine && message.id > 0 && message.id === lastReadMine ? h('span', { class: 'rd' }, '읽음 ') : null,
+          mine && message.id > 0 && message.id === lastReadMine ? '읽음 ' : null,
           fmtTime(message.ts),
         ),
       ),
@@ -719,7 +740,7 @@ function chatView(convId: number): HTMLElement {
       h('button', { class: 'chat-back', onclick: () => go('chats') }, '‹'),
       h('h1', {}, conv?.peer.nickname ?? '대화'),
     ),
-    colHead(),
+    sheetHead(),
     msgList,
     h(
       'div',

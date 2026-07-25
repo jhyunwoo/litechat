@@ -57,6 +57,39 @@ body {
   backdrop-filter: blur(20px) saturate(160%);
 }
 
+/* 지도 위 패널/모달 진입 모션 — 퇴장은 즉시 언마운트(상태 기계를 늘리지 않는다) */
+@keyframes lc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes lc-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-fade-in {
+  animation: lc-fade-in 0.16s ease-out both;
+}
+.animate-sheet-in {
+  animation: lc-sheet-in 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-sheet-in,
+  .animate-pulse {
+    animation-duration: 0.01ms;
+  }
+}
+
 /* 글래스 패널 안의 얇은 스크롤바 */
 .scroll-thin {
   scrollbar-width: thin;

@@ -1,12 +1,39 @@
 /**
  * 지도 페이지 공용 타입/헬퍼 — 컨테이너(MapPage)와 하위 컴포넌트가 함께 쓴다.
  */
+import type { SessionRow } from '../../api';
 
-/** 지도 이동 목표 — 값이 바뀌면 MapController가 팬/줌한다 */
-export interface MapTarget {
-  lat: number;
-  lng: number;
-  zoom?: number;
+/** 위도/경도 사각형 — google.maps.LatLngBoundsLiteral과 같은 모양 (타입 의존 없이 씀) */
+export interface LatLngBox {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+/**
+ * 지도 이동 목표 — 값이 바뀌면 MapController가 팬/줌하거나 bounds에 맞춘다.
+ * 같은 목표를 다시 눌러도 이동하도록 호출부는 매번 새 객체를 만든다.
+ */
+export type MapTarget =
+  | { kind: 'point'; lat: number; lng: number; zoom?: number }
+  | { kind: 'bounds'; box: LatLngBox };
+
+/**
+ * 위치가 있는 접속 기록들을 감싸는 최소 사각형 — '결과 전체 보기'용.
+ * 위치가 있는 기록이 2건 미만이면 null (한 점에 fitBounds하면 최대 줌으로 튄다).
+ */
+export function boundsOf(rows: SessionRow[]): LatLngBox | null {
+  const located = rows.filter((row) => row.lat !== null && row.lon !== null);
+  if (located.length < 2) return null;
+  const lats = located.map((row) => row.lat!);
+  const lons = located.map((row) => row.lon!);
+  return {
+    north: Math.max(...lats),
+    south: Math.min(...lats),
+    east: Math.max(...lons),
+    west: Math.min(...lons),
+  };
 }
 
 /** 선택된 접속 기록의 정확도 반경 원 (km는 MaxMind 표준 단위) */

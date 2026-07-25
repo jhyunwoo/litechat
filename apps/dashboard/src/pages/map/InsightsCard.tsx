@@ -1,6 +1,7 @@
 /**
  * GeoIP2 Insights 상세 카드 — 요약(ISP/조직/반경/캐시 여부) + 응답 전체 필드.
- * 글래스 패널 안에서 표시되므로 표면은 살짝 밝힌 흰 오버레이를 쓴다.
+ * 글래스 표면(SessionDetailModal) 안에서 표시되므로 살짝 밝힌 흰 오버레이를 쓴다.
+ * 바깥 여백은 이 카드를 놓는 쪽이 정한다.
  */
 import { useMemo } from 'react';
 import type { InsightsResult } from '../../api';
@@ -43,7 +44,7 @@ export function InsightsCard({ result }: { result: InsightsResult }) {
     }
   }, [i.data]);
   return (
-    <div className="mb-3 rounded-md border border-hairline/70 bg-white/5 px-4 py-3 text-xs">
+    <div className="rounded-md border border-hairline/70 bg-white/5 px-4 py-3 text-xs">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm">Insights · {i.ip}</span>
         {result.cached && (

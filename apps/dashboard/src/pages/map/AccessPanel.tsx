@@ -5,12 +5,14 @@
  *
  * 탭 3개로 기존 기능을 전부 담는다:
  *  - 접속 기록: 최근 세션 목록 + 필터(사용자/플랫폼/IP/기간/조회 건수) +
- *    새로고침/마지막 업데이트 + Insights 상세
+ *    새로고침/마지막 업데이트 + 결과 전체 보기
  *  - 사용자: 사용자 목록 + Insights 상시 수집(★) 토글 + 수집된 Insights 칩
  *  - 진단: GeoIP DB 상태/실패 IP 표본
  *
  * 기록을 클릭하면 지도의 해당 핀이 강조되고, 핀을 클릭하면
  * 목록의 해당 행이 하이라이트되며 화면 안으로 스크롤된다.
+ * 상세 정보는 이 패널이 아니라 오른쪽에 도킹되는 SessionDetailModal이 담당한다 —
+ * 목록 맨 위에 카드를 끼워 넣으면 시야 밖에 생기고 목록이 밀렸다.
  */
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -21,7 +23,6 @@ import type {
   UserVisit,
 } from '../../api';
 import { GeoDiagnostics } from './GeoDiagnostics';
-import { InsightsCard } from './InsightsCard';
 import { formatDate, formatTime, LIMIT_OPTIONS, type SessionFilters } from './shared';
 
 export type PanelTab = 'sessions' | 'users' | 'diagnostics';
@@ -42,11 +43,15 @@ interface AccessPanelProps {
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
   onClose: () => void;
+  /** 데이터 로딩 실패 메시지 — 어느 탭에 있든 보이도록 패널 본문 최상단에 띄운다 */
+  loadError: string;
 
   // 접속 기록 탭 — 목록/필터/새로고침
   sessions: SessionRow[];
   sessionsTotal: number;
   sessionsBusy: boolean;
+  /** 첫 조회가 끝났는지 — 끝나기 전에 "기록이 없어요"를 띄우면 거짓말이 된다 */
+  sessionsLoaded: boolean;
   /** 마지막으로 접속 기록을 불러온 시각 (ms epoch) — 아직 없으면 null */
   lastUpdated: number | null;
   filters: SessionFilters;
@@ -55,13 +60,15 @@ interface AccessPanelProps {
   onUserFilter: (userId: string) => void;
   onResetFilters: () => void;
   onRefresh: () => void;
+  /** 결과 핀이 전부 보이도록 지도를 맞춘다 — 위치 있는 기록이 없으면 비활성 */
+  onFitResults: () => void;
+  canFitResults: boolean;
   selectedSession: SessionRow | null;
   selectedUser: UserVisit | null;
   insights: InsightsResult | null;
-  insightsBusy: boolean;
-  insightsError: string;
   onSelectSession: (row: SessionRow) => void;
-  onLookupInsights: (ip: string) => void;
+  /** 상세 모달 열기 — 유료 Insights를 호출하지 않는다 */
+  onOpenDetail: (row: SessionRow) => void;
 
   // 사용자 탭
   users: UserVisit[];
@@ -83,7 +90,7 @@ export function AccessPanel(props: AccessPanelProps) {
     <aside
       className={
         // 모바일: 하단 시트(높이 고정) / sm+: 왼쪽 세로 패널 (top은 헤더 높이를 따라 lg에서 한 번 더 올라간다)
-        'glass pointer-events-auto absolute bottom-2 left-2 right-2 z-10 flex h-[48dvh] flex-col overflow-hidden rounded-2xl border border-hairline/70 ' +
+        'glass animate-sheet-in pointer-events-auto absolute bottom-2 left-2 right-2 z-10 flex h-[48dvh] flex-col overflow-hidden rounded-2xl border border-hairline/70 ' +
         'sm:bottom-4 sm:left-4 sm:right-auto sm:top-24 sm:h-auto sm:w-[400px] sm:max-w-[calc(100vw-2rem)] lg:top-16'
       }
     >
@@ -101,7 +108,7 @@ export function AccessPanel(props: AccessPanelProps) {
         ))}
         <button
           onClick={onClose}
-          className="ml-auto rounded-full px-2 py-1 text-ink-mute hover:text-white"
+          className="ml-auto rounded-full px-2 py-1 text-ink-mute hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft"
           title="패널 접기"
           aria-label="패널 접기"
         >
@@ -110,6 +117,12 @@ export function AccessPanel(props: AccessPanelProps) {
         </button>
       </div>
       <div className="scroll-thin flex-1 overflow-y-auto p-3">
+        {/* 어느 탭에서 발생한 실패든 여기에 뜬다 (사용자 탭의 상시 수집 실패 포함) */}
+        {props.loadError !== '' && (
+          <p className="mb-2 rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">
+            {props.loadError}
+          </p>
+        )}
         {tab === 'sessions' && <SessionsTab {...props} />}
         {tab === 'users' && <UsersTab {...props} />}
         {tab === 'diagnostics' &&
@@ -127,22 +140,22 @@ function SessionsTab({
   sessions,
   sessionsTotal,
   sessionsBusy,
+  sessionsLoaded,
   lastUpdated,
   filters,
   onFilters,
   onUserFilter,
   onResetFilters,
   onRefresh,
+  onFitResults,
+  canFitResults,
   selectedSession,
   selectedUser,
-  insights,
-  insightsBusy,
-  insightsError,
   onSelectSession,
-  onLookupInsights,
+  onOpenDetail,
   users,
 }: AccessPanelProps) {
-  const selectedRef = useRef<HTMLButtonElement | null>(null);
+  const selectedRef = useRef<HTMLDivElement | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // 지도 핀 클릭 등으로 선택이 바뀌면 목록에서 해당 행이 보이도록 스크롤한다
@@ -170,7 +183,7 @@ function SessionsTab({
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
-            className={`rounded-full border px-2.5 py-1 transition-colors ${
+            className={`rounded-full border px-2.5 py-1 transition-colors focus-visible:ring-1 focus-visible:ring-primary-soft ${
               filtersOpen || hasFilter
                 ? 'border-primary/70 text-white'
                 : 'border-hairline hover:text-white'
@@ -182,15 +195,26 @@ function SessionsTab({
           <button
             onClick={onRefresh}
             disabled={sessionsBusy}
-            className="rounded-full border border-hairline px-2.5 py-1 hover:text-white disabled:opacity-40"
+            className="rounded-full border border-hairline px-2.5 py-1 hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft disabled:opacity-40"
             title="접속 기록과 지도 데이터를 다시 불러옵니다"
           >
             {sessionsBusy ? '갱신 중…' : '↻ 새로고침'}
           </button>
         </div>
       </div>
-      <div className="tnum text-[11px] text-ink-mute">
-        마지막 업데이트 {lastUpdated !== null ? formatTime(lastUpdated) : '—'}
+      <div className="flex items-center justify-between gap-2">
+        <span className="tnum text-[11px] text-ink-mute">
+          마지막 업데이트 {lastUpdated !== null ? formatTime(lastUpdated) : '—'}
+        </span>
+        {/* 필터를 걸어도 지도는 그대로여서 결과 핀이 화면 밖인 경우가 많다 */}
+        <button
+          onClick={onFitResults}
+          disabled={!canFitResults}
+          className="shrink-0 rounded-full border border-hairline px-2.5 py-1 text-xs text-ink-mute hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft disabled:opacity-40"
+          title="위치가 있는 결과가 전부 보이도록 지도를 맞춥니다"
+        >
+          결과 전체 보기
+        </button>
       </div>
 
       {filtersOpen && (
@@ -276,70 +300,60 @@ function SessionsTab({
         </div>
       )}
 
-      {insightsError !== '' && (
-        <p className="rounded-md border border-danger/40 px-3 py-2 text-xs text-danger">
-          Insights 조회 실패: {insightsError}
-        </p>
-      )}
-
-      {insights && <InsightsCard result={insights} />}
-
       <div className="flex flex-col gap-1">
         {sessions.map((row) => {
           const selected = selectedSession?.id === row.id;
           return (
-            <button
+            // 선택 버튼과 상세 버튼은 형제다 — 예전엔 button 안에 role="button" span이 중첩돼 있었다
+            <div
               key={row.id}
               ref={selected ? selectedRef : undefined}
-              onClick={() => onSelectSession(row)}
-              className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
-                selected
-                  ? 'border-primary/70 bg-white/15'
-                  : 'border-transparent hover:bg-white/8'
+              className={`relative rounded-lg border transition-colors ${
+                selected ? 'border-primary/70 bg-white/15' : 'border-transparent hover:bg-white/8'
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="tnum">{formatDate(row.createdAt)}</span>
-                <span className="rounded-full border border-hairline/70 px-1.5 py-0.5 text-[10px] text-ink-mute">
-                  {row.platform}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-2 text-ink-mute">
-                <span className="tnum">{row.ip}</span>
-                <span>
-                  {row.lat === null
-                    ? '위치 없음'
-                    : [row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-ink-mute">
-                <span>{row.nickname ? `${row.nickname} @${row.username}` : '비로그인'}</span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectSession(row);
-                    onLookupInsights(row.ip);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.stopPropagation();
-                      onSelectSession(row);
-                      onLookupInsights(row.ip);
-                    }
-                  }}
-                  aria-disabled={insightsBusy}
-                  className={`rounded-md border border-hairline px-2 py-0.5 hover:text-white ${insightsBusy ? 'opacity-40' : ''}`}
-                  title="GeoIP2 Insights 상세 조회 (유료 API — 같은 IP는 1주 캐시)"
-                >
-                  상세 조회
-                </span>
-              </div>
-            </button>
+              <button
+                onClick={() => onSelectSession(row)}
+                className="w-full rounded-lg px-3 py-2 text-left text-xs focus-visible:ring-1 focus-visible:ring-primary-soft"
+                title="지도에서 이 접속 위치 보기"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="tnum">{formatDate(row.createdAt)}</span>
+                  <span className="rounded-full border border-hairline/70 px-1.5 py-0.5 text-[10px] text-ink-mute">
+                    {row.platform}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2 text-ink-mute">
+                  <span className="tnum">{row.ip}</span>
+                  <span>
+                    {row.lat === null
+                      ? '위치 없음'
+                      : [row.city, row.country].filter(Boolean).join(', ') || '좌표만 있음'}
+                  </span>
+                </div>
+                {/* 우측은 형제 '상세 정보' 버튼이 덮으므로 그만큼 비워 둔다.
+                    버튼이 줄보다 높아 위 줄을 침범하지 않도록 여백을 한 단 넉넉히 준다. */}
+                <div className="mt-2 truncate pr-[5.5rem] text-[11px] text-ink-mute">
+                  {row.nickname ? `${row.nickname} @${row.username}` : '비로그인'}
+                </div>
+              </button>
+              <button
+                onClick={() => onOpenDetail(row)}
+                className="absolute bottom-1.5 right-3 rounded-md border border-hairline px-2 py-0.5 text-[11px] text-ink-mute hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft"
+                title="이 접속 로그의 상세 정보 — 유료 조회는 하지 않습니다"
+              >
+                상세 정보
+              </button>
+            </div>
           );
         })}
-        {sessions.length === 0 && (
+        {/* 첫 조회 전에는 스켈레톤 — 예전엔 "기록이 없어요"가 먼저 번쩍였다 */}
+        {!sessionsLoaded &&
+          sessions.length === 0 &&
+          [0, 1, 2, 3].map((n) => (
+            <div key={n} className="animate-pulse h-[58px] rounded-lg bg-white/5" />
+          ))}
+        {sessionsLoaded && sessions.length === 0 && (
           <p className="py-6 text-center text-xs text-ink-mute">접속 기록이 없어요.</p>
         )}
       </div>

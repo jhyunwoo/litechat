@@ -29,6 +29,8 @@ import {
 
 interface MapCanvasProps {
   config: AdminConfig | null;
+  /** 설정을 못 불러왔을 때의 메시지 — 있으면 "불러오는 중"에 영구 고착되지 않도록 이유를 보여준다 */
+  configError: string;
   target: MapTarget | null;
   points: GeoPoint[];
   /** 패널에 나열된 접속 기록 중 위치가 있는 것들 — 핀으로 표시 */
@@ -42,10 +44,13 @@ interface MapCanvasProps {
   insightsPin: { lat: number; lng: number } | null;
   selectedCircle: SelectedCircle | null;
   onSelectSession: (row: SessionRow) => void;
+  /** 밀도 지점 클릭 — 그 지점으로 줌인한다 */
+  onSelectPoint: (point: GeoPoint) => void;
 }
 
 export function MapCanvas({
   config,
+  configError,
   target,
   points,
   locatedSessions,
@@ -53,7 +58,15 @@ export function MapCanvas({
   insightsPin,
   selectedCircle,
   onSelectSession,
+  onSelectPoint,
 }: MapCanvasProps) {
+  if (configError !== '') {
+    return (
+      <div className="flex h-full items-center justify-center px-6 text-center text-xs text-danger">
+        지도 설정을 불러오지 못했습니다: {configError}
+      </div>
+    );
+  }
   if (config && !config.googleMapsApiKey) {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-mute">
@@ -90,6 +103,7 @@ export function MapCanvas({
             point={p}
             max={max}
             dimmed={selectedCircle !== null}
+            onSelect={onSelectPoint}
           />
         ))}
 
@@ -145,11 +159,18 @@ export function MapCanvas({
   );
 }
 
-/** 지도 이동 컨트롤러 — target이 바뀌면 해당 위치로 팬/줌한다 (Map 자식으로만 동작) */
+/**
+ * 지도 이동 컨트롤러 — target이 바뀌면 해당 위치로 팬/줌하거나 사각형에 맞춘다
+ * (Map 자식으로만 동작). bounds는 '결과 전체 보기'가 쓴다.
+ */
 function MapController({ target }: { target: MapTarget | null }) {
   const map = useMap();
   useEffect(() => {
     if (!map || !target) return;
+    if (target.kind === 'bounds') {
+      map.fitBounds(target.box, 64);
+      return;
+    }
     map.panTo({ lat: target.lat, lng: target.lng });
     if (target.zoom) map.setZoom(target.zoom);
   }, [map, target]);
@@ -160,14 +181,25 @@ function MapController({ target }: { target: MapTarget | null }) {
  * 밀도 지점 — 미터 기반 정확도 원 + 중앙 카운트 칩.
  * 정확도가 없는 레거시 지점은 기본 반경을 옅게 그려 "추정"임을 드러낸다.
  * dimmed(선택 원이 떠 있는 동안)면 흐려져 선택 원의 대비를 키운다.
+ * 칩을 누르면 그 지점으로 줌인한다 — 세계 줌에서 도시 단위로 파고드는 유일한 손잡이.
  */
-function GeoAreaCircle({ point, max, dimmed }: { point: GeoPoint; max: number; dimmed: boolean }) {
+function GeoAreaCircle({
+  point,
+  max,
+  dimmed,
+  onSelect,
+}: {
+  point: GeoPoint;
+  max: number;
+  dimmed: boolean;
+  onSelect: (point: GeoPoint) => void;
+}) {
   const estimated = point.accuracyKm === null;
   const radiusKm = point.accuracyKm ?? DEFAULT_ACCURACY_KM;
   // 접속 수 → 채움 불투명도 (0.08~0.22). 반경은 밀도가 아니라 실제 지리 정확도만 나타낸다.
   const density = max > 0 ? point.count / max : 0;
   const dim = dimmed ? 0.4 : 1;
-  const label = `${[point.city, point.country].filter(Boolean).join(', ') || '알 수 없음'} · ${point.count}건${estimated ? ' · 반경 추정' : ` · 반경 ${radiusKm}km`}`;
+  const label = `${[point.city, point.country].filter(Boolean).join(', ') || '알 수 없음'} · ${point.count}건${estimated ? ' · 반경 추정' : ` · 반경 ${radiusKm}km`} — 클릭하면 확대`;
   return (
     <>
       <Circle
@@ -180,13 +212,17 @@ function GeoAreaCircle({ point, max, dimmed }: { point: GeoPoint; max: number; d
         fillOpacity={(estimated ? 0.5 : 1) * (0.08 + density * 0.14) * dim}
         clickable={false}
       />
-      <AdvancedMarker position={{ lat: point.lat, lng: point.lon }} title={label}>
+      <AdvancedMarker
+        position={{ lat: point.lat, lng: point.lon }}
+        title={label}
+        onClick={() => onSelect(point)}
+      >
         {point.count > 1 ? (
-          <span className="tnum rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-none">
+          <span className="tnum cursor-pointer rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-none">
             {point.count}
           </span>
         ) : (
-          <span className="block h-2 w-2 rounded-full border border-black/40 bg-white" />
+          <span className="block h-2 w-2 cursor-pointer rounded-full border border-black/40 bg-white" />
         )}
       </AdvancedMarker>
     </>
