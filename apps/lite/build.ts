@@ -6,7 +6,8 @@
  *  2. CSS 공백/주석 제거
  *  3. 자산 파일명에 콘텐츠 해시 부여 → 서버가 /assets/* 를 immutable 캐시로 서빙
  *  4. brotli + gzip 사전 압축 파일(.br/.gz) 생성 → 서버가 재압축 없이 그대로 전송
- *  5. **크기 예산 검사**: 초기 전송(html+css+js, brotli 기준)이 10KB를 넘으면 빌드 실패
+ *  5. robots.txt 배포
+ *  6. **크기 예산 검사**: 초기 전송(html+css+js, brotli 기준)이 10KB를 넘으면 빌드 실패
  */
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -72,7 +73,10 @@ const jsBr = await writeCompressed(join(DIST, jsName), js);
 const cssBr = await writeCompressed(join(DIST, cssName), css);
 const htmlBr = await writeCompressed(join(DIST, 'index.html'), html);
 
-// 5) 예산 검사
+// 5) 크롤러 거부 정책 파일 배포
+await Bun.write(join(DIST, 'robots.txt'), Bun.file(join(SRC, 'robots.txt')));
+
+// 6) 예산 검사
 const total = htmlBr + cssBr + jsBr;
 console.log(`lite build — 초기 전송량 (brotli):`);
 console.log(`  index.html ${htmlBr}B / ${jsName} ${jsBr}B / ${cssName} ${cssBr}B`);
