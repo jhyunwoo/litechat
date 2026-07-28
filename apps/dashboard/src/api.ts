@@ -68,6 +68,15 @@ export interface GeoPoint {
   accuracyKm: number | null;
 }
 
+export interface GeoParams {
+  days?: number;
+  userId?: number;
+  platform?: string;
+  ip?: string;
+  from?: number;
+  to?: number;
+}
+
 export interface GeoipRefreshInfo {
   at: number;
   ok: boolean;
@@ -131,6 +140,13 @@ export interface SessionsParams {
   dir?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
+}
+
+export interface PriorSameIpSession {
+  id: string;
+  platform: string;
+  createdAt: number;
+  lastSeenAt: number;
 }
 
 export interface Insights {
@@ -219,16 +235,27 @@ export interface NotificationSummary {
 
 export const adminApi = {
   login: (username: string, password: string) =>
-    request<{ ok: true }>('/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    request<{ ok: true }>('/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
   logout: () => request<{ ok: true }>('/logout', { method: 'POST' }),
   me: () => request<AdminMe>('/me'),
   config: () => request<AdminConfig>('/config'),
   overview: (days = 30) => request<Overview>(`/overview?days=${days}`),
   timeseries: (days = 30) => request<TimeseriesPoint[]>(`/timeseries?days=${days}`),
-  geo: (days = 30) => request<GeoPoint[]>(`/geo?days=${days}`),
+  geo: (params: GeoParams = {}) => {
+    const qs = new URLSearchParams();
+    const values = { days: 30, ...params };
+    for (const [key, value] of Object.entries(values)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<GeoPoint[]>(`/geo?${qs.toString()}`);
+  },
   geoStatus: (days = 30) => request<GeoStatus>(`/geo/status?days=${days}`),
   usersVisits: () => request<UserVisit[]>('/users/visits'),
-  vitals: (metric = 'LCP', days = 30) => request<VitalsPoint[]>(`/vitals?metric=${metric}&days=${days}`),
+  vitals: (metric = 'LCP', days = 30) =>
+    request<VitalsPoint[]>(`/vitals?metric=${metric}&days=${days}`),
   sessions: (params: SessionsParams = {}) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
@@ -236,6 +263,10 @@ export const adminApi = {
     }
     return request<SessionsResult>(`/sessions?${qs.toString()}`);
   },
+  priorSameIpSessions: (sessionId: string) =>
+    request<{ rows: PriorSameIpSession[] }>(
+      `/sessions/${encodeURIComponent(sessionId)}/prior-same-ip`,
+    ),
   notifications: (params: NotificationsParams = {}) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {

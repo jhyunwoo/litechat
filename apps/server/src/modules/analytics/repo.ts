@@ -6,7 +6,7 @@
  */
 import type { Database } from 'bun:sqlite';
 import type { GeoResult } from './geoip';
-import type { InsightsRow } from './insights';
+import { normalizeIp, type InsightsRow } from './insights';
 
 export interface NewSessionInput {
   id: string;
@@ -34,6 +34,17 @@ export interface SessionListFilter {
   offset: number;
 }
 
+/** 지도 밀도 집계에 적용할 접속 조건 — 세션 목록과 같은 필터 의미를 사용한다. */
+export interface GeoPointFilter {
+  userId?: number;
+  platform?: string;
+  /** 부분 일치 (LIKE) */
+  ip?: string;
+  /** unix epoch 초 범위. from이 없으면 호출자가 지정한 days를 하한으로 쓴다. */
+  from?: number;
+  to?: number;
+}
+
 export interface SessionRow {
   id: string;
   visitorId: string;
@@ -52,6 +63,13 @@ export interface SessionRow {
   accuracyKm: number | null;
   /** 지도 좌표의 출처 — 저장된 Insights 좌표가 유효할 때만 insights */
   locationSource: 'geoip' | 'insights';
+  createdAt: number;
+  lastSeenAt: number;
+}
+
+export interface PriorSameIpSessionRow {
+  id: string;
+  platform: string;
   createdAt: number;
   lastSeenAt: number;
 }
@@ -160,7 +178,10 @@ export class AnalyticsRepo {
       .all(since, since);
   }
 
-  geoPoints(days: number): {
+  geoPoints(
+    days: number,
+    filter: GeoPointFilter = {},
+  ): {
     lat: number;
     lon: number;
     city: string | null;
@@ -168,7 +189,26 @@ export class AnalyticsRepo {
     count: number;
     accuracyKm: number | null;
   }[] {
-    const since = Math.floor(Date.now() / 1000) - days * 86400;
+    const where = ['s.created_at >= ?'];
+    const params: (string | number)[] = [
+      filter.from ?? Math.floor(Date.now() / 1000) - days * 86400,
+    ];
+    if (filter.userId !== undefined) {
+      where.push('s.user_id = ?');
+      params.push(filter.userId);
+    }
+    if (filter.platform) {
+      where.push('s.platform = ?');
+      params.push(filter.platform);
+    }
+    if (filter.ip) {
+      where.push('s.ip LIKE ?');
+      params.push(`%${filter.ip}%`);
+    }
+    if (filter.to !== undefined) {
+      where.push('s.created_at <= ?');
+      params.push(filter.to);
+    }
     // 저장된 Insights 좌표가 있으면 세션의 GeoLite2 좌표보다 우선한다. Insights가
     // 위치를 주지 않은 결과라면 기존 좌표를 그대로 사용한다.
     // MAX(정확도) = 그룹에서 가장 보수적인(넓은) 반경 — 원이 실제보다 작게 그려지는 것을 막는다.
@@ -182,7 +222,7 @@ export class AnalyticsRepo {
           count: number;
           accuracyKm: number | null;
         },
-        [number]
+        (string | number)[]
       >(
         `WITH effective_locations AS (
            SELECT
@@ -197,14 +237,14 @@ export class AnalyticsRepo {
                ELSE s.geo_accuracy_km END AS accuracyKm
            FROM analytics_sessions s
            LEFT JOIN geoip_insights gi ON gi.ip = REPLACE(s.ip, '::ffff:', '')
-           WHERE s.created_at >= ?
+           WHERE ${where.join(' AND ')}
          )
          SELECT lat, lon, city, country, COUNT(*) AS count, MAX(accuracyKm) AS accuracyKm
          FROM effective_locations
          WHERE lat IS NOT NULL AND lon IS NOT NULL
          GROUP BY lat, lon, city, country`,
       )
-      .all(since);
+      .all(...params);
   }
 
   /** 지도 진단 — 최근 기간 세션 중 위치를 확보한 비율을 파악한다. */
@@ -321,6 +361,49 @@ export class AnalyticsRepo {
     return { rows, total };
   }
 
+  /**
+   * 특정 로그인 세션보다 앞서 같은 사용자가 같은 IP로 접속한 모든 세션.
+   * SQLite epoch가 초 단위이므로 같은 초에 생성된 세션은 rowid(삽입 순서)로 선후를
+   * 보완한다. IPv4-mapped IPv6와 일반 IPv4는 같은 주소로 취급한다.
+   */
+  priorSessionsSameUserIp(sessionId: string): PriorSameIpSessionRow[] | null {
+    const current = this.db
+      .query<
+        { insertionOrder: number; userId: number | null; ip: string; createdAt: number },
+        [string]
+      >(
+        `SELECT rowid AS insertionOrder, user_id AS userId, ip, created_at AS createdAt
+         FROM analytics_sessions WHERE id = ?`,
+      )
+      .get(sessionId);
+    if (!current) return null;
+    if (current.userId === null) return [];
+
+    const normalized = normalizeIp(current.ip);
+    if (!normalized) return [];
+    const ipCandidates = normalized.includes(':')
+      ? [normalized]
+      : [normalized, `::ffff:${normalized}`];
+    const placeholders = ipCandidates.map(() => '?').join(', ');
+
+    return this.db
+      .query<PriorSameIpSessionRow, (string | number)[]>(
+        `SELECT id, platform, created_at AS createdAt, last_seen_at AS lastSeenAt
+         FROM analytics_sessions
+         WHERE user_id = ?
+           AND LOWER(ip) IN (${placeholders})
+           AND (created_at < ? OR (created_at = ? AND rowid < ?))
+         ORDER BY created_at DESC, rowid DESC`,
+      )
+      .all(
+        current.userId,
+        ...ipCandidates.map((ip) => ip.toLowerCase()),
+        current.createdAt,
+        current.createdAt,
+        current.insertionOrder,
+      );
+  }
+
   // ── GeoIP2 Insights 캐시 ─────────────────────────────────
 
   getInsights(ip: string): InsightsRow | null {
@@ -369,7 +452,9 @@ export class AnalyticsRepo {
 
   addInsightsWatch(userId: number): void {
     this.db
-      .query('INSERT INTO insights_watch (user_id, created_at) VALUES (?, ?) ON CONFLICT DO NOTHING')
+      .query(
+        'INSERT INTO insights_watch (user_id, created_at) VALUES (?, ?) ON CONFLICT DO NOTHING',
+      )
       .run(userId, Math.floor(Date.now() / 1000));
   }
 
@@ -379,14 +464,19 @@ export class AnalyticsRepo {
 
   isInsightsWatched(userId: number): boolean {
     return (
-      this.db.query<{ user_id: number }, [number]>('SELECT user_id FROM insights_watch WHERE user_id = ?').get(userId) !==
-      null
+      this.db
+        .query<{ user_id: number }, [number]>(
+          'SELECT user_id FROM insights_watch WHERE user_id = ?',
+        )
+        .get(userId) !== null
     );
   }
 
   listInsightsWatch(): number[] {
     return this.db
-      .query<{ userId: number }, []>('SELECT user_id AS userId FROM insights_watch ORDER BY created_at')
+      .query<{ userId: number }, []>(
+        'SELECT user_id AS userId FROM insights_watch ORDER BY created_at',
+      )
       .all()
       .map((row) => row.userId);
   }
@@ -427,7 +517,13 @@ export class AnalyticsRepo {
   }[] {
     return this.db
       .query<
-        { userId: number; username: string; nickname: string; sessionCount: number; lastSeenAt: number },
+        {
+          userId: number;
+          username: string;
+          nickname: string;
+          sessionCount: number;
+          lastSeenAt: number;
+        },
         []
       >(
         `SELECT u.id AS userId, u.username, u.nickname,

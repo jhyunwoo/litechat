@@ -5,25 +5,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   adminApi,
+  type InsightsResult,
   type SessionRow,
   type SessionsParams,
   type SessionsResult,
   type UserVisit,
 } from '../api';
-
-function formatDate(epochSeconds: number): string {
-  return new Date(epochSeconds * 1000).toLocaleString('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
-/** yyyy-mm-dd(로컬) → epoch 초. endOfDay면 그날 23:59:59 */
-function dateToEpoch(value: string, endOfDay: boolean): number | undefined {
-  if (!value) return undefined;
-  const date = new Date(`${value}T${endOfDay ? '23:59:59' : '00:00:00'}`);
-  return Math.floor(date.getTime() / 1000);
-}
+import { SessionDetailModal } from './map/SessionDetailModal';
+import { applyInsightsLocation, dateToEpoch, formatDate } from './map/shared';
 
 function locationOf(row: SessionRow): string {
   return [row.city, row.region, row.country].filter(Boolean).join(', ') || '—';
@@ -36,6 +25,10 @@ export default function SessionsPage() {
   const [users, setUsers] = useState<UserVisit[]>([]);
   const [result, setResult] = useState<SessionsResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailSession, setDetailSession] = useState<SessionRow | null>(null);
+  const [insights, setInsights] = useState<InsightsResult | null>(null);
+  const [insightsBusy, setInsightsBusy] = useState(false);
+  const [insightsError, setInsightsError] = useState('');
 
   // 필터/정렬/페이지 상태
   const [userId, setUserId] = useState('');
@@ -90,6 +83,34 @@ export default function SessionsPage() {
       setDir('desc');
     }
     setPage(1);
+  }
+
+  function openDetail(row: SessionRow) {
+    setDetailSession(row);
+    setInsights(null);
+    setInsightsError('');
+  }
+
+  function lookupInsights(ip: string) {
+    if (insightsBusy || ip === '') return;
+    setInsightsBusy(true);
+    setInsightsError('');
+    void adminApi
+      .insights(ip)
+      .then((next) => {
+        setInsights(next);
+        setResult((current) =>
+          current
+            ? {
+                ...current,
+                rows: current.rows.map((row) => applyInsightsLocation(row, next.insights)),
+              }
+            : current,
+        );
+        setDetailSession((row) => row && applyInsightsLocation(row, next.insights));
+      })
+      .catch((err: Error) => setInsightsError(err.message))
+      .finally(() => setInsightsBusy(false));
   }
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / PAGE_SIZE)) : 1;
@@ -201,6 +222,12 @@ export default function SessionsPage() {
               <div className="mt-1 truncate text-[11px] text-ink-mute" title={row.userAgent}>
                 {row.userAgent || '—'}
               </div>
+              <button
+                onClick={() => openDetail(row)}
+                className="mt-2 rounded-md border border-hairline px-2.5 py-1 text-[11px] text-ink-mute hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft"
+              >
+                상세 정보
+              </button>
             </div>
           ))}
         </div>
@@ -226,6 +253,7 @@ export default function SessionsPage() {
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal">위치</th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal">리퍼러</th>
                 <th className="px-4 py-2.5 font-normal">기기 (User-Agent)</th>
+                <th className="whitespace-nowrap px-4 py-2.5 font-normal">상세</th>
               </tr>
             </thead>
             <tbody>
@@ -238,8 +266,7 @@ export default function SessionsPage() {
                   <td className="whitespace-nowrap px-4 py-2">
                     {row.userId ? (
                       <>
-                        {row.nickname}{' '}
-                        <span className="text-ink-mute">@{row.username}</span>
+                        {row.nickname} <span className="text-ink-mute">@{row.username}</span>
                       </>
                     ) : (
                       <span className="text-ink-mute">비로그인</span>
@@ -260,6 +287,14 @@ export default function SessionsPage() {
                     title={row.userAgent}
                   >
                     {row.userAgent || '—'}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2">
+                    <button
+                      onClick={() => openDetail(row)}
+                      className="rounded-md border border-hairline px-2.5 py-1 text-[11px] text-ink-mute hover:text-white focus-visible:ring-1 focus-visible:ring-primary-soft"
+                    >
+                      상세 정보
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -293,6 +328,17 @@ export default function SessionsPage() {
           </div>
         </div>
       </div>
+      {detailSession && (
+        <SessionDetailModal
+          context="sessions"
+          session={detailSession}
+          insights={insights}
+          insightsBusy={insightsBusy}
+          insightsError={insightsError}
+          onLookupInsights={lookupInsights}
+          onClose={() => setDetailSession(null)}
+        />
+      )}
     </div>
   );
 }

@@ -33,6 +33,8 @@ import { SessionDetailModal } from './map/SessionDetailModal';
 import {
   boundsOf,
   dateToEpoch,
+  applyInsightsLocation,
+  isInsightsForSession,
   type MapTarget,
   type SelectedCircle,
   type SessionFilters,
@@ -41,26 +43,6 @@ import {
 /** 실패를 조용히 삼키지 않기 위한 catch 핸들러 — 기존 "… 실패: 사유" 문구 형식을 따른다 */
 function fail(set: (message: string) => void, what?: string) {
   return (err: Error) => set(what ? `${what} 불러오기 실패: ${err.message}` : err.message);
-}
-
-function isInsightsForSession(row: SessionRow, details: Insights): boolean {
-  return row.ip.replace(/^::ffff:/i, '') === details.ip;
-}
-
-/** 방금 조회한 Insights 위치를 새로고침 전에 같은 IP의 세션들에 즉시 반영한다. */
-function applyInsightsLocation(row: SessionRow, details: Insights): SessionRow {
-  if (!isInsightsForSession(row, details) || details.lat === null || details.lon === null)
-    return row;
-  return {
-    ...row,
-    country: details.country ?? row.country,
-    region: details.region ?? row.region,
-    city: details.city ?? row.city,
-    lat: details.lat,
-    lon: details.lon,
-    accuracyKm: details.accuracyRadius ?? row.accuracyKm,
-    locationSource: 'insights',
-  };
 }
 
 const EMPTY_FILTERS: SessionFilters = {
@@ -108,6 +90,9 @@ export default function MapPage() {
 
   // 사용자 필터를 새로 걸었을 때만 지도를 그 사용자의 최근 위치로 이동한다 (새로고침 때는 안 움직임)
   const panToUserRef = useRef(false);
+  /** 빠른 필터 변경 때 이전 요청의 응답이 새 지도 상태를 덮지 못하게 하는 세대 번호 */
+  const sessionsRequestRef = useRef(0);
+  const pointsRequestRef = useRef(0);
 
   // 실패해도 조용히 멈추지 않도록 전부 catch한다 — 예전엔 config 실패 시
   // 지도가 "불러오는 중…"에서 영구 고착됐다.
@@ -118,7 +103,6 @@ export default function MapPage() {
       .watchList()
       .then((r) => setWatched(new Set(r.watched)))
       .catch(fail(setLoadError, '상시 수집 목록'));
-    void adminApi.geo(30).then(setPoints).catch(fail(setLoadError, '지도 밀도'));
     void adminApi.geoStatus(30).then(setStatus).catch(fail(setLoadError, '진단 정보'));
   }, []);
 
@@ -143,8 +127,22 @@ export default function MapPage() {
     [filters.userId, filters.platform, filters.fromDate, filters.toDate, filters.limit, ipQuery],
   );
 
+  /** 밀도 원/카운트도 접속 기록과 동일한 사용자·플랫폼·IP·기간 조건을 쓴다. */
+  const geoQuery = useMemo(
+    () => ({
+      days: 30,
+      userId: query.userId,
+      platform: query.platform,
+      ip: query.ip,
+      from: query.from,
+      to: query.to,
+    }),
+    [query.userId, query.platform, query.ip, query.from, query.to],
+  );
+
   /** 접속 기록 로드 — 조건이 바뀌거나 새로고침할 때 호출, 성공 시 마지막 업데이트 시각 기록 */
   const loadSessions = useCallback(() => {
+    const requestId = ++sessionsRequestRef.current;
     setSessionsBusy(true);
     // 배너는 "시도할 때" 지운다. 성공 시점에 지우면 같은 틱에 시작한 다른 요청
     // (지도 밀도 등)이 조금 뒤에 실패했을 때 그 오류를 덮어써 삼켜버린다.
@@ -152,6 +150,7 @@ export default function MapPage() {
     void adminApi
       .sessions(query)
       .then((result) => {
+        if (requestId !== sessionsRequestRef.current) return;
         setSessions(result.rows);
         setSessionsTotal(result.total);
         setSessionsLoaded(true);
@@ -170,13 +169,33 @@ export default function MapPage() {
           }
         }
       })
-      .catch(fail(setLoadError, '접속 기록'))
-      .finally(() => setSessionsBusy(false));
+      .catch((err: Error) => {
+        if (requestId === sessionsRequestRef.current) fail(setLoadError, '접속 기록')(err);
+      })
+      .finally(() => {
+        if (requestId === sessionsRequestRef.current) setSessionsBusy(false);
+      });
   }, [query]);
 
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  const loadPoints = useCallback(() => {
+    const requestId = ++pointsRequestRef.current;
+    void adminApi
+      .geo(geoQuery)
+      .then((next) => {
+        if (requestId === pointsRequestRef.current) setPoints(next);
+      })
+      .catch((err: Error) => {
+        if (requestId === pointsRequestRef.current) fail(setLoadError, '지도 밀도')(err);
+      });
+  }, [geoQuery]);
+
+  useEffect(() => {
+    loadPoints();
+  }, [loadPoints]);
 
   // Esc — 모달이 열려 있으면 모달이 캡처 단계에서 먼저 먹고, 없을 때만 선택이 풀린다
   useEffect(() => {
@@ -188,6 +207,15 @@ export default function MapPage() {
   }, []);
 
   function updateFilters(patch: Partial<SessionFilters>) {
+    // 새 조건을 적용한 순간부터 이전 조건의 핀/선택을 지도에 남기지 않는다.
+    sessionsRequestRef.current += 1;
+    setSessions([]);
+    setSessionsLoaded(false);
+    clearSelection();
+    if (Object.keys(patch).some((key) => key !== 'limit')) {
+      pointsRequestRef.current += 1;
+      setPoints([]);
+    }
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
@@ -228,14 +256,16 @@ export default function MapPage() {
 
   /** 필터 전체 초기화 (조회 건수는 유지) */
   function resetFilters() {
-    clearSelection();
-    setFilters((prev) => ({ ...EMPTY_FILTERS, limit: prev.limit }));
+    panToUserRef.current = false;
+    // IP 디바운스가 끝나기 전에 이전 IP 조건으로 중간 요청이 나가지 않게 즉시 맞춘다.
+    setIpQuery('');
+    updateFilters({ userId: '', platform: '', ip: '', fromDate: '', toDate: '' });
   }
 
   /** 새로고침 — 접속 기록과 지도 오버레이(밀도 원/진단/사용자)를 전부 다시 불러온다 */
   function refresh() {
     loadSessions();
-    void adminApi.geo(30).then(setPoints).catch(fail(setLoadError, '지도 밀도'));
+    loadPoints();
     void adminApi.geoStatus(30).then(setStatus).catch(fail(setLoadError, '진단 정보'));
     void adminApi.usersVisits().then(setUsers).catch(fail(setLoadError, '사용자 목록'));
   }
@@ -287,7 +317,7 @@ export default function MapPage() {
         setSessions((rows) => rows.map((row) => applyInsightsLocation(row, result.insights)));
         setSelectedSession((row) => row && applyInsightsLocation(row, result.insights));
         // 밀도 원도 방금 저장된 Insights 위치로 다시 집계한다.
-        void adminApi.geo(30).then(setPoints).catch(fail(setLoadError, '지도 밀도'));
+        loadPoints();
         const { lat, lon } = result.insights;
         if (lat !== null && lon !== null) setTarget({ kind: 'point', lat, lng: lon, zoom: 11 });
       })
@@ -301,7 +331,7 @@ export default function MapPage() {
     setInsightsError('');
     setSessions((sessions) => sessions.map((session) => applyInsightsLocation(session, row)));
     // 밀도 원도 이 Insights 위치로 다시 집계한다.
-    void adminApi.geo(30).then(setPoints).catch(fail(setLoadError, '지도 밀도'));
+    loadPoints();
     setSelectedSession(null);
     setDetailOpen(true);
     if (row.lat !== null && row.lon !== null) {
@@ -355,9 +385,7 @@ export default function MapPage() {
         (selectedSession && isInsightsForSession(selectedSession, insightsData)
           ? selectedSession.accuracyKm
           : null);
-      return radiusKm !== null
-        ? { lat: insightsData.lat, lng: insightsData.lon, radiusKm }
-        : null;
+      return radiusKm !== null ? { lat: insightsData.lat, lng: insightsData.lon, radiusKm } : null;
     }
     const s = selectedSession;
     if (s && s.lat !== null && s.lon !== null && s.accuracyKm !== null) {

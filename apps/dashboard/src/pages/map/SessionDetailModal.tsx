@@ -13,10 +13,10 @@
  * position은 fixed지만 portal은 쓰지 않는다 — App의 <main>이 z-index:auto라
  * 스택 컨텍스트를 만들지 않아서, 여기의 z-30/z-40이 z-20 헤더 위에 그려진다.
  */
-import { useEffect, useRef, type ReactNode } from 'react';
-import type { InsightsResult, SessionRow } from '../../api';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { adminApi, type InsightsResult, type PriorSameIpSession, type SessionRow } from '../../api';
 import { InsightsCard } from './InsightsCard';
-import { formatDate, isPrivateIp } from './shared';
+import { formatDate, isPrivateIp, normalizeDisplayIp } from './shared';
 
 interface SessionDetailModalProps {
   /** 사용자 탭의 수집된 Insights 칩으로 열면 세션 없이 Insights만 표시된다 */
@@ -26,6 +26,8 @@ interface SessionDetailModalProps {
   insightsError: string;
   onLookupInsights: (ip: string) => void;
   onClose: () => void;
+  /** 지도에서는 좌측 패널 옆 도킹, 일반 접속 기록에서는 중앙 모달로 표시한다. */
+  context?: 'map' | 'sessions';
 }
 
 const TITLE_ID = 'session-detail-title';
@@ -37,8 +39,12 @@ export function SessionDetailModal({
   insightsError,
   onLookupInsights,
   onClose,
+  context = 'map',
 }: SessionDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [priorSessions, setPriorSessions] = useState<PriorSameIpSession[]>([]);
+  const [priorBusy, setPriorBusy] = useState(false);
+  const [priorError, setPriorError] = useState('');
 
   // Escape로 닫기 — 캡처 단계에서 먹고 전파를 끊어, MapPage의 "선택 해제"보다 먼저 처리된다
   useEffect(() => {
@@ -59,19 +65,50 @@ export function SessionDetailModal({
     return () => previous?.focus();
   }, []);
 
+  // 사용자가 특정된 로그만 동일 사용자·IP 과거 이력을 지연 조회한다.
+  useEffect(() => {
+    let cancelled = false;
+    setPriorSessions([]);
+    setPriorError('');
+    if (!session || session.userId === null) {
+      setPriorBusy(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setPriorBusy(true);
+    void adminApi
+      .priorSameIpSessions(session.id)
+      .then((result) => {
+        if (!cancelled) setPriorSessions(result.rows);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setPriorError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setPriorBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.id, session?.userId]);
+
   const ip = session?.ip ?? insights?.insights.ip ?? '';
   // 다른 IP의 Insights가 남아 있으면 이 로그의 것이 아니다
   const ownInsights =
-    insights !== null && (session === null || insights.insights.ip === session.ip)
+    insights !== null &&
+    (session === null ||
+      normalizeDisplayIp(insights.insights.ip) === normalizeDisplayIp(session.ip))
       ? insights
       : null;
+  const isMap = context === 'map';
 
   return (
     <>
       {/* 딤은 좁은 화면에서만 — lg+에서는 지도와 목록을 계속 쓸 수 있어야 한다 */}
       <div
         onClick={onClose}
-        className="animate-fade-in fixed inset-0 z-30 bg-black/50 lg:hidden"
+        className={`animate-fade-in fixed inset-0 z-30 bg-black/50 ${isMap ? 'lg:hidden' : ''}`}
         aria-hidden="true"
       />
       <div
@@ -80,13 +117,13 @@ export function SessionDetailModal({
         aria-labelledby={TITLE_ID}
         tabIndex={-1}
         className={
-          // lg 도킹 위치는 패널을 접어도 그대로 둔다 — left-4로 당기면 패널 재열기
-          // 버튼('› 접속 기록')과 정확히 겹쳐 패널을 다시 열 수 없게 된다.
-          // 높이는 내용에 맞추고 넘칠 때만 스크롤한다 (bottom을 고정하면 짧은 내용에도 빈 통이 된다)
           'glass animate-sheet-in fixed inset-x-2 bottom-2 z-40 flex max-h-[80dvh] flex-col ' +
           'overflow-hidden rounded-2xl border border-hairline/70 outline-none ' +
-          'sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-24 sm:w-[420px] sm:max-h-[calc(100dvh-7rem)] ' +
-          'lg:left-[27rem] lg:right-auto lg:top-16 lg:w-[440px] lg:max-h-[calc(100dvh-5rem)]'
+          (isMap
+            ? 'sm:inset-x-auto sm:bottom-auto sm:right-4 sm:top-24 sm:w-[420px] sm:max-h-[calc(100dvh-7rem)] ' +
+              'lg:left-[27rem] lg:right-auto lg:top-16 lg:w-[440px] lg:max-h-[calc(100dvh-5rem)]'
+            : 'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[520px] ' +
+              'sm:max-h-[calc(100dvh-4rem)] sm:-translate-x-1/2 sm:-translate-y-1/2')
         }
       >
         <div className="flex items-center gap-2 border-b border-hairline/60 px-4 py-3">
@@ -155,6 +192,45 @@ export function SessionDetailModal({
             </section>
           )}
 
+          {session !== null && session.userId !== null && (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-ink-mute">동일 사용자·IP 과거 접속</h3>
+              {priorError !== '' && (
+                <p className="rounded-md border border-danger/40 px-3 py-2 text-danger">
+                  과거 접속 이력 조회 실패: {priorError}
+                </p>
+              )}
+              {priorBusy ? (
+                <p className="text-ink-mute">불러오는 중…</p>
+              ) : priorSessions.length > 0 ? (
+                <div className="overflow-hidden rounded-md border border-hairline/70">
+                  {priorSessions.map((row) => (
+                    <div
+                      key={row.id}
+                      className="flex items-start justify-between gap-3 border-b border-hairline/40 px-3 py-2 last:border-b-0"
+                    >
+                      <div className="min-w-0">
+                        <div className="tnum">{formatDate(row.createdAt)}</div>
+                        <div className="tnum mt-0.5 text-[11px] text-ink-mute">
+                          마지막 활동 {formatDate(row.lastSeenAt)}
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-hairline/70 px-1.5 py-0.5 text-[10px] text-ink-mute">
+                        {row.platform}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                priorError === '' && (
+                  <p className="text-[11px] text-ink-mute">
+                    이 사용자가 해당 IP에서 이전에 접속한 기록이 없습니다.
+                  </p>
+                )
+              )}
+            </section>
+          )}
+
           <section className="flex flex-col gap-2">
             <h3 className="text-ink-mute">GeoIP2 Insights</h3>
             {insightsError !== '' && (
@@ -176,8 +252,8 @@ export function SessionDetailModal({
                 <p className="text-[11px] text-ink-mute">
                   쿼리당 과금되는 유료 API입니다 · 같은 IP는 1주간 캐시를 재사용합니다.
                   <br />
-                  조회하면 ISP/조직/정확도 반경이 나오고, 지도의 핀과 반경 원이 이 정밀 위치로
-                  대체됩니다.
+                  조회하면 ISP/조직/정확도 반경과 정밀 위치를 확인할 수 있습니다.
+                  {isMap && ' 지도의 핀과 반경 원도 이 위치로 대체됩니다.'}
                 </p>
               </>
             )}

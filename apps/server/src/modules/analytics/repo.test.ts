@@ -131,13 +131,53 @@ describe('listSessions', () => {
   });
 });
 
+describe('priorSessionsSameUserIp', () => {
+  test('동일 사용자·정규화 IP의 모든 과거 세션을 최신순으로 반환한다', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    const insert = (
+      id: string,
+      userId: number | null,
+      ip: string,
+      createdAt: number,
+      platform: 'web' | 'lite' | 'app' = 'web',
+    ) =>
+      db
+        .query(
+          `INSERT INTO analytics_sessions
+             (id, visitor_id, user_id, platform, ip, user_agent, created_at, last_seen_at)
+           VALUES (?, ?, ?, ?, ?, 'UA', ?, ?)`,
+        )
+        .run(id, `v-${id}`, userId, platform, ip, createdAt, createdAt + 10);
+
+    insert('same-second-prior', 1, '::ffff:8.8.8.8', 3000, 'lite');
+    insert('current', 1, '8.8.8.8', 3000, 'app');
+    insert('older', 1, '8.8.8.8', 2500);
+    insert('future', 1, '8.8.8.8', 3500);
+    insert('other-user', 2, '8.8.8.8', 2000);
+    insert('other-ip', 1, '9.9.9.9', 2000);
+
+    expect(repo.priorSessionsSameUserIp('current')).toEqual([
+      {
+        id: 'same-second-prior',
+        platform: 'lite',
+        createdAt: 3000,
+        lastSeenAt: 3010,
+      },
+      { id: 'older', platform: 'web', createdAt: 2500, lastSeenAt: 2510 },
+    ]);
+  });
+
+  test('비로그인 세션은 빈 이력, 없는 세션은 null을 반환한다', () => {
+    const repo = seed(openTestDatabase());
+    expect(repo.priorSessionsSameUserIp('s4')).toEqual([]);
+    expect(repo.priorSessionsSameUserIp('missing')).toBeNull();
+  });
+});
+
 describe('geo_accuracy_km — 지도 미터 기반 반경의 데이터 소스', () => {
   /** GeoIP 조회 결과가 있는 세션 입력 헬퍼 — accuracyKm만 케이스별로 바꾼다 */
-  const geoInput = (
-    id: string,
-    accuracyKm: number | null,
-    lat = 37.5,
-  ): NewSessionInput => ({
+  const geoInput = (id: string, accuracyKm: number | null, lat = 37.5): NewSessionInput => ({
     id,
     visitorId: `v-${id}`,
     userId: null,
@@ -204,6 +244,38 @@ describe('geo_accuracy_km — 지도 미터 기반 반경의 데이터 소스', 
       },
     ]);
   });
+
+  test('geoPoints — 사용자·플랫폼·IP·기간 필터를 밀도 집계에 적용한다', () => {
+    const db = openTestDatabase();
+    const repo = seed(db);
+    db.exec(
+      `UPDATE analytics_sessions
+       SET geo_lat = CASE id WHEN 's1' THEN 37.5 WHEN 's2' THEN 35.1 ELSE 33.4 END,
+           geo_lon = CASE id WHEN 's1' THEN 127.0 WHEN 's2' THEN 129.0 ELSE 126.5 END,
+           geo_city = id,
+           geo_country = 'KR'`,
+    );
+
+    expect(
+      repo
+        .geoPoints(30, { from: 0, userId: 1 })
+        .map((p) => p.city)
+        .sort(),
+    ).toEqual(['s1', 's2']);
+    expect(repo.geoPoints(30, { from: 0, platform: 'app' }).map((p) => p.city)).toEqual(['s3']);
+    expect(
+      repo
+        .geoPoints(30, { from: 0, ip: '1.1' })
+        .map((p) => p.city)
+        .sort(),
+    ).toEqual(['s1', 's3']);
+    expect(
+      repo
+        .geoPoints(30, { from: 1001, to: 1002 })
+        .map((p) => p.city)
+        .sort(),
+    ).toEqual(['s2', 's3']);
+  });
 });
 
 describe('geoip_insights 캐시', () => {
@@ -238,8 +310,17 @@ describe('geoip_insights 캐시', () => {
 
 describe('insights_watch', () => {
   const insightsRow = (ip: string, fetchedAt: number) => ({
-    ip, fetchedAt, lat: 0, lon: 0, accuracyRadius: null,
-    city: null, region: null, country: null, isp: null, organization: null, userType: null,
+    ip,
+    fetchedAt,
+    lat: 0,
+    lon: 0,
+    accuracyRadius: null,
+    city: null,
+    region: null,
+    country: null,
+    isp: null,
+    organization: null,
+    userType: null,
     data: '{}',
   });
 

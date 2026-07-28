@@ -1,7 +1,7 @@
 /**
  * 지도 페이지 공용 타입/헬퍼 — 컨테이너(MapPage)와 하위 컴포넌트가 함께 쓴다.
  */
-import type { SessionRow } from '../../api';
+import type { Insights, SessionRow } from '../../api';
 
 /** 위도/경도 사각형 — google.maps.LatLngBoundsLiteral과 같은 모양 (타입 의존 없이 씀) */
 export interface LatLngBox {
@@ -16,8 +16,7 @@ export interface LatLngBox {
  * 같은 목표를 다시 눌러도 이동하도록 호출부는 매번 새 객체를 만든다.
  */
 export type MapTarget =
-  | { kind: 'point'; lat: number; lng: number; zoom?: number }
-  | { kind: 'bounds'; box: LatLngBox };
+  { kind: 'point'; lat: number; lng: number; zoom?: number } | { kind: 'bounds'; box: LatLngBox };
 
 /**
  * 위치가 있는 접속 기록들을 감싸는 최소 사각형 — '결과 전체 보기'용.
@@ -86,6 +85,31 @@ export function isPrivateIp(ip: string): boolean {
   if (/^127\./.test(v) || v === '0.0.0.0') return true;
   if (/^(fc|fd)/i.test(v) || v === '::1') return true; // IPv6 ULA/loopback
   return false;
+}
+
+/** API/캐시 비교용 최소 정규화 — 서버와 같이 IPv4-mapped 접두사를 제거한다. */
+export function normalizeDisplayIp(ip: string): string {
+  return ip.replace(/^::ffff:/i, '').toLowerCase();
+}
+
+export function isInsightsForSession(row: SessionRow, details: Insights): boolean {
+  return normalizeDisplayIp(row.ip) === normalizeDisplayIp(details.ip);
+}
+
+/** 조회 직후 저장된 Insights 위치를 같은 IP의 세션 행에 즉시 반영한다. */
+export function applyInsightsLocation(row: SessionRow, details: Insights): SessionRow {
+  if (!isInsightsForSession(row, details) || details.lat === null || details.lon === null)
+    return row;
+  return {
+    ...row,
+    country: details.country ?? row.country,
+    region: details.region ?? row.region,
+    city: details.city ?? row.city,
+    lat: details.lat,
+    lon: details.lon,
+    accuracyKm: details.accuracyRadius ?? row.accuracyKm,
+    locationSource: 'insights',
+  };
 }
 
 export function formatDate(epochSeconds: number): string {
