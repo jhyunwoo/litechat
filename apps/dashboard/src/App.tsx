@@ -44,7 +44,7 @@ function Tab({ to, label }: { to: string; label: string }) {
 
 function Shell() {
   const { admin, logout } = useAdminAuth();
-  // 지도는 뷰포트 전체를 쓰는 풀블리드 라우트 — 네비게이션이 frosted 바로 지도 위에 뜬다
+  // 지도는 뷰포트 전체를 쓰는 풀블리드 라우트 — 헤더가 지도 위에 겹쳐 뜬다(그 외 라우트는 sticky)
   const isMap = useLocation().pathname === '/map';
 
   // 모바일에서는 탭이 줄바꿈 대신 한 줄 가로 스크롤로 흐른다 (세로 공간 절약)
@@ -67,32 +67,39 @@ function Shell() {
     </div>
   );
 
+  // 모든 라우트가 같은 frosted 헤더를 쓴다 — 지도만 지도 위에 겹치고(absolute), 나머지는 sticky.
+  // 좁은 화면에서는 타이틀+계정 / 내비 두 줄로 쌓이고, lg부터 한 줄로 합쳐진다.
+  const header = (
+    <header
+      className={`glass z-20 border-b border-hairline/60 ${
+        isMap ? 'absolute inset-x-0 top-0' : 'sticky top-0'
+      }`}
+    >
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 py-2.5 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
+        <div className="flex items-center justify-between gap-4 lg:contents">
+          <h1 className="display text-base lg:text-lg">litechat 대시보드</h1>
+          <div className="lg:order-last lg:ml-auto">{account}</div>
+        </div>
+        {nav}
+      </div>
+    </header>
+  );
+
   if (isMap) {
     return (
       <div className="relative h-dvh overflow-hidden">
         <main className="absolute inset-0">
           <Outlet />
         </main>
-        {/* 좁은 화면에서는 타이틀+계정 / 내비 두 줄로 쌓이고, lg부터 한 줄로 합쳐진다 */}
-        <header className="glass absolute inset-x-0 top-0 z-20 flex flex-col gap-2 border-b border-hairline/60 px-4 py-2.5 lg:flex-row lg:items-center lg:gap-6 lg:px-6">
-          <div className="flex items-center justify-between gap-4 lg:contents">
-            <h1 className="display text-base lg:text-lg">litechat 대시보드</h1>
-            <div className="lg:order-last lg:ml-auto">{account}</div>
-          </div>
-          {nav}
-        </header>
+        {header}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-8 sm:py-8">
-      <header className="flex items-center justify-between">
-        <h1 className="display text-xl sm:text-2xl">litechat 대시보드</h1>
-        {account}
-      </header>
-      {nav}
-      <main className="flex-1">
+    <div className="min-h-full">
+      {header}
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-8 sm:py-8">
         <Outlet />
       </main>
     </div>
