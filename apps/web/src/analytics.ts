@@ -8,11 +8,16 @@
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type Metric } from 'web-vitals';
 import { api } from './api';
 
+// 첫 페이지뷰/웹바이탈이 세션 등록보다 먼저 도착하지 않도록 초기 요청을 공유한다.
+// 세션 요청이 실패해도 후속 계측은 진행하며, 서버가 누락 세션을 복구한다.
+let sessionReady: Promise<void> = Promise.resolve();
+
 /** 앱 로드 시 1회 — 방문자 식별/기기 정보 등록만 담당한다 (페이지뷰는 별도) */
 export function bootstrapAnalytics(): void {
-  void api.api.analytics.session
+  sessionReady = api.api.analytics.session
     .$post({ json: { platform: 'web', referrer: document.referrer || undefined } })
-    .catch(() => {});
+    .then(() => undefined)
+    .catch(() => undefined);
 
   onCLS(sendVital);
   onFCP(sendVital);
@@ -23,7 +28,7 @@ export function bootstrapAnalytics(): void {
 
 /** SPA 라우트 전환마다 호출 — 최초 진입 경로도 포함해서 매번 보낸다 */
 export function trackPageview(path: string): void {
-  void api.api.analytics.event.$post({ json: { path } }).catch(() => {});
+  void sessionReady.then(() => api.api.analytics.event.$post({ json: { path } })).catch(() => {});
 }
 
 /**
@@ -36,5 +41,7 @@ function sendVital(metric: Metric): void {
     value: metric.value,
     path: location.pathname,
   });
+  // 언로드 직전에는 Promise 대기로 beacon 기회를 놓칠 수 있어 즉시 전송한다.
+  // 부모 세션이 아직 없다면 서버가 같은 요청 정보로 먼저 복구한다.
   navigator.sendBeacon('/api/analytics/vitals', new Blob([body], { type: 'application/json' }));
 }

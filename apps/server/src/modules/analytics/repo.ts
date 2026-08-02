@@ -77,6 +77,16 @@ export interface PriorSameIpSessionRow {
 export class AnalyticsRepo {
   constructor(private db: Database) {}
 
+  hasSession(sessionId: string): boolean {
+    return (
+      this.db
+        .query<{ found: number }, [string]>(
+          'SELECT 1 AS found FROM analytics_sessions WHERE id = ? LIMIT 1',
+        )
+        .get(sessionId) !== null
+    );
+  }
+
   /**
    * 세션 upsert — 없으면 새로 만들고, 있으면 last_seen_at만 갱신하며 user_id는
    * (비로그인으로 시작했다가 로그인한 경우를 위해) 아직 NULL일 때만 채운다.

@@ -21,6 +21,12 @@ const SESSION_GAP_MS = 30 * 60 * 1000;
 let visitorId: string | null = null;
 let sessionId: string | null = null;
 let lastActiveAt = 0;
+// React effect와 AppState 콜백에서 발생한 계측을 호출 순서대로 실행한다.
+let analyticsQueue: Promise<void> = Promise.resolve();
+
+function enqueueAnalytics(task: () => Promise<void>): void {
+  analyticsQueue = analyticsQueue.then(task, task).catch(() => {});
+}
 
 async function getVisitorId(): Promise<string> {
   if (visitorId) return visitorId;
@@ -73,9 +79,9 @@ export function useAppAnalytics(): void {
   const lastPath = useRef<string | null>(null);
 
   useEffect(() => {
-    void sendSession();
+    enqueueAnalytics(sendSession);
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void sendSession();
+      if (state === 'active') enqueueAnalytics(sendSession);
     });
     return () => subscription.remove();
   }, []);
@@ -83,6 +89,6 @@ export function useAppAnalytics(): void {
   useEffect(() => {
     if (lastPath.current === pathname) return;
     lastPath.current = pathname;
-    void sendEvent(pathname);
+    enqueueAnalytics(() => sendEvent(pathname));
   }, [pathname]);
 }

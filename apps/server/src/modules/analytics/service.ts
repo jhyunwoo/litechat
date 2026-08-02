@@ -2,8 +2,8 @@
  * 분석 수집 오케스트레이션 — IP/지오IP 조회, 방문자·세션 식별, 로그인 여부 파악 후 repo에 기록한다.
  *
  * 수집은 어떤 경우에도 사용자 요청을 실패시키면 안 되는 best-effort 작업이므로,
- * DB 쓰기 과정의 에러는 여기서 삼키고 로그만 남긴다 (예: fire-and-forget 호출 중
- * analytics_sessions 행이 아직 안 만들어진 상태에서 event가 먼저 도착하는 경쟁 상황 등).
+ * DB 쓰기 과정의 에러는 여기서 삼키고 로그만 남긴다. fire-and-forget 호출 순서가
+ * 뒤집혀 event/vitals가 먼저 도착하는 경우에는 부모 세션을 즉시 복구한 뒤 기록한다.
  */
 import type { Context } from 'hono';
 import type {
@@ -55,6 +55,33 @@ export class AnalyticsService {
   }
 
   /**
+   * 이벤트/바이탈이 세션 등록보다 먼저 도착해도 FK 오류나 데이터 유실이 없도록 한다.
+   * 정상 경로에서는 PK 존재 확인 1회만 수행하고, 누락된 경우에만 지오IP 등을 조회한다.
+   */
+  private async ensureSession(
+    c: Context<AppEnv>,
+    identity: VisitorIdentity,
+    platform: 'web' | 'app',
+  ): Promise<void> {
+    if (this.repo.hasSession(identity.sessionId)) return;
+
+    const userId = await this.resolveUserId(c);
+    const ip = clientIp(c);
+    const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
+    this.repo.insertSession({
+      id: identity.sessionId,
+      visitorId: identity.visitorId,
+      userId,
+      platform,
+      ip,
+      userAgent: c.req.header('user-agent') ?? '',
+      referrer: c.req.header('referer') ?? null,
+      geo,
+    });
+    this.collectIfWatched(userId, ip);
+  }
+
+  /**
    * 방문자/세션 식별과 기기 정보 등록만 담당한다 — 페이지뷰는 항상 recordEvent로 남긴다.
    *
    * insertSession은 upsert이므로 "이미 있는 세션인지"를 여기서 미리 판단하지 않고
@@ -91,7 +118,11 @@ export class AnalyticsService {
 
   async recordEvent(c: Context<AppEnv>, body: AnalyticsEventInput): Promise<void> {
     try {
-      const identity = this.resolveIdentity(c, body);
+      // 앱은 두 상관관계 ID를 항상 body에 싣고, 웹은 서버 발급 쿠키만 사용한다.
+      // 쿠키가 아직 없는 웹의 첫 병렬 요청도 웹으로 판별해야 임의 app 세션이 생기지 않는다.
+      const platform = body.visitorId && body.sessionId ? 'app' : 'web';
+      const identity = this.resolveIdentity(c, body, platform);
+      await this.ensureSession(c, identity, platform);
       this.repo.insertEvent(identity.sessionId, body.path);
     } catch (err) {
       console.error('analytics.recordEvent failed:', err);
@@ -100,7 +131,8 @@ export class AnalyticsService {
 
   async recordVitals(c: Context<AppEnv>, body: AnalyticsVitalsInput): Promise<void> {
     try {
-      const identity = this.resolveIdentity(c, body);
+      const identity = this.resolveIdentity(c, body, 'web');
+      await this.ensureSession(c, identity, 'web');
       this.repo.insertVitals(identity.sessionId, body.metric, body.value, body.path);
     } catch (err) {
       console.error('analytics.recordVitals failed:', err);
