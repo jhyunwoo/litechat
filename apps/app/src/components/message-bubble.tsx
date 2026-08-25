@@ -34,6 +34,7 @@ interface Props {
   /** 마운트 이후 도착한 새 메시지인지 — true면 스프링 등장 */
   animate: boolean;
   onImagePress: (message: WireMessage) => void;
+  onLongPress?: (message: WireMessage) => void;
 }
 
 /** 아래에서 살짝 튀어오르는 스프링 등장 (iMessage 느낌) */
@@ -62,6 +63,7 @@ export const MessageBubble = memo(function MessageBubble({
   isTail,
   animate,
   onImagePress,
+  onLongPress,
 }: Props) {
   const styles = useStyles();
   const emojiOnly = message.k === 'e' || (message.k === 't' && isEmojiOnly(message.x));
@@ -83,7 +85,12 @@ export const MessageBubble = memo(function MessageBubble({
         pending && styles.pending,
       ]}
     >
-      <View style={[styles.group, mine && styles.groupMine]}>
+      <Pressable
+        style={[styles.group, mine && styles.groupMine]}
+        onLongPress={onLongPress ? () => onLongPress(message) : undefined}
+        delayLongPress={450}
+        accessibilityHint={onLongPress ? '길게 눌러 신고 옵션 열기' : undefined}
+      >
         {message.k === 'i' && message.im ? (
           <Pressable onPress={() => onImagePress(message)}>
             <Image
@@ -115,7 +122,7 @@ export const MessageBubble = memo(function MessageBubble({
             <Text style={styles.time}>{formatTime(message.ts)}</Text>
           </View>
         )}
-      </View>
+      </Pressable>
     </Animated.View>
   );
 });

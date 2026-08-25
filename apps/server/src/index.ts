@@ -5,6 +5,7 @@
  * - `export default { fetch, websocket }` 형태는 Bun.serve의 표준 진입 형식이다.
  */
 import { createApp } from './app';
+import { startRetentionSchedule } from './db/retention';
 import { createDeps } from './deps';
 import { startGeoipAutoRefresh } from './modules/analytics/geoip-updater';
 import { AnalyticsService } from './modules/analytics/service';
@@ -12,6 +13,8 @@ import { serveFrontend } from './static';
 import { websocket } from './ws/hub';
 
 const deps = createDeps();
+// 부팅 정리(createApp) 이후에도 장기 실행 중 6시간마다 보관기간을 강제한다.
+startRetentionSchedule(deps.db);
 // GeoLite2 DB 주간 자동 갱신 — 부팅 시 + 6시간마다 파일 나이를 확인해 7일 지나면 교체한다.
 startGeoipAutoRefresh(deps.config);
 // static.ts의 lite 서버사이드 수집 훅과 /api/analytics, /api/admin 라우트가 같은 인스턴스를 공유한다.

@@ -6,18 +6,14 @@
  *   4. 상대방 + 내 다른 기기로 WS 팬아웃
  *   5. 상대가 오프라인이면 오프라인 훅 호출 (푸시 알림 발송)
  */
-import type {
-  ConversationSummary,
-  MessageKind,
-  PublicUser,
-  WireMessage,
-} from '@litechat/types';
+import type { ConversationSummary, MessageKind, PublicUser, WireMessage } from '@litechat/types';
 import { MAX_MESSAGE_LENGTH } from '@litechat/types';
 import type { WSContext } from 'hono/ws';
 import type { AppDeps } from '../../deps';
 import { errors } from '../../errors';
 import { UsersRepo } from '../auth/repo';
 import { ImagesRepo } from '../images/repo';
+import { SafetyRepo } from '../safety/repo';
 import { ConversationsRepo, type ConversationRow } from './conversations-repo';
 import { MessagesRepo } from './messages-repo';
 
@@ -29,6 +25,7 @@ export class ChatService {
   private messages: MessagesRepo;
   private images: ImagesRepo;
   private users: UsersRepo;
+  private safety: SafetyRepo;
 
   constructor(
     private deps: AppDeps,
@@ -39,6 +36,7 @@ export class ChatService {
     this.messages = new MessagesRepo(deps.db);
     this.images = new ImagesRepo(deps.db);
     this.users = new UsersRepo(deps.db);
+    this.safety = new SafetyRepo(deps.db);
   }
 
   /** 대화방 조회 + 참여자 검증. 통과하면 [대화방, 상대방 ID]를 반환한다. */
@@ -47,6 +45,7 @@ export class ChatService {
     if (!conversation) throw errors.notFound();
     const peerId = this.conversations.peerOf(conversation, meId);
     if (peerId === null) throw errors.forbidden();
+    if (this.safety.isBlockedEitherWay(meId, peerId)) throw errors.forbidden();
     return [conversation, peerId];
   }
 
@@ -127,7 +126,7 @@ export class ChatService {
       peer_read: number;
     }
     const rows = this.deps.db
-      .query<SummaryRow, [number, number, number, number, number]>(
+      .query<SummaryRow, [number, number, number, number, number, number, number]>(
         `SELECT c.id,
                 u.id AS peer_id, u.username, u.nickname,
                 (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id) AS last_id,
@@ -140,10 +139,15 @@ export class ChatService {
          JOIN users u ON u.id = CASE WHEN c.user_a = ? THEN c.user_b ELSE c.user_a END
          LEFT JOIN message_reads r ON r.conversation_id = c.id AND r.user_id = ?
          LEFT JOIN message_reads pr ON pr.conversation_id = c.id AND pr.user_id = u.id
-         WHERE c.user_a = ? OR c.user_b = ?
+         WHERE (c.user_a = ? OR c.user_b = ?)
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks b
+             WHERE (b.blocker_id = ? AND b.blocked_id = u.id)
+                OR (b.blocker_id = u.id AND b.blocked_id = ?)
+           )
          ORDER BY COALESCE(last_id, 0) DESC, c.id DESC`,
       )
-      .all(meId, meId, meId, meId, meId);
+      .all(meId, meId, meId, meId, meId, meId, meId);
 
     return rows.map((row) => ({
       id: row.id,

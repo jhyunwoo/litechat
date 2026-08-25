@@ -36,3 +36,12 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Runtime state and generated user content must never enter source control
+**/data/*.db
+**/data/*.db-shm
+**/data/*.db-wal
+**/data/uploads/
+/e2e/.data/
+/data/GeoLite2-*
+/apps/server/data/GeoLite2-*

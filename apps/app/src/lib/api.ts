@@ -16,8 +16,25 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  if (init?.signal?.aborted) controller.abort();
+  else init?.signal?.addEventListener('abort', abort, { once: true });
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    init?.signal?.removeEventListener('abort', abort);
+  }
+}
+
 export const api = hc<AppType>(API_URL, {
   headers: () => authHeaders(),
+  fetch: fetchWithTimeout,
 });
 
 /** 응답이 실패면 서버 오류 코드를 담아 던진다 */
@@ -56,6 +73,7 @@ export async function unwrap<T>(res: JsonResponse): Promise<T> {
 
 /** 서버 오류 코드 → 사용자에게 보여줄 한국어 메시지 */
 export function errorMessage(error: unknown): string {
+  if (typeof error === 'string') return error;
   const code = error instanceof ApiFailure ? error.code : '';
   const messages: Record<string, string> = {
     USERNAME_TAKEN: '이미 사용 중인 아이디예요.',
@@ -66,6 +84,11 @@ export function errorMessage(error: unknown): string {
     INVALID_IMAGE: '지원하지 않는 이미지 형식이에요.',
     INVALID_CONTENT: '메시지 내용을 확인해 주세요.',
     NOT_FOUND: '요청한 대상을 찾을 수 없어요.',
+    FORBIDDEN: '이 작업을 수행할 수 없어요.',
+    RATE_LIMITED: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.',
   };
+  if (error instanceof Error && error.name === 'AbortError') {
+    return '서버 응답이 지연되고 있어요. 연결을 확인한 뒤 다시 시도해 주세요.';
+  }
   return messages[code] ?? '문제가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }

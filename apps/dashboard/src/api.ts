@@ -233,6 +233,22 @@ export interface NotificationSummary {
   avgLatencySeconds: number | null;
 }
 
+export interface ContentReport {
+  id: number;
+  reporterId: number;
+  reportedUserId: number;
+  messageId: number | null;
+  reason: 'harassment' | 'hate' | 'sexual' | 'violence' | 'spam' | 'other';
+  details: string | null;
+  status: 'open' | 'reviewed' | 'dismissed' | 'actioned';
+  createdAt: number;
+  resolvedAt: number | null;
+  reporterUsername: string;
+  reportedUsername: string;
+  messageKind: string | null;
+  messageContent: string | null;
+}
+
 export const adminApi = {
   login: (username: string, password: string) =>
     request<{ ok: true }>('/login', {
@@ -285,4 +301,11 @@ export const adminApi = {
   watchRemove: (userId: number) =>
     request<{ ok: true }>(`/geoip/watch/${userId}`, { method: 'DELETE' }),
   geoipRefresh: () => request<GeoipRefreshInfo>('/geoip/refresh', { method: 'POST' }),
+  reports: (status?: ContentReport['status']) =>
+    request<{ reports: ContentReport[] }>(`/reports${status ? `?status=${status}` : ''}`),
+  resolveReport: (id: number, status: 'reviewed' | 'dismissed' | 'actioned') =>
+    request<{ ok: true }>(`/reports/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
 };

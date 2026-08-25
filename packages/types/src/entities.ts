@@ -17,6 +17,12 @@ export interface PublicUser {
   nickname: string;
 }
 
+/** 현재 사용자가 차단한 계정 */
+export interface BlockedUser {
+  user: PublicUser;
+  ts: number;
+}
+
 /** 친구 관계 상태: 요청 대기중 또는 수락됨 */
 export type FriendshipStatus = 'pending' | 'accepted';
 

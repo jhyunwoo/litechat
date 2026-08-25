@@ -37,6 +37,10 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/** 계정 영구 삭제 요청 — 현재 비밀번호로 재인증한다. */
+export const deleteAccountSchema = z.object({ password: passwordSchema });
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+
 /** 사용자 검색 쿼리 (?q=아이디) */
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(20),
@@ -54,6 +58,28 @@ export const friendRespondSchema = z.object({
   accept: z.boolean(),
 });
 export type FriendRespondInput = z.infer<typeof friendRespondSchema>;
+
+/** 사용자 차단 */
+export const blockUserSchema = z.object({ userId: z.number().int().positive() });
+export type BlockUserInput = z.infer<typeof blockUserSchema>;
+
+export const reportReasonSchema = z.enum([
+  'harassment',
+  'hate',
+  'sexual',
+  'violence',
+  'spam',
+  'other',
+]);
+
+/** 신고는 사용자 단위이며, 선택적으로 확인 가능한 메시지를 근거로 연결한다. */
+export const contentReportSchema = z.object({
+  userId: z.number().int().positive(),
+  messageId: z.number().int().positive().optional(),
+  reason: reportReasonSchema,
+  details: z.string().trim().max(500).optional(),
+});
+export type ContentReportInput = z.infer<typeof contentReportSchema>;
 
 /** 메시지 목록 조회 쿼리 — after: 재접속 후 따라잡기, before: 과거 페이지네이션 */
 export const messagesQuerySchema = z.object({
@@ -161,3 +187,8 @@ export const adminLoginSchema = z.object({
   password: passwordSchema,
 });
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
+
+export const reportStatusSchema = z.enum(['open', 'reviewed', 'dismissed', 'actioned']);
+export const resolveReportSchema = z.object({
+  status: z.enum(['reviewed', 'dismissed', 'actioned']),
+});

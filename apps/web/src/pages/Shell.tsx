@@ -20,8 +20,6 @@ import { Icon, type IconName } from '../components/Icon';
 const IOS_ONBOARD_SEEN = 'lc:ios-onboard-seen';
 
 /** 검색 입력 포커스를 요청하는 전역 커스텀 이벤트 이름 */
-export const SEARCH_EVENT = 'lc:focus-search';
-
 /** 좌측 세로 배치의 배지 (탭/레일 공용) — 모노크롬 잉크 칩 */
 function Badge({ count }: { count: number }) {
   if (!count) return null;
@@ -33,7 +31,19 @@ function Badge({ count }: { count: number }) {
 }
 
 /** 하단 탭(모바일) 항목 */
-function Tab({ to, label, icon, active, badge }: { to: string; label: string; icon: IconName; active: boolean; badge?: number }) {
+function Tab({
+  to,
+  label,
+  icon,
+  active,
+  badge,
+}: {
+  to: string;
+  label: string;
+  icon: IconName;
+  active: boolean;
+  badge?: number;
+}) {
   return (
     <Link
       to={to}
@@ -53,7 +63,19 @@ function Tab({ to, label, icon, active, badge }: { to: string; label: string; ic
 }
 
 /** 네비 레일(데스크탑) 항목 — 세로 배치 */
-function RailItem({ to, label, icon, active, badge }: { to: string; label: string; icon: IconName; active: boolean; badge?: number }) {
+function RailItem({
+  to,
+  label,
+  icon,
+  active,
+  badge,
+}: {
+  to: string;
+  label: string;
+  icon: IconName;
+  active: boolean;
+  badge?: number;
+}) {
   return (
     <Link
       to={to}
@@ -128,9 +150,7 @@ export function Shell() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        navigate('/friends');
-        // 렌더 후 검색 입력에 포커스를 요청한다.
-        setTimeout(() => window.dispatchEvent(new CustomEvent(SEARCH_EVENT)), 50);
+        navigate('/friends', { state: { focusSearch: true } });
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -141,8 +161,20 @@ export function Shell() {
     <div className="flex h-full w-full flex-col bg-white md:flex-row">
       {/* 네비 레일 — 데스크탑 전용, 파치먼트 표면 */}
       <nav className="hidden w-20 shrink-0 flex-col gap-1 border-r border-hairline bg-canvas-soft p-2 md:flex">
-        <RailItem to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
-        <RailItem to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
+        <RailItem
+          to="/"
+          label="채팅"
+          icon="chat"
+          active={section === 'chats'}
+          badge={unreadTotal}
+        />
+        <RailItem
+          to="/friends"
+          label="친구"
+          icon="friends"
+          active={section === 'friends'}
+          badge={incomingCount}
+        />
         <RailItem to="/profile" label="프로필" icon="profile" active={section === 'profile'} />
       </nav>
 
@@ -152,7 +184,13 @@ export function Shell() {
           inChat ? 'hidden md:block' : 'block flex-1 md:flex-none'
         }`}
       >
-        {section === 'chats' ? <ChatsTab /> : section === 'friends' ? <FriendsTab /> : <ProfileTab />}
+        {section === 'chats' ? (
+          <ChatsTab />
+        ) : section === 'friends' ? (
+          <FriendsTab />
+        ) : (
+          <ProfileTab />
+        )}
       </aside>
 
       {/* 디테일 컬럼 — 대화(Outlet). 모바일에서는 대화 중일 때만 표시한다. */}
@@ -164,7 +202,13 @@ export function Shell() {
       {!inChat && (
         <nav className="frosted pb-safe flex shrink-0 border-t border-hairline md:hidden">
           <Tab to="/" label="채팅" icon="chat" active={section === 'chats'} badge={unreadTotal} />
-          <Tab to="/friends" label="친구" icon="friends" active={section === 'friends'} badge={incomingCount} />
+          <Tab
+            to="/friends"
+            label="친구"
+            icon="friends"
+            active={section === 'friends'}
+            badge={incomingCount}
+          />
           <Tab to="/profile" label="프로필" icon="profile" active={section === 'profile'} />
         </nav>
       )}

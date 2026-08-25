@@ -35,7 +35,7 @@ export function pushRoutes(
       })
       // 알림 끄기
       .post('/unsubscribe', zValidator('json', pushUnsubscribeSchema), (c) => {
-        service.unsubscribe(c.req.valid('json').endpoint);
+        service.unsubscribe(c.var.userId, c.req.valid('json').endpoint);
         return c.json({ ok: true }, 200);
       })
       // 네이티브 앱 알림 켜기 — Expo Push 토큰 등록

@@ -43,4 +43,25 @@ describe('MemoryKV', () => {
     await kv.del('k');
     expect(await kv.get('k')).toBeNull();
   });
+
+  test('increment는 고정 시간창 카운터와 남은 TTL을 유지한다', async () => {
+    let now = 0;
+    const kv = new MemoryKV(() => now);
+    expect(await kv.increment('rate', 10)).toEqual({ count: 1, retryAfter: 10 });
+    now = 5_000;
+    expect(await kv.increment('rate', 10)).toEqual({ count: 2, retryAfter: 5 });
+    now = 10_001;
+    expect(await kv.increment('rate', 10)).toEqual({ count: 1, retryAfter: 10 });
+  });
+
+  test('deleteByValue는 지정 접두사의 일치 세션만 삭제한다', async () => {
+    const kv = new MemoryKV();
+    await kv.set('sess:a', '1');
+    await kv.set('sess:b', '2');
+    await kv.set('other:c', '1');
+    expect(await kv.deleteByValue('sess:', '1')).toBe(1);
+    expect(await kv.get('sess:a')).toBeNull();
+    expect(await kv.get('sess:b')).toBe('2');
+    expect(await kv.get('other:c')).toBe('1');
+  });
 });

@@ -44,13 +44,17 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
-/** 시간 표시 (오늘이면 시:분, 아니면 월/일) */
-function fmtTime(ts: number): string {
+/** 시간 표시 — 오늘이면 시:분, 아니면 월/일.
+    withDate면 지난 날짜도 시각까지 붙인다 (메시지 행 전용).
+    시간 열은 한 칸(64px)뿐이라 넘치면 잘린다 — 날짜를 같이 쓸 땐 오전/오후 없이 24시간제로 폭을 아낀다 */
+function fmtTime(ts: number, withDate = false): string {
   const d = new Date(ts * 1000);
   const now = new Date();
-  return d.toDateString() === now.toDateString()
-    ? d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
-    : d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+  if (!withDate) return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  const hm = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 }
 
 const isEmojiOnly = (s: string) =>
@@ -582,7 +586,7 @@ function chatView(convId: number): HTMLElement {
           'span',
           { class: 'cc' },
           mine && message.id > 0 && message.id === lastReadMine ? '읽음 ' : null,
-          fmtTime(message.ts),
+          fmtTime(message.ts, true),
         ),
       ),
     );

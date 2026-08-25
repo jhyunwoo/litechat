@@ -66,16 +66,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 저장된 선호를 불러와 네이티브 스킴에 반영한다. 완료 전에는 렌더하지 않아
   // (네이티브 스플래시가 덮고 있는 동안) 라이트 → 다크 플래시를 막는다.
   useEffect(() => {
-    void hydrateThemePref().then((stored) => {
-      setPrefState(stored);
-      if (stored !== 'system') Appearance.setColorScheme(stored);
-      setHydrated(true);
-    });
+    void hydrateThemePref()
+      .catch(() => 'system' as const)
+      .then((stored) => {
+        setPrefState(stored);
+        if (stored !== 'system') Appearance.setColorScheme(stored);
+      })
+      .finally(() => setHydrated(true));
   }, []);
 
   const setPref = useCallback((next: ThemePreference) => {
     setPrefState(next);
-    void setThemePref(next);
+    void setThemePref(next).catch(() => {});
     // 네이티브 표면(탭바/알럿/키보드)도 함께 전환 — unspecified면 시스템 복귀
     Appearance.setColorScheme(next === 'system' ? 'unspecified' : next);
   }, []);

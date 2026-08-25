@@ -22,7 +22,10 @@ import { ExpoPushService, type ExpoPushSender } from './modules/push/expo-servic
 import { NotificationLogRepo } from './modules/push/notification-log-repo';
 import { pushRoutes } from './modules/push/routes';
 import { PushService, type PushSender } from './modules/push/service';
+import { safetyRoutes } from './modules/safety/routes';
 import { wsRoutes } from './ws/routes';
+import { secureHeaders } from 'hono/secure-headers';
+import { applyRetention } from './db/retention';
 
 /** 라우트 핸들러에서 사용할 수 있는 컨텍스트 변수 타입 */
 export interface AppVariables {
@@ -42,6 +45,7 @@ export interface CreateAppOptions {
 
 /** 의존성을 주입받아 Hono 앱을 조립한다. */
 export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
+  applyRetention(deps.db);
   // 상대가 오프라인일 때 푸시를 쏘는 훅을 ChatService에 주입한다.
   // Web Push(브라우저/PWA)와 Expo Push(네이티브 앱)를 하나의 훅으로 합성한다.
   const notificationLogRepo = new NotificationLogRepo(deps.db);
@@ -58,6 +62,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
 
   const app = new Hono<AppEnv>()
+    .use('*', secureHeaders())
     // 헬스체크 — 배포 환경(Dokploy)의 컨테이너 상태 확인용
     .get('/api/health', (c) => c.json({ ok: true }))
     .route('/api/auth', authRoutes(deps))
@@ -65,13 +70,14 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     .route('/api/chat', chatRoutes(deps, chatService))
     .route('/api/images', imagesRoutes(deps, imagesService))
     .route('/api/push', pushRoutes(deps, pushService, expoPushService, notificationLogRepo))
+    .route('/api/safety', safetyRoutes(deps))
     .route('/api/analytics', analyticsRoutes(analyticsService))
     .route('/api/admin', adminRoutes(deps, analyticsService, notificationLogRepo))
     .route('/img', imgRoutes(deps, imagesService))
     .route('/', wsRoutes(deps, chatService));
 
   // OpenAPI 명세(/openapi.json) + 문서 UI(/docs) — 모든 라우트 등록 후에 붙인다.
-  attachDocs(app);
+  if (deps.config.exposeApiDocs) attachDocs(app);
 
   // 서비스 계층에서 던진 ApiError를 일관된 JSON 오류 응답으로 변환한다.
   app.onError((error, c) => {

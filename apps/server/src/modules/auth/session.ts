@@ -38,5 +38,10 @@ export async function destroySession(deps: AppDeps, token: string): Promise<void
   await deps.kv.del(PREFIX + token);
 }
 
+/** 계정에 연결된 모든 기기의 세션을 파기한다. */
+export async function destroyAllUserSessions(deps: AppDeps, userId: number): Promise<number> {
+  return deps.kv.deleteByValue(PREFIX, String(userId));
+}
+
 /** 세션 쿠키 이름 — 클라이언트/미들웨어가 공유 */
 export const SESSION_COOKIE = 'lc_sess';

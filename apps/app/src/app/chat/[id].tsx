@@ -2,7 +2,8 @@
  * 채팅방 라우트 (iPhone) — 글래스 헤더 + ChatRoomView
  */
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { ChatRoomView } from '@/components/chat-room-view';
@@ -11,6 +12,7 @@ import { useAuth } from '@/data/auth';
 import { useConversations } from '@/data/data';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
+import { api, errorMessage, unwrap } from '@/lib/api';
 
 export default function ChatRoomScreen() {
   const styles = useStyles();
@@ -18,11 +20,69 @@ export default function ChatRoomScreen() {
   const convId = Number(id);
   const { me } = useAuth();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
 
   const { data: conversations } = useConversations();
   const conversation = conversations?.find((c) => c.id === convId);
 
   if (!me || !Number.isFinite(convId)) return null;
+
+  function safetyMenu() {
+    if (!conversation) return;
+    Alert.alert(conversation.peer.nickname, '안전 옵션', [
+      {
+        text: '사용자 신고',
+        onPress: () =>
+          void (async () => {
+            try {
+              await unwrap(
+                await api.api.safety.reports.$post({
+                  json: {
+                    userId: conversation.peer.id,
+                    reason: 'other',
+                    details: '사용자 프로필에서 신고',
+                  },
+                }),
+              );
+              Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+            } catch (cause) {
+              Alert.alert('신고 실패', errorMessage(cause));
+            }
+          })(),
+      },
+      {
+        text: '사용자 차단',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(
+            '이 사용자를 차단할까요?',
+            '서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.',
+            [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '차단',
+                style: 'destructive',
+                onPress: () =>
+                  void (async () => {
+                    try {
+                      await unwrap(
+                        await api.api.safety.blocks.$post({
+                          json: { userId: conversation.peer.id },
+                        }),
+                      );
+                      await queryClient.invalidateQueries();
+                      router.replace('/');
+                    } catch (cause) {
+                      Alert.alert('차단 실패', errorMessage(cause));
+                    }
+                  })(),
+              },
+            ],
+          ),
+      },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }
 
   return (
     <View style={styles.screen}>
@@ -43,6 +103,15 @@ export default function ChatRoomScreen() {
           </Text>
           {conversation && <Text style={styles.peerUsername}>@{conversation.peer.username}</Text>}
         </View>
+        <Pressable
+          onPress={safetyMenu}
+          accessibilityRole="button"
+          accessibilityLabel="대화 안전 옵션"
+          hitSlop={8}
+          style={styles.menu}
+        >
+          <Text style={styles.menuText}>•••</Text>
+        </Pressable>
       </Glass>
 
       <ChatRoomView convId={convId} meId={me.id} />
@@ -75,6 +144,8 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.primary,
   },
   headerText: { flex: 1, minWidth: 0 },
+  menu: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  menuText: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
   peerName: {
     fontSize: 16,
     fontWeight: '400',

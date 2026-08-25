@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { getActiveConversation } from '@/data/active-conversation';
 import { api, unwrap } from './api';
 
@@ -42,6 +43,14 @@ Notifications.setNotificationHandler({
 export async function registerForPush(): Promise<boolean> {
   if (!Device.isDevice) return false; // 시뮬레이터는 푸시 토큰이 없다
 
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('messages', {
+      name: '새 메시지',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 200, 150, 200],
+    });
+  }
+
   const existing = await Notifications.getPermissionsAsync();
   const permission = existing.granted ? existing : await Notifications.requestPermissionsAsync();
   if (!permission.granted) return false;
@@ -65,6 +74,11 @@ export async function unregisterPush(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
   const res = await api.api.push.expo.unregister.$post({ json: { token } });
   await unwrap(res);
+}
+
+/** 서버 계정이 이미 삭제된 뒤 호출 — 로컬 토큰/배지만 지운다. */
+export async function clearLocalPushState(): Promise<void> {
+  await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), Notifications.setBadgeCountAsync(0)]);
 }
 
 /** 이 기기에서 푸시를 켠 상태인지 (프로필 토글 초기값) */
@@ -140,6 +154,6 @@ export function useBadgeSync(conversations: ConversationSummary[] | undefined): 
   useEffect(() => {
     if (!conversations) return;
     const total = conversations.reduce((sum, conv) => sum + conv.unread, 0);
-    void Notifications.setBadgeCountAsync(total);
+    void Notifications.setBadgeCountAsync(total).catch(() => {});
   }, [conversations]);
 }

@@ -177,6 +177,18 @@ describe('구독 관리', () => {
     await aliceSends();
     expect(sent).toHaveLength(0);
   });
+
+  test('다른 사용자는 endpoint를 알아도 구독을 해지할 수 없다', async () => {
+    await subscribeBob();
+    const res = await jsonRequest(app, '/api/push/unsubscribe', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { endpoint: SUBSCRIPTION.endpoint },
+    });
+    expect(res.status).toBe(200);
+    await aliceSends();
+    expect(sent).toHaveLength(1);
+  });
 });
 
 describe('POST /api/push/ack', () => {

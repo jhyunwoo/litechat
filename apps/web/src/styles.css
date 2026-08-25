@@ -42,8 +42,15 @@ body,
 body {
   /* 시스템 폰트 스택 (SF Pro 대체) — 웹폰트 다운로드 없이 브랜드 리듬 유지 */
   font-family:
-    'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
-    'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    'SF Pro Display',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Apple SD Gothic Neo',
+    'Pretendard',
+    'Segoe UI',
+    Roboto,
+    'Noto Sans KR',
+    sans-serif;
   /* DESIGN.md: 본문 17px/400/1.47 + 네거티브 트래킹, ss01 전역 적용 */
   font-weight: 400;
   font-size: 17px;
@@ -93,4 +100,31 @@ body {
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: rgb(29 29 31 / 0.15) transparent;
+}
+
+.legal-content {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.legal-content h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.legal-content p + p {
+  margin-top: 1rem;
+}
+.legal-content ul {
+  margin-top: 0.75rem;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.legal-content li + li {
+  margin-top: 0.5rem;
+}
+.legal-content a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }

@@ -9,6 +9,25 @@
  *   서버 → 클라이언트: m(새 메시지), a(전송 확인), r(상대 읽음), f(친구 이벤트), q(퐁), e(오류)
  */
 import type { MessageKind, PublicUser, WireMessage } from './entities';
+import { z } from 'zod';
+import { MAX_MESSAGE_LENGTH } from './schemas';
+
+/** 애플리케이션 WebSocket 프레임 상한. JSON 파싱 전에 적용한다. */
+export const MAX_WS_FRAME_BYTES = 8 * 1024;
+
+function utf8Bytes(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff && index + 1 < value.length) {
+      bytes += 4;
+      index += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
 
 /* -------------------------------------------------------------- */
 /* 클라이언트 → 서버                                                */
@@ -41,6 +60,35 @@ export interface ClientPingFrame {
 }
 
 export type ClientFrame = ClientSendFrame | ClientReadFrame | ClientPingFrame;
+
+const clientFrameSchema = z.discriminatedUnion('t', [
+  z
+    .object({
+      t: z.literal('m'),
+      c: z.number().int().positive(),
+      k: z.enum(['t', 'i', 'e']),
+      x: z.string().min(1).max(MAX_MESSAGE_LENGTH),
+      i: z.string().min(1).max(100),
+    })
+    .strict(),
+  z
+    .object({ t: z.literal('r'), c: z.number().int().positive(), m: z.number().int().positive() })
+    .strict(),
+  z.object({ t: z.literal('p') }).strict(),
+]);
+
+/** 서버가 신뢰하기 전에 클라이언트 프레임 크기와 종류별 구조를 모두 검증한다. */
+export function parseClientFrame(raw: unknown): ClientFrame | null {
+  if (typeof raw !== 'string' || utf8Bytes(raw) > MAX_WS_FRAME_BYTES) {
+    return null;
+  }
+  try {
+    const parsed = clientFrameSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
 
 /* -------------------------------------------------------------- */
 /* 서버 → 클라이언트                                                */

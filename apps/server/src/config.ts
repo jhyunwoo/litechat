@@ -52,6 +52,8 @@ export interface AppConfig {
   passwordMemoryCost: number;
   /** argon2id 반복 횟수 */
   passwordTimeCost: number;
+  /** 프로덕션에서 OpenAPI/UI를 공개할지 여부 (기본 비활성) */
+  exposeApiDocs: boolean;
 }
 
 /** 환경 변수 + 부분 오버라이드로 설정 객체를 생성한다. */
@@ -82,6 +84,7 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     googleMapsMapId: env.GOOGLE_MAPS_MAP_ID ?? 'DEMO_MAP_ID',
     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),
+    exposeApiDocs: env.EXPOSE_API_DOCS === 'true' || env.NODE_ENV !== 'production',
     ...overrides,
   };
 }

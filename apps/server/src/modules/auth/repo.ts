@@ -5,7 +5,7 @@ import type { Database } from 'bun:sqlite';
 import type { PublicUser } from '@litechat/types';
 
 /** DB 행 형태 (내부용 — password_hash 포함) */
-interface UserRow {
+export interface UserRow {
   id: number;
   username: string;
   password_hash: string;
@@ -18,7 +18,9 @@ export class UsersRepo {
   /** 사용자 생성 — UNIQUE 위반은 호출자가 처리한다. @returns 생성된 ID */
   insert(username: string, passwordHash: string, nickname: string): number {
     const result = this.db
-      .query('INSERT INTO users (username, password_hash, nickname, created_at) VALUES (?, ?, ?, ?)')
+      .query(
+        'INSERT INTO users (username, password_hash, nickname, created_at) VALUES (?, ?, ?, ?)',
+      )
       .run(username, passwordHash, nickname, Math.floor(Date.now() / 1000));
     return Number(result.lastInsertRowid);
   }
@@ -30,6 +32,15 @@ export class UsersRepo {
         'SELECT id, username, password_hash, nickname FROM users WHERE username = ?',
       )
       .get(username);
+  }
+
+  /** ID로 내부 계정 정보 조회 (재인증용 — 해시 포함) */
+  findById(id: number): UserRow | null {
+    return this.db
+      .query<UserRow, [number]>(
+        'SELECT id, username, password_hash, nickname FROM users WHERE id = ?',
+      )
+      .get(id);
   }
 
   /** ID로 공개 정보 조회 */

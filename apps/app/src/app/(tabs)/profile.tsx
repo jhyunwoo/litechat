@@ -5,7 +5,8 @@
  * 권한 요청 → Expo 토큰 등록으로 이어진다.
  */
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { useAuth } from '@/data/auth';
@@ -13,6 +14,7 @@ import { isPushEnabled, registerForPush, unregisterPush } from '@/lib/notificati
 import type { ThemePreference } from '@/lib/theme-pref';
 import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
+import { WEB_URL } from '@/lib/env';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: '시스템' },
@@ -30,8 +32,18 @@ export default function ProfileTab() {
 
   // 이 기기의 등록 상태로 토글 초기값을 맞춘다.
   useEffect(() => {
-    void isPushEnabled().then(setPushOn);
+    void isPushEnabled()
+      .then(setPushOn)
+      .catch(() => setPushOn(false));
   }, []);
+
+  async function openLegalPage(path: string) {
+    try {
+      await Linking.openURL(`${WEB_URL}${path}`);
+    } catch {
+      Alert.alert('페이지를 열 수 없어요', '인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+    }
+  }
 
   async function togglePush(next: boolean) {
     if (pushBusy) return;
@@ -56,66 +68,120 @@ export default function ProfileTab() {
         <Text style={styles.headerTitle}>프로필</Text>
       </View>
 
-      <View style={styles.identity}>
-        <Avatar nickname={me?.nickname ?? '?'} size={80} />
-        <Text style={styles.nickname}>{me?.nickname}</Text>
-        <Text style={styles.username}>@{me?.username}</Text>
-      </View>
-
-      <View style={styles.card}>
-        {/* 푸시 알림 토글 */}
-        <View style={styles.cardRow}>
-          <View style={styles.cardRowText}>
-            <Text style={styles.rowTitle}>푸시 알림</Text>
-            <Text style={styles.rowHint}>접속 중이 아닐 때 새 메시지를 알려드려요</Text>
-          </View>
-          <Switch
-            value={pushOn}
-            onValueChange={(next) => void togglePush(next)}
-            disabled={pushBusy}
-            trackColor={{ true: colors.primary, false: colors.hairlineInput }}
-          />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
+        <View style={styles.identity}>
+          <Avatar nickname={me?.nickname ?? '?'} size={80} />
+          <Text style={styles.nickname}>{me?.nickname}</Text>
+          <Text style={styles.username}>@{me?.username}</Text>
         </View>
 
-        <View style={styles.divider} />
-
-        {/* 화면 테마 — 시스템 추종 또는 수동 고정 */}
-        <View style={styles.cardRow}>
-          <View style={styles.cardRowText}>
-            <Text style={styles.rowTitle}>화면 테마</Text>
+        <View style={styles.card}>
+          {/* 푸시 알림 토글 */}
+          <View style={styles.cardRow}>
+            <View style={styles.cardRowText}>
+              <Text style={styles.rowTitle}>푸시 알림</Text>
+              <Text style={styles.rowHint}>접속 중이 아닐 때 새 메시지를 알려드려요</Text>
+            </View>
+            <Switch
+              value={pushOn}
+              onValueChange={(next) => void togglePush(next)}
+              disabled={pushBusy}
+              trackColor={{ true: colors.primary, false: colors.hairlineInput }}
+            />
           </View>
-          <View style={styles.segments}>
-            {THEME_OPTIONS.map((option) => (
-              <Pressable
-                key={option.value}
-                onPress={() => setPref(option.value)}
-                style={[styles.segment, pref === option.value && styles.segmentOn]}
-              >
-                <Text
-                  style={[styles.segmentLabel, pref === option.value && styles.segmentLabelOn]}
+
+          <View style={styles.divider} />
+
+          <Pressable
+            onPress={() => router.push('/blocked-users')}
+            accessibilityRole="button"
+            style={styles.cardRow}
+          >
+            <Text style={styles.rowTitle}>차단한 사용자</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+          <View style={styles.divider} />
+
+          <Pressable
+            onPress={() => router.push('/account')}
+            accessibilityRole="button"
+            style={styles.cardRow}
+          >
+            <Text style={styles.rowTitle}>계정 관리</Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+          <View style={styles.divider} />
+
+          <Pressable
+            onPress={() => void openLegalPage('/privacy')}
+            accessibilityRole="link"
+            style={styles.cardRow}
+          >
+            <Text style={styles.rowTitle}>개인정보처리방침</Text>
+            <Text style={styles.chevron}>↗</Text>
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable
+            onPress={() => void openLegalPage('/terms')}
+            accessibilityRole="link"
+            style={styles.cardRow}
+          >
+            <Text style={styles.rowTitle}>이용약관</Text>
+            <Text style={styles.chevron}>↗</Text>
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable
+            onPress={() => void openLegalPage('/support')}
+            accessibilityRole="link"
+            style={styles.cardRow}
+          >
+            <Text style={styles.rowTitle}>지원 및 문의</Text>
+            <Text style={styles.chevron}>↗</Text>
+          </Pressable>
+          <View style={styles.divider} />
+
+          {/* 화면 테마 — 시스템 추종 또는 수동 고정 */}
+          <View style={styles.cardRow}>
+            <View style={styles.cardRowText}>
+              <Text style={styles.rowTitle}>화면 테마</Text>
+            </View>
+            <View style={styles.segments}>
+              {THEME_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setPref(option.value)}
+                  style={[styles.segment, pref === option.value && styles.segmentOn]}
                 >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[styles.segmentLabel, pref === option.value && styles.segmentLabelOn]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
+
+          <View style={styles.divider} />
+
+          {/* 로그아웃 */}
+          <Pressable
+            onPress={() =>
+              void logout().catch(() =>
+                Alert.alert('로그아웃할 수 없어요', '잠시 후 다시 시도해 주세요.'),
+              )
+            }
+            style={({ pressed }) => [
+              styles.cardRow,
+              pressed && { backgroundColor: colors.canvasSoft },
+            ]}
+          >
+            <Text style={styles.logout}>로그아웃</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.divider} />
-
-        {/* 로그아웃 */}
-        <Pressable
-          onPress={() => void logout()}
-          style={({ pressed }) => [
-            styles.cardRow,
-            pressed && { backgroundColor: colors.canvasSoft },
-          ]}
-        >
-          <Text style={styles.logout}>로그아웃</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.footer}>litechat</Text>
+        <Text style={styles.footer}>litechat</Text>
+      </ScrollView>
     </View>
   );
 }
@@ -184,6 +250,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     fontWeight: '500',
     color: colors.ruby,
   },
+  chevron: { fontSize: 20, color: colors.inkMute },
   segments: {
     flexDirection: 'row',
     backgroundColor: colors.canvasSoft,

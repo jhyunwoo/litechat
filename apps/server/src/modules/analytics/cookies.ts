@@ -8,7 +8,7 @@
  * auth 모듈의 SESSION_COOKIE와 동일하게 Domain을 .moveto.kr로 두어
  * chat/litechat 두 서브도메인에서 같은 방문자로 상관관계를 맺는다.
  */
-import { getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../app';
 import type { AppDeps } from '../../deps';
@@ -55,4 +55,14 @@ export function ensureVisitorCookies(c: Context<AppEnv>, deps: AppDeps): Visitor
   setCookie(c, SESSION_COOKIE, sessionId, cookieOptions(deps, SESSION_MAX_AGE));
 
   return { visitorId, sessionId };
+}
+
+/** 계정 삭제 시 브라우저의 장기 분석 상관관계 키도 함께 제거한다. */
+export function clearVisitorCookies(c: Context<AppEnv>, deps: AppDeps): void {
+  const base = {
+    path: '/',
+    ...(deps.config.cookieDomain ? { domain: deps.config.cookieDomain } : {}),
+  };
+  deleteCookie(c, VISITOR_COOKIE, base);
+  deleteCookie(c, SESSION_COOKIE, base);
 }

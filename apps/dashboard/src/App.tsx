@@ -12,11 +12,10 @@ const SessionsPage = lazy(() => import('./pages/SessionsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const VitalsPage = lazy(() => import('./pages/VitalsPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 
 function Loading() {
-  return (
-    <div className="flex h-full items-center justify-center text-ink-mute">불러오는 중…</div>
-  );
+  return <div className="flex h-full items-center justify-center text-ink-mute">불러오는 중…</div>;
 }
 
 function RequireAdmin({ children }: { children: ReactNode }) {
@@ -56,6 +55,7 @@ function Shell() {
       <Tab to="/users" label="사용자별 방문" />
       <Tab to="/vitals" label="웹 바이탈" />
       <Tab to="/notifications" label="알림 로그" />
+      <Tab to="/reports" label="신고 검토" />
     </nav>
   );
   const account = (
@@ -124,6 +124,7 @@ export default function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/vitals" element={<VitalsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

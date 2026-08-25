@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  Linking,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -20,6 +21,7 @@ import { useAuth } from '@/data/auth';
 import { errorMessage } from '@/lib/api';
 import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
+import { WEB_URL } from '@/lib/env';
 
 /* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md 잉크 블랙 + 화이트) */
 const HERO_BG = '#1d1d1f';
@@ -54,6 +56,14 @@ export default function SignIn() {
     }
   }
 
+  async function openPrivacy() {
+    try {
+      await Linking.openURL(`${WEB_URL}/privacy`);
+    } catch {
+      setError('개인정보처리방침을 열 수 없어요. 인터넷 연결을 확인해 주세요.');
+    }
+  }
+
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.screen}>
       {/* 브랜드 히어로 — 잉크 블랙 타일 (표면 색 전환이 곧 구획) */}
@@ -63,10 +73,7 @@ export default function SignIn() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + spacing.xl },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.form}>
@@ -105,7 +112,11 @@ export default function SignIn() {
             onSubmitEditing={() => void submit()}
           />
 
-          {error !== '' && <Text style={styles.error}>{error}</Text>}
+          {error !== '' && (
+            <Text style={styles.error} accessibilityRole="alert">
+              {error}
+            </Text>
+          )}
 
           {/* button-primary-pill — 밴드당 하나뿐인 채워진 인디고 CTA */}
           <Pressable
@@ -140,7 +151,16 @@ export default function SignIn() {
           </Pressable>
         </View>
 
-        <Text style={styles.notice}>서비스 개선을 위해 접속 IP·기기 정보 등을 수집해요.</Text>
+        <Text style={styles.notice}>
+          서비스 개선과 보안을 위해 접속 IP·기기 정보 등을 수집해요.
+        </Text>
+        <Pressable
+          onPress={() => void openPrivacy()}
+          accessibilityRole="link"
+          style={styles.privacyLink}
+        >
+          <Text style={styles.privacyLinkText}>개인정보처리방침 보기</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -234,4 +254,6 @@ const useStyles = makeStyles(({ colors, type }) => ({
     textAlign: 'center',
     marginTop: spacing.xl,
   },
+  privacyLink: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
+  privacyLinkText: { ...type.caption, color: colors.primary, textDecorationLine: 'underline' },
 }));

@@ -4,10 +4,9 @@
 import type { PublicUser } from '@litechat/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
 import { useFriendRequests, useFriends } from '../data';
-import { SEARCH_EVENT } from './Shell';
 
 type SearchUser = PublicUser & { rel: string };
 
@@ -40,16 +39,17 @@ export default function FriendsTab() {
   const [debounced, setDebounced] = useState('');
   const [notice, setNotice] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const location = useLocation();
 
   const { data: friends } = useFriends();
   const { data: requests } = useFriendRequests();
 
-  // Ctrl/Cmd+K → 검색 입력 포커스 (Shell에서 발행하는 커스텀 이벤트)
+  // Ctrl/Cmd+K → 라우트가 마운트된 후 검색 입력을 포커스한다.
   useEffect(() => {
-    const focus = () => searchRef.current?.focus();
-    window.addEventListener(SEARCH_EVENT, focus);
-    return () => window.removeEventListener(SEARCH_EVENT, focus);
-  }, []);
+    if ((location.state as { focusSearch?: boolean } | null)?.focusSearch) {
+      searchRef.current?.focus();
+    }
+  }, [location.state]);
 
   // 입력 250ms 디바운스 — 타이핑마다 요청하지 않는다.
   useEffect(() => {

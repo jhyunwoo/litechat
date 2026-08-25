@@ -13,7 +13,7 @@ import type { FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import {
   KeyboardAvoidingView,
   useKeyboardHandler,
@@ -23,7 +23,7 @@ import Animated, { runOnJS, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
 import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
-import { errorMessage } from '@/lib/api';
+import { api, errorMessage, unwrap } from '@/lib/api';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
 import { Composer } from './composer';
@@ -95,6 +95,51 @@ export function ChatRoomView({ convId, meId }: Props) {
     [queryClient, meId, convId],
   );
 
+  const reportMessage = useCallback(
+    (message: WireMessage) => {
+      if (!conversation || message.s === meId) return;
+      const choices: {
+        text: string;
+        reason?: 'harassment' | 'hate' | 'sexual' | 'violence' | 'spam';
+      }[] = [
+        { text: '괴롭힘', reason: 'harassment' },
+        { text: '혐오 표현', reason: 'hate' },
+        { text: '성적 콘텐츠', reason: 'sexual' },
+        { text: '폭력적 콘텐츠', reason: 'violence' },
+        { text: '스팸', reason: 'spam' },
+        { text: '취소' },
+      ];
+      Alert.alert(
+        '메시지 신고',
+        '신고 사유를 선택해 주세요. 운영팀이 해당 메시지와 계정을 검토합니다.',
+        choices.map((choice) => ({
+          text: choice.text,
+          style: choice.reason ? 'default' : 'cancel',
+          onPress: choice.reason
+            ? () =>
+                void (async () => {
+                  try {
+                    await unwrap(
+                      await api.api.safety.reports.$post({
+                        json: {
+                          userId: conversation.peer.id,
+                          messageId: message.id,
+                          reason: choice.reason!,
+                        },
+                      }),
+                    );
+                    Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+                  } catch (cause) {
+                    setError(errorMessage(cause));
+                  }
+                })()
+            : undefined,
+        })),
+      );
+    },
+    [conversation, meId],
+  );
+
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <View style={styles.list}>
@@ -105,6 +150,7 @@ export function ChatRoomView({ convId, meId }: Props) {
             messages={messages}
             conversation={conversation}
             onImagePress={setViewing}
+            onMessageLongPress={reportMessage}
             listRef={listRef}
           />
         )}

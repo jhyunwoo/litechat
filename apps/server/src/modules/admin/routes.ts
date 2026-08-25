@@ -6,11 +6,12 @@
  * 위임한다 — 데이터 접근 로직을 두 모듈에 중복하지 않기 위해서다.
  */
 import { validator as zValidator } from 'hono-openapi/zod';
-import { adminLoginSchema } from '@litechat/types';
+import { adminLoginSchema, reportStatusSchema, resolveReportSchema } from '@litechat/types';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppDeps } from '../../deps';
 import { requireAdmin } from '../../middleware/admin-auth';
+import { rateLimit } from '../../middleware/rate-limit';
 import { probeGeoip } from '../analytics/geoip';
 import { geoipRefreshEnabled, geoipRefreshInfo, refreshGeoipDb } from '../analytics/geoip-updater';
 import { fetchInsights, INSIGHTS_TTL_SECONDS, normalizeIp } from '../analytics/insights';
@@ -18,6 +19,8 @@ import { backfillUserInsights } from '../analytics/insights-collector';
 import type { AnalyticsService } from '../analytics/service';
 import type { NotificationLogRepo } from '../push/notification-log-repo';
 import { AdminRepo } from './repo';
+import { SafetyRepo } from '../safety/repo';
+import { z } from 'zod';
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_TTL_SECONDS,
@@ -47,23 +50,29 @@ export function adminRoutes(
   notificationLog: NotificationLogRepo,
 ) {
   const repo = new AdminRepo(deps.db);
+  const safetyRepo = new SafetyRepo(deps.db);
 
   return (
     new Hono<AppAdminEnv>()
-      .post('/login', zValidator('json', adminLoginSchema), async (c) => {
-        const { username, password } = c.req.valid('json');
-        const row = repo.findByUsername(username);
-        if (!row) return c.json({ error: 'INVALID_CREDENTIALS' }, 401);
-        const valid = await Bun.password.verify(password, row.password_hash);
-        if (!valid) return c.json({ error: 'INVALID_CREDENTIALS' }, 401);
+      .post(
+        '/login',
+        rateLimit(deps, { name: 'admin-login', limit: 5, windowSeconds: 900 }),
+        zValidator('json', adminLoginSchema),
+        async (c) => {
+          const { username, password } = c.req.valid('json');
+          const row = repo.findByUsername(username);
+          if (!row) return c.json({ error: 'INVALID_CREDENTIALS' }, 401);
+          const valid = await Bun.password.verify(password, row.password_hash);
+          if (!valid) return c.json({ error: 'INVALID_CREDENTIALS' }, 401);
 
-        const token = await createAdminSession(deps, row.id);
-        setCookie(c, ADMIN_SESSION_COOKIE, token, {
-          ...cookieOptions(deps),
-          maxAge: ADMIN_SESSION_TTL_SECONDS,
-        });
-        return c.json({ ok: true }, 200);
-      })
+          const token = await createAdminSession(deps, row.id);
+          setCookie(c, ADMIN_SESSION_COOKIE, token, {
+            ...cookieOptions(deps),
+            maxAge: ADMIN_SESSION_TTL_SECONDS,
+          });
+          return c.json({ ok: true }, 200);
+        },
+      )
       .post('/logout', async (c) => {
         const token = getCookie(c, ADMIN_SESSION_COOKIE);
         if (token) await destroyAdminSession(deps, token);
@@ -85,6 +94,25 @@ export function adminRoutes(
           200,
         );
       })
+      .get('/reports', requireAdmin(deps), (c) => {
+        const parsed = reportStatusSchema.optional().safeParse(c.req.query('status'));
+        if (!parsed.success) return c.json({ error: 'BAD_REQUEST' }, 400);
+        return c.json({ reports: safetyRepo.listReports(parsed.data) }, 200);
+      })
+      .post(
+        '/reports/:id/resolve',
+        requireAdmin(deps),
+        zValidator('param', z.object({ id: z.coerce.number().int().positive() })),
+        zValidator('json', resolveReportSchema),
+        (c) => {
+          const changed = safetyRepo.resolveReport(
+            c.req.valid('param').id,
+            c.req.valid('json').status,
+          );
+          if (!changed) return c.json({ error: 'NOT_FOUND' }, 404);
+          return c.json({ ok: true }, 200);
+        },
+      )
       .get('/overview', requireAdmin(deps), (c) => {
         const days = Number(c.req.query('days') ?? 30);
         return c.json(analyticsService.queries.overview(days), 200);

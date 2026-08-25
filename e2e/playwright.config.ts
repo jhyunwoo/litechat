@@ -17,6 +17,9 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     trace: 'retain-on-failure',
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+      : undefined,
   },
   webServer: {
     command: 'sh ./start-server.sh',

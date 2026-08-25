@@ -5,6 +5,7 @@
  */
 import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { QueryClient } from '@tanstack/react-query';
+import { socket } from '@/lib/ws';
 import { handleFrame, markRead, sendMessage } from '../data';
 
 // WS 소켓 모킹 — 각 테스트에서 send 반환값을 조절한다.
@@ -31,8 +32,6 @@ jest.mock('@/lib/api', () => ({
     return res.json();
   },
 }));
-
-import { socket } from '@/lib/ws';
 
 const ME = 1;
 const PEER = 2;

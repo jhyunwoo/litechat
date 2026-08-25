@@ -10,6 +10,12 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'https://chat.moveto.
   '',
 );
 
+/** 공개 웹사이트 — 개인정보처리방침/지원/계정 삭제 페이지의 기준 URL */
+export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? 'https://chat.moveto.kr').replace(
+  /\/$/,
+  '',
+);
+
 /** WebSocket 주소 — http(s) → ws(s) 치환으로 파생 */
 export function wsUrl(): string {
   return `${API_URL.replace(/^http/, 'ws')}/ws`;

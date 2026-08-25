@@ -7,8 +7,10 @@
 import type { ConversationSummary } from '@litechat/types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { handleFrame } from '@/data/data';
+import { socket } from '@/lib/ws';
 import { ChatRoomView } from '../chat-room-view';
 
 /** 테스트용 세이프 에어리어 값 */
@@ -20,8 +22,6 @@ const INITIAL_METRICS = {
 jest.mock('@/lib/ws', () => ({
   socket: { send: jest.fn(() => true), onFrame: jest.fn(), onReconnect: jest.fn() },
 }));
-
-import { socket } from '@/lib/ws';
 
 const ME = 1;
 const CONV = 10;
@@ -84,9 +84,9 @@ describe('ChatRoomView 전송 흐름', () => {
     await fireEvent.press(screen.getByLabelText('전송'));
     await waitFor(() => expect(socket.send).toHaveBeenCalled());
 
-    const frame = jest.mocked(socket.send).mock.calls.find(
-      ([f]) => (f as { t: string }).t === 'm',
-    )![0] as { i: string };
+    const frame = jest
+      .mocked(socket.send)
+      .mock.calls.find(([f]) => (f as { t: string }).t === 'm')![0] as { i: string };
     handleFrame(queryClient, ME, { t: 'a', i: frame.i, id: 55, ts: 123 });
 
     await waitFor(() => {
@@ -101,14 +101,25 @@ describe('ChatRoomView 전송 흐름', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('메시지 보내기'), '🎉');
     await fireEvent.press(screen.getByLabelText('전송'));
     await waitFor(() => {
-      expect(socket.send).toHaveBeenCalledWith(expect.objectContaining({ t: 'm', k: 'e', x: '🎉' }));
+      expect(socket.send).toHaveBeenCalledWith(
+        expect.objectContaining({ t: 'm', k: 'e', x: '🎉' }),
+      );
+    });
+  });
+
+  test('사진 보관함을 열 수 없으면 설정 안내를 표시한다', async () => {
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockRejectedValueOnce(new Error('denied'));
+    await setup([]);
+
+    await fireEvent.press(screen.getByLabelText('사진 보내기'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/기기 설정에서 litechat의 사진 접근/)).toBeTruthy();
     });
   });
 
   test('화면에 들어오면 마지막 수신 메시지를 읽음 처리한다', async () => {
-    await setup([
-      { id: 3, c: CONV, s: 2, k: 't', x: '읽어줘', ts: 100 },
-    ]);
+    await setup([{ id: 3, c: CONV, s: 2, k: 't', x: '읽어줘', ts: 100 }]);
     await waitFor(() => {
       expect(socket.send).toHaveBeenCalledWith({ t: 'r', c: CONV, m: 3 });
     });

@@ -99,7 +99,11 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               maxLength={72}
             />
 
-            {error && <p className="text-center text-sm text-ruby">{error}</p>}
+            {error && (
+              <p className="text-center text-sm text-ruby" role="alert">
+                {error}
+              </p>
+            )}
 
             {/* button-primary pill — 밴드당 하나뿐인 채워진 블랙 CTA */}
             <button
@@ -115,18 +119,30 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {isRegister ? (
               <>
                 이미 계정이 있나요?{' '}
-                <Link className="font-semibold text-primary underline underline-offset-4" to="/login">
+                <Link
+                  className="font-semibold text-primary underline underline-offset-4"
+                  to="/login"
+                >
                   로그인
                 </Link>
               </>
             ) : (
               <>
                 처음이신가요?{' '}
-                <Link className="font-semibold text-primary underline underline-offset-4" to="/register">
+                <Link
+                  className="font-semibold text-primary underline underline-offset-4"
+                  to="/register"
+                >
                   가입하기
                 </Link>
               </>
             )}
+          </p>
+          <p className="mt-5 text-center text-xs leading-5 text-ink-mute">
+            서비스 개선과 보안을 위해 접속 IP·기기 정보 등을 처리합니다.{' '}
+            <Link className="text-primary underline underline-offset-4" to="/privacy">
+              개인정보처리방침
+            </Link>
           </p>
         </div>
       </div>

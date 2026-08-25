@@ -1,0 +1,3 @@
+[install]
+# Expo Doctor/native autolinking expect a single physical copy of each native module.
+linker = "hoisted"

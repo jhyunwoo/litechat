@@ -4,7 +4,7 @@
  * 인증은 세션 쿠키로 처리한다 (브라우저는 WS 업그레이드 요청에도 쿠키를 보낸다).
  * 프레임 프로토콜은 @litechat/types의 protocol.ts 참고.
  */
-import { parseFrame, type ClientFrame } from '@litechat/types';
+import { parseClientFrame } from '@litechat/types';
 import { Hono } from 'hono';
 import type { AppEnv } from '../app';
 import type { AppDeps } from '../deps';
@@ -27,7 +27,7 @@ export function wsRoutes(deps: AppDeps, chat: ChatService) {
         },
 
         onMessage(event, ws) {
-          const frame = parseFrame<ClientFrame>(event.data);
+          const frame = parseClientFrame(event.data);
           if (!frame) return; // 알 수 없는 프레임은 조용히 무시 (프로토콜 강건성)
 
           try {

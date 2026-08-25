@@ -24,11 +24,11 @@ export function getToken(): string | null {
 
 /** 로그인 성공 시 토큰 저장 */
 export async function setToken(token: string): Promise<void> {
-  cached = token;
   await SecureStore.setItemAsync(KEY, token, {
     // 기기 잠금 해제 상태에서만 접근 가능 + iCloud/기기 이전에 포함되지 않음
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
+  cached = token;
 }
 
 /** 로그아웃 시 토큰 삭제 */

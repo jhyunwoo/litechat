@@ -63,4 +63,12 @@ export class WsHub {
   isOnline(userId: number): boolean {
     return (this.connections.get(userId)?.size ?? 0) > 0;
   }
+
+  /** 계정 삭제/강제 로그아웃 시 해당 사용자의 모든 실시간 연결을 닫는다. */
+  disconnectUser(userId: number): void {
+    const sockets = this.connections.get(userId);
+    if (!sockets) return;
+    for (const ws of sockets.values()) ws.close(1000, 'Session ended');
+    this.connections.delete(userId);
+  }
 }

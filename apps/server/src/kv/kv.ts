@@ -15,6 +15,10 @@ export interface KVStore {
   del(key: string): Promise<void>;
   /** 만료 시간 갱신 (슬라이딩 세션용) */
   expire(key: string, ttlSeconds: number): Promise<void>;
+  /** 고정 시간창 카운터를 원자적으로 증가시키고 현재 값/남은 TTL을 반환 */
+  increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }>;
+  /** 접두사 아래에서 값이 일치하는 키를 모두 삭제 (계정 전체 세션 파기용) */
+  deleteByValue(prefix: string, value: string): Promise<number>;
   /** 연결 종료 (테스트 정리/서버 셧다운용) */
   close(): Promise<void>;
 }
@@ -50,6 +54,25 @@ export class MemoryKV implements KVStore {
   async expire(key: string, ttlSeconds: number): Promise<void> {
     const entry = this.store.get(key);
     if (entry) entry.expiresAt = this.now() + ttlSeconds * 1000;
+  }
+
+  async increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }> {
+    const current = Number((await this.get(key)) ?? 0) + 1;
+    const existing = this.store.get(key);
+    const expiresAt = existing?.expiresAt ?? this.now() + ttlSeconds * 1000;
+    this.store.set(key, { value: String(current), expiresAt });
+    return { count: current, retryAfter: Math.max(1, Math.ceil((expiresAt - this.now()) / 1000)) };
+  }
+
+  async deleteByValue(prefix: string, value: string): Promise<number> {
+    let deleted = 0;
+    for (const [key, entry] of this.store) {
+      if (key.startsWith(prefix) && (await this.get(key)) === value && entry) {
+        this.store.delete(key);
+        deleted += 1;
+      }
+    }
+    return deleted;
   }
 
   async close(): Promise<void> {

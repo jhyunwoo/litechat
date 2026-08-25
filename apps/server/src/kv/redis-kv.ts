@@ -38,6 +38,32 @@ export class RedisKV implements KVStore {
     await this.redis.expire(key, ttlSeconds);
   }
 
+  async increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }> {
+    const result = (await this.redis.eval(
+      `local count = redis.call('INCR', KEYS[1])
+       if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+       return {count, redis.call('TTL', KEYS[1])}`,
+      1,
+      key,
+      ttlSeconds,
+    )) as [number, number];
+    return { count: Number(result[0]), retryAfter: Math.max(1, Number(result[1])) };
+  }
+
+  async deleteByValue(prefix: string, value: string): Promise<number> {
+    let cursor = '0';
+    let deleted = 0;
+    do {
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+      cursor = next;
+      if (keys.length === 0) continue;
+      const values = await this.redis.mget(keys);
+      const matches = keys.filter((_key, index) => values[index] === value);
+      if (matches.length > 0) deleted += await this.redis.del(...matches);
+    } while (cursor !== '0');
+    return deleted;
+  }
+
   async close(): Promise<void> {
     await this.redis.quit();
   }

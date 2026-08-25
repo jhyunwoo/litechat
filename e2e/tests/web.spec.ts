@@ -49,21 +49,22 @@ test('전체 여정: 가입 → 친구 추가/수락 → 실시간 채팅 → �
   await alice.getByRole('link', { name: /바비/ }).click();
   await alice.getByPlaceholder('메시지 보내기').fill('안녕 바비!');
   await alice.getByPlaceholder('메시지 보내기').press('Enter');
-  await expect(alice.getByText('안녕 바비!')).toBeVisible();
+  await expect(alice.getByRole('main').getByText('안녕 바비!')).toBeVisible();
 
   // ── bob 채팅 탭에 실시간 반영 (안읽음 배지 + 미리보기)
   await bob.getByRole('link', { name: /채팅/ }).click();
-  await expect(bob.getByText('안녕 바비!')).toBeVisible();
+  const aliceConversation = bob.getByRole('link', { name: /앨리스.*안녕 바비!/ });
+  await expect(aliceConversation).toBeVisible();
 
   // ── bob이 방에 들어가면 읽음 처리 → alice 화면에 '읽음' 표시
-  await bob.getByText('앨리스').click();
-  await expect(bob.getByText('안녕 바비!')).toBeVisible();
+  await aliceConversation.click();
+  await expect(bob.getByRole('main').getByText('안녕 바비!')).toBeVisible();
   await expect(alice.getByText('읽음')).toBeVisible();
 
   // ── bob이 답장 → alice에게 실시간 수신
   await bob.getByPlaceholder('메시지 보내기').fill('안녕 앨리스! 반가워 😊');
   await bob.getByPlaceholder('메시지 보내기').press('Enter');
-  await expect(alice.getByText('안녕 앨리스! 반가워 😊')).toBeVisible();
+  await expect(alice.getByRole('main').getByText('안녕 앨리스! 반가워 😊')).toBeVisible();
 
   // ── 이미지 전송: alice 업로드 → 양쪽에 썸네일 표시 → 뷰어 열기
   await alice.locator('input[type="file"]').setInputFiles({
@@ -114,4 +115,47 @@ test('로그인/로그아웃과 데스크탑 단축키', async ({ browser }) => 
   await expect(page.getByRole('heading', { name: '채팅' })).toBeVisible();
 
   await context.close();
+});
+
+test('공개 출시 페이지와 웹 계정 삭제 검증', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    // Chromium reports expected 401 form-validation responses as resource errors.
+    if (message.type() === 'error' && !message.text().startsWith('Failed to load resource')) {
+      consoleErrors.push(message.text());
+    }
+  });
+
+  for (const [path, heading] of [
+    ['/privacy', '개인정보처리방침'],
+    ['/terms', '이용약관'],
+    ['/support', '지원 및 문의'],
+    ['/account-deletion', 'litechat 계정 삭제'],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(`${BASE}${path}`);
+  }
+
+  await page.getByLabel('아이디').fill(uniqueName('missing'));
+  await page.getByLabel('현재 비밀번호').fill('password123');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '계정 영구 삭제' }).click();
+  await expect(page.getByRole('alert')).toHaveText('아이디 또는 비밀번호가 올바르지 않아요.');
+
+  const deletionUsername = uniqueName('delete');
+  await register(page, deletionUsername, '삭제테스트');
+  await page.goto('/account-deletion');
+  await page.getByLabel('현재 비밀번호').fill('password123');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: '계정 영구 삭제' }).click();
+  await expect(page.getByRole('status')).toContainText('삭제가 완료되었습니다');
+
+  await page.goto('/login');
+  await page.getByPlaceholder('아이디 (영문 소문자/숫자/_)').fill(deletionUsername);
+  await page.getByPlaceholder('비밀번호 (8자 이상)').fill('password123');
+  await page.getByRole('button', { name: '로그인' }).click();
+  await expect(page.getByRole('alert')).toHaveText('아이디 또는 비밀번호가 올바르지 않아요.');
+  expect(consoleErrors).toEqual([]);
 });

@@ -8,21 +8,27 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr"
+        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr",
+        "EXPO_PUBLIC_WEB_URL": "https://chat.moveto.kr"
       },
       "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr"
+        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr",
+        "EXPO_PUBLIC_WEB_URL": "https://chat.moveto.kr"
       },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr"
+        "EXPO_PUBLIC_API_URL": "https://chat.moveto.kr",
+        "EXPO_PUBLIC_WEB_URL": "https://chat.moveto.kr"
       },
       "channel": "production"
     }

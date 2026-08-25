@@ -47,10 +47,16 @@ export function Composer({ onSend, onError }: Props) {
 
   /** 사진 선택 → 업로드 → 이미지 메시지 전송 */
   async function pickImage() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    });
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.9,
+      });
+    } catch {
+      onError('사진 보관함을 열 수 없어요. 기기 설정에서 litechat의 사진 접근을 확인해 주세요.');
+      return;
+    }
     const asset = result.assets?.[0];
     if (result.canceled || !asset) return;
 
@@ -150,8 +156,8 @@ const useStyles = makeStyles(({ colors }) => ({
   iconButton: {
     padding: spacing.sm,
     borderRadius: rounded.pill,
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 48,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -170,8 +176,8 @@ const useStyles = makeStyles(({ colors }) => ({
     color: colors.ink,
   },
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: rounded.pill,
     backgroundColor: colors.primary,
     alignItems: 'center',

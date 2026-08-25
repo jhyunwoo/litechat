@@ -10,6 +10,7 @@ import { errors } from '../../errors';
 import { UsersRepo } from '../auth/repo';
 import { ConversationsRepo } from '../chat/conversations-repo';
 import { FriendsRepo, type RequestWithUser } from './repo';
+import { SafetyRepo } from '../safety/repo';
 
 /** 검색 결과에 붙는 나와의 관계 상태 */
 export type Relation = 'none' | 'self' | 'friends' | 'pending_out' | 'pending_in';
@@ -22,27 +23,32 @@ export class FriendsService {
   private users: UsersRepo;
   private friends: FriendsRepo;
   private conversations: ConversationsRepo;
+  private safety: SafetyRepo;
 
   constructor(private deps: AppDeps) {
     this.users = new UsersRepo(deps.db);
     this.friends = new FriendsRepo(deps.db);
     this.conversations = new ConversationsRepo(deps.db);
+    this.safety = new SafetyRepo(deps.db);
   }
 
   /** 아이디 검색 — 각 결과에 나와의 관계(rel)를 붙여 UI가 버튼 상태를 결정하게 한다. */
   search(meId: number, query: string): SearchResult[] {
-    return this.users.searchByUsername(query, 10).map((user) => {
-      let rel: Relation = 'none';
-      if (user.id === meId) {
-        rel = 'self';
-      } else {
-        const existing = this.friends.findBetween(meId, user.id);
-        if (existing?.status === 'accepted') rel = 'friends';
-        else if (existing?.requester_id === meId) rel = 'pending_out';
-        else if (existing) rel = 'pending_in';
-      }
-      return { ...user, rel };
-    });
+    return this.users
+      .searchByUsername(query, 10)
+      .filter((user) => !this.safety.isBlockedEitherWay(meId, user.id))
+      .map((user) => {
+        let rel: Relation = 'none';
+        if (user.id === meId) {
+          rel = 'self';
+        } else {
+          const existing = this.friends.findBetween(meId, user.id);
+          if (existing?.status === 'accepted') rel = 'friends';
+          else if (existing?.requester_id === meId) rel = 'pending_out';
+          else if (existing) rel = 'pending_in';
+        }
+        return { ...user, rel };
+      });
   }
 
   /** 친구 요청 전송 + 상대방에게 실시간 알림 */
@@ -51,6 +57,7 @@ export class FriendsService {
 
     const target = this.users.findPublicById(targetUserId);
     if (!target) throw errors.notFound();
+    if (this.safety.isBlockedEitherWay(meId, targetUserId)) throw errors.forbidden();
 
     if (this.friends.findBetween(meId, targetUserId)) throw errors.conflict('ALREADY_RELATED');
 
@@ -66,8 +73,12 @@ export class FriendsService {
   /** 받은/보낸 대기중 요청 목록 */
   listRequests(meId: number): { incoming: RequestWithUser[]; outgoing: RequestWithUser[] } {
     return {
-      incoming: this.friends.listIncoming(meId),
-      outgoing: this.friends.listOutgoing(meId),
+      incoming: this.friends
+        .listIncoming(meId)
+        .filter((request) => !this.safety.isBlockedEitherWay(meId, request.user.id)),
+      outgoing: this.friends
+        .listOutgoing(meId)
+        .filter((request) => !this.safety.isBlockedEitherWay(meId, request.user.id)),
     };
   }
 
@@ -83,6 +94,7 @@ export class FriendsService {
     if (!request || request.addressee_id !== meId || request.status !== 'pending') {
       throw errors.notFound();
     }
+    if (this.safety.isBlockedEitherWay(meId, request.requester_id)) throw errors.notFound();
 
     if (!accept) {
       this.friends.delete(requestId);
@@ -101,9 +113,12 @@ export class FriendsService {
 
   /** 친구 목록 — 각 친구의 대화방 ID를 함께 반환해 바로 채팅을 열 수 있게 한다. */
   listFriends(meId: number): { user: PublicUser; c: number }[] {
-    return this.friends.listFriends(meId).map((user) => ({
-      user,
-      c: this.conversations.createForPair(meId, user.id),
-    }));
+    return this.friends
+      .listFriends(meId)
+      .filter((user) => !this.safety.isBlockedEitherWay(meId, user.id))
+      .map((user) => ({
+        user,
+        c: this.conversations.createForPair(meId, user.id),
+      }));
   }
 }

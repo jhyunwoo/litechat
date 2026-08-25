@@ -46,6 +46,8 @@ export function errorMessage(error: unknown): string {
     INVALID_IMAGE: '지원하지 않는 이미지 형식이에요.',
     INVALID_CONTENT: '메시지 내용을 확인해 주세요.',
     NOT_FOUND: '요청한 대상을 찾을 수 없어요.',
+    FORBIDDEN: '이 작업을 수행할 수 없어요.',
+    RATE_LIMITED: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.',
   };
   return messages[code] ?? '문제가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }

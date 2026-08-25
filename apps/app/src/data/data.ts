@@ -10,12 +10,7 @@
  * 실시간 프레임은 useRealtimeSync가 받아 캐시를 직접 갱신한다.
  * → 추가 REST 호출 없이 화면이 즉시 반영된다 (트래픽 절약 + 저지연).
  */
-import type {
-  ConversationSummary,
-  MessageKind,
-  ServerFrame,
-  WireMessage,
-} from '@litechat/types';
+import type { ConversationSummary, MessageKind, ServerFrame, WireMessage } from '@litechat/types';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api, unwrap } from '@/lib/api';
@@ -253,7 +248,7 @@ export function useRealtimeSync(): void {
       offFrame();
       offReconnect();
     };
-  }, [me?.id, queryClient]);
+  }, [me, queryClient]);
 }
 
 /** 과거 메시지 페이지 로드 (위로 스크롤 시) — 더 없으면 false 반환 */

@@ -92,3 +92,12 @@ export function useAppAnalytics(): void {
     enqueueAnalytics(() => sendEvent(pathname));
   }, [pathname]);
 }
+
+/** 계정 삭제 시 기기에 남은 장기 분석 상관관계 키를 제거한다. */
+export async function clearAnalyticsIdentity(): Promise<void> {
+  visitorId = null;
+  sessionId = null;
+  lastActiveAt = 0;
+  analyticsQueue = Promise.resolve();
+  await SecureStore.deleteItemAsync(VISITOR_ID_KEY);
+}

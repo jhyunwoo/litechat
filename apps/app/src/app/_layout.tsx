@@ -9,9 +9,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { AuthProvider, useAuth } from '@/data/auth';
+import { AppErrorBoundary } from '@/components/app-error-boundary';
 import { useRealtimeSync } from '@/data/data';
 import { useAppAnalytics } from '@/lib/analytics';
 import { useNotificationDeepLink, useNotificationReceivedAck } from '@/lib/notifications';
@@ -19,7 +21,7 @@ import { useOTAUpdates } from '@/lib/ota';
 import { bindAppState } from '@/lib/ws';
 import { ThemeProvider, useTheme } from '@/theme/theme';
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +34,7 @@ const queryClient = new QueryClient({
 });
 
 function Root() {
-  const { me, ready } = useAuth();
+  const { me, ready, bootstrapError, retryBootstrap } = useAuth();
   const { colors } = useTheme();
 
   // 실시간 프레임 → 캐시 반영 (로그인 트리 전체에서 한 번만)
@@ -51,13 +53,49 @@ function Root() {
 
   // 초기 세션 확인이 끝나면 스플래시를 걷는다.
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync();
+    if (ready) void SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 
   // 세션 확인이 끝나기 전에는 Stack을 렌더하지 않는다 — 네이티브 스플래시가
   // 화면을 덮은 채 대기하므로, sign-in을 미리 마운트해 생기는 로그인 화면
   // 플래시가 사라진다. ready 이후 곧바로 올바른 브랜치로 마운트된다.
   if (!ready) return null;
+
+  if (bootstrapError) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          backgroundColor: colors.canvas,
+        }}
+        accessibilityRole="alert"
+      >
+        <Text style={{ fontSize: 20, fontWeight: '600', color: colors.ink }}>
+          서버에 연결할 수 없어요
+        </Text>
+        <Text style={{ marginTop: 8, color: colors.inkMute, textAlign: 'center' }}>
+          인터넷 연결을 확인한 뒤 다시 시도해 주세요.
+        </Text>
+        <Pressable
+          onPress={retryBootstrap}
+          style={{
+            marginTop: 24,
+            minHeight: 48,
+            borderRadius: 999,
+            paddingHorizontal: 28,
+            backgroundColor: colors.primary,
+            justifyContent: 'center',
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={{ color: colors.onPrimary, fontSize: 16 }}>다시 시도</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <Stack
@@ -69,6 +107,8 @@ function Root() {
       <Stack.Protected guard={!!me}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat/[id]" />
+        <Stack.Screen name="account" />
+        <Stack.Screen name="blocked-users" />
       </Stack.Protected>
       <Stack.Protected guard={!me}>
         <Stack.Screen name="sign-in" />
@@ -82,13 +122,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ThemeProvider>
-              {/* auto — Appearance 유효 스킴(수동 오버라이드 포함)을 따라간다 */}
-              <StatusBar style="auto" />
-              <Root />
-            </ThemeProvider>
-          </AuthProvider>
+          <AppErrorBoundary>
+            <AuthProvider>
+              <ThemeProvider>
+                {/* auto — Appearance 유효 스킴(수동 오버라이드 포함)을 따라간다 */}
+                <StatusBar style="auto" />
+                <Root />
+              </ThemeProvider>
+            </AuthProvider>
+          </AppErrorBoundary>
         </QueryClientProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

@@ -216,4 +216,31 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE analytics_sessions ADD COLUMN geo_accuracy_km REAL;
   `,
+
+  // v7 → v8: UGC 안전 기능 — 사용자 차단과 실제 처리 가능한 신고 큐
+  `
+  CREATE TABLE user_blocks (
+    blocker_id INTEGER NOT NULL REFERENCES users(id),
+    blocked_id INTEGER NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (blocker_id, blocked_id),
+    CHECK (blocker_id <> blocked_id)
+  );
+  CREATE INDEX ix_user_blocks_blocked ON user_blocks (blocked_id, blocker_id);
+
+  CREATE TABLE content_reports (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id      INTEGER NOT NULL REFERENCES users(id),
+    reported_user_id INTEGER NOT NULL REFERENCES users(id),
+    message_id       INTEGER REFERENCES messages(id),
+    reason           TEXT NOT NULL CHECK (reason IN ('harassment','hate','sexual','violence','spam','other')),
+    details          TEXT,
+    status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','reviewed','dismissed','actioned')),
+    created_at       INTEGER NOT NULL,
+    resolved_at      INTEGER,
+    CHECK (reporter_id <> reported_user_id)
+  );
+  CREATE INDEX ix_content_reports_status ON content_reports (status, created_at);
+  CREATE INDEX ix_content_reports_reported ON content_reports (reported_user_id, created_at);
+  `,
 ];

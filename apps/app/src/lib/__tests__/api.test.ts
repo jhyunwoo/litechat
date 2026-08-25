@@ -58,8 +58,12 @@ describe('errorMessage', () => {
   });
 
   test('모르는 오류는 기본 메시지를 반환한다', () => {
-    expect(errorMessage(new Error('boom'))).toBe(
-      '문제가 발생했어요. 잠시 후 다시 시도해 주세요.',
+    expect(errorMessage(new Error('boom'))).toBe('문제가 발생했어요. 잠시 후 다시 시도해 주세요.');
+  });
+
+  test('의도적으로 만든 로컬 안내는 그대로 반환한다', () => {
+    expect(errorMessage('기기 설정에서 권한을 확인해 주세요.')).toBe(
+      '기기 설정에서 권한을 확인해 주세요.',
     );
   });
 });

@@ -33,6 +33,7 @@ interface Props {
   messages: WireMessage[];
   conversation: ConversationSummary | undefined;
   onImagePress: (message: WireMessage) => void;
+  onMessageLongPress?: (message: WireMessage) => void;
   /** 키보드가 열릴 때 부모가 바닥으로 스크롤하기 위한 ref */
   listRef?: React.Ref<FlashListRef<Row>>;
 }
@@ -43,6 +44,7 @@ export function MessageList({
   messages,
   conversation,
   onImagePress,
+  onMessageLongPress,
   listRef,
 }: Props) {
   const styles = useStyles();
@@ -94,9 +96,10 @@ export function MessageList({
         isTail={item.isTail}
         animate={item.animate}
         onImagePress={onImagePress}
+        onLongPress={item.mine ? undefined : onMessageLongPress}
       />
     ),
-    [onImagePress],
+    [onImagePress, onMessageLongPress],
   );
 
   if (messages.length === 0) {

@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Pressable,
+  Alert,
   RefreshControl,
   StyleSheet,
   Text,
@@ -26,6 +27,7 @@ import { useConversations } from '@/data/data';
 import { formatTime } from '@/lib/format';
 import { makeStyles, useTheme } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
+import { api, errorMessage, unwrap } from '@/lib/api';
 
 /** iPad 2-pane 전환 기준 폭 */
 const SPLIT_BREAKPOINT = 768;
@@ -92,6 +94,61 @@ export default function ChatsTab() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = conversations?.find((c) => c.id === selectedId);
 
+  function safetyMenu() {
+    if (!selected) return;
+    Alert.alert(selected.peer.nickname, '안전 옵션', [
+      {
+        text: '사용자 신고',
+        onPress: () =>
+          void (async () => {
+            try {
+              await unwrap(
+                await api.api.safety.reports.$post({
+                  json: {
+                    userId: selected.peer.id,
+                    reason: 'other',
+                    details: '사용자 프로필에서 신고',
+                  },
+                }),
+              );
+              Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+            } catch (cause) {
+              Alert.alert('신고 실패', errorMessage(cause));
+            }
+          })(),
+      },
+      {
+        text: '사용자 차단',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(
+            '이 사용자를 차단할까요?',
+            '서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.',
+            [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '차단',
+                style: 'destructive',
+                onPress: () =>
+                  void (async () => {
+                    try {
+                      await unwrap(
+                        await api.api.safety.blocks.$post({ json: { userId: selected.peer.id } }),
+                      );
+                      setSelectedId(null);
+                      await queryClient.invalidateQueries();
+                    } catch (cause) {
+                      Alert.alert('차단 실패', errorMessage(cause));
+                    }
+                  })(),
+              },
+            ],
+          ),
+      },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }
+
   const openConversation = useCallback(
     (id: number) => {
       if (isSplit) setSelectedId(id);
@@ -152,6 +209,14 @@ export default function ChatsTab() {
                 <Text style={styles.detailName}>{selected.peer.nickname}</Text>
                 <Text style={styles.detailUsername}>@{selected.peer.username}</Text>
               </View>
+              <Pressable
+                onPress={safetyMenu}
+                accessibilityRole="button"
+                accessibilityLabel="대화 안전 옵션"
+                style={styles.detailMenu}
+              >
+                <Text style={styles.detailMenuText}>•••</Text>
+              </Pressable>
             </View>
             <ChatRoomView convId={selected.id} meId={me.id} />
           </>
@@ -197,6 +262,14 @@ const useStyles = makeStyles(({ colors, type }) => ({
   },
   detailName: { ...type.bodyMd, fontWeight: '400' },
   detailUsername: { ...type.micro },
+  detailMenu: {
+    marginLeft: 'auto',
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailMenuText: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
   detailEmpty: {
     flex: 1,
     alignItems: 'center',

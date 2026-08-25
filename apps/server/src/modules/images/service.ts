@@ -15,6 +15,7 @@ import sharp from 'sharp';
 import type { AppDeps } from '../../deps';
 import { errors } from '../../errors';
 import { ImagesRepo } from './repo';
+import { SafetyRepo } from '../safety/repo';
 
 /** 저화질 webp 변환 파라미터 — 데이터 절약과 알아볼 수 있는 화질의 절충점 */
 const WEBP_MAX_WIDTH = 640;
@@ -30,9 +31,11 @@ const FORMAT_INFO: Record<string, { ext: string; mime: string }> = {
 
 export class ImagesService {
   private repo: ImagesRepo;
+  private safety: SafetyRepo;
 
   constructor(private deps: AppDeps) {
     this.repo = new ImagesRepo(deps.db);
+    this.safety = new SafetyRepo(deps.db);
     // 업로드 디렉터리를 미리 만들어 둔다 (Docker 볼륨 첫 마운트 대비).
     mkdirSync(deps.config.uploadDir, { recursive: true });
   }
@@ -93,6 +96,7 @@ export class ImagesService {
     const image = this.repo.findById(imageId);
     if (!image) return false;
     if (image.owner_id === userId) return true;
+    if (this.safety.isBlockedEitherWay(userId, image.owner_id)) return false;
 
     const row = this.deps.db
       .query<{ ok: number }, [string, number, number]>(

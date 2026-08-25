@@ -95,6 +95,36 @@ export default function ProfileTab() {
 
         {/* 로그아웃 */}
         <button
+          onClick={() => navigate('/account-deletion')}
+          className="flex min-h-12 w-full items-center justify-between px-4 py-3 text-left active:bg-canvas-soft"
+        >
+          <span>계정 삭제</span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <a
+          href="/privacy"
+          className="flex min-h-12 items-center justify-between px-4 py-3 active:bg-canvas-soft"
+        >
+          <span>개인정보처리방침</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+        <a
+          href="/terms"
+          className="flex min-h-12 items-center justify-between px-4 py-3 active:bg-canvas-soft"
+        >
+          <span>이용약관</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+        <a
+          href="/support"
+          className="flex min-h-12 items-center justify-between px-4 py-3 active:bg-canvas-soft"
+        >
+          <span>지원 및 문의</span>
+          <span aria-hidden="true">↗</span>
+        </a>
+
+        {/* 로그아웃 */}
+        <button
           onClick={() => {
             void logout().then(() => navigate('/login', { replace: true }));
           }}

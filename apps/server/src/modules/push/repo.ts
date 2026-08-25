@@ -35,7 +35,14 @@ export class PushRepo {
       .all(userId);
   }
 
-  /** endpoint로 삭제 (해지 또는 만료 정리) */
+  /** 사용자가 소유한 endpoint만 해지 */
+  deleteForUser(userId: number, endpoint: string): void {
+    this.db
+      .query('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?')
+      .run(userId, endpoint);
+  }
+
+  /** 제공자가 만료로 판정한 endpoint 정리 (내부 발송 경로 전용) */
   deleteByEndpoint(endpoint: string): void {
     this.db.query('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
   }

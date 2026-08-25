@@ -75,8 +75,8 @@ export class PushService {
     this.repo.upsert(userId, input.endpoint, input.keys.p256dh, input.keys.auth);
   }
 
-  unsubscribe(endpoint: string): void {
-    this.repo.deleteByEndpoint(endpoint);
+  unsubscribe(userId: number, endpoint: string): void {
+    this.repo.deleteForUser(userId, endpoint);
   }
 
   offlineHook: OfflineMessageHook = (peerId, sender, message) => {

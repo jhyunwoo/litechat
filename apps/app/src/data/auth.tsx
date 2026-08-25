@@ -10,7 +10,8 @@ import type { PublicUser } from '@litechat/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, unwrap } from '@/lib/api';
-import { unregisterPush } from '@/lib/notifications';
+import { clearAnalyticsIdentity } from '@/lib/analytics';
+import { clearLocalPushState, unregisterPush } from '@/lib/notifications';
 import { clearToken, hydrateToken, setToken } from '@/lib/session';
 import { socket } from '@/lib/ws';
 
@@ -24,9 +25,12 @@ interface AuthState {
   me: PublicUser | null;
   /** 초기 세션 확인이 끝났는지 (스플래시 유지 판단) */
   ready: boolean;
+  bootstrapError: boolean;
+  retryBootstrap: () => void;
   login: (credentials: Credentials) => Promise<void>;
   register: (input: Credentials & { nickname: string }) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -37,11 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    void hydrateToken().finally(() => setHydrated(true));
+    void hydrateToken()
+      .catch(() => null)
+      .finally(() => setHydrated(true));
   }, []);
 
   // 앱 시작 시 저장된 토큰으로 내 정보를 확인한다.
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, refetch } = useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await api.api.auth.me.$get();
@@ -60,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (me) socket.start();
     else socket.stop();
     return () => socket.stop();
-  }, [me?.id]);
+  }, [me]);
 
   /** 로그인/가입 공통 후처리 — 토큰 저장 + me 캐시 갱신 */
   async function signedIn(user: PublicUser, token: string): Promise<void> {
@@ -71,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     me,
     ready: hydrated && !isPending,
+    bootstrapError: hydrated && isError,
+    retryBootstrap: () => void refetch(),
     login: async (credentials) => {
       const res = await api.api.auth.login.$post({ json: credentials });
       const { user, token } = await unwrap<{ user: PublicUser; token: string }>(res);
@@ -86,11 +94,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await unregisterPush().catch(() => {});
       await api.api.auth.logout.$post().catch(() => {});
       socket.stop();
-      await clearToken();
+      await clearToken().catch(() => {});
       // me를 먼저 null로 만들어 화면을 즉시 로그아웃 상태로 전환하고,
       // 나머지 캐시만 제거한다. (clear()는 me 쿼리까지 비워 재조회 레이스를 만든다)
       queryClient.setQueryData(['me'], null);
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' });
+    },
+    deleteAccount: async (password) => {
+      const res = await api.api.auth.account.$delete({ json: { password } });
+      await unwrap(res);
+      socket.stop();
+      // The server deletion has committed. Local cleanup is best effort per
+      // storage API, but the in-memory token/cache must always be invalidated.
+      await Promise.allSettled([clearToken(), clearAnalyticsIdentity(), clearLocalPushState()]);
+      queryClient.clear();
+      queryClient.setQueryData(['me'], null);
     },
   };
 

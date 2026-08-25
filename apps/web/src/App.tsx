@@ -19,6 +19,18 @@ import ChatDetailEmpty from './pages/ChatDetailEmpty';
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ChatRoom = lazy(() => import('./pages/ChatRoom'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
+const PrivacyPage = lazy(() =>
+  import('./pages/LegalPages').then((module) => ({ default: module.PrivacyPage })),
+);
+const TermsPage = lazy(() =>
+  import('./pages/LegalPages').then((module) => ({ default: module.TermsPage })),
+);
+const SupportPage = lazy(() =>
+  import('./pages/LegalPages').then((module) => ({ default: module.SupportPage })),
+);
+const AccountDeletionPage = lazy(() =>
+  import('./pages/LegalPages').then((module) => ({ default: module.AccountDeletionPage })),
+);
 
 /** 전체 화면 로딩 스피너 */
 function Loading() {
@@ -52,6 +64,10 @@ export default function App() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/support" element={<SupportPage />} />
+        <Route path="/account-deletion" element={<AccountDeletionPage />} />
         <Route
           path="/login"
           element={ready && me ? <Navigate to="/" replace /> : <AuthPage mode="login" />}
