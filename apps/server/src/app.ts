@@ -62,7 +62,41 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
 
   const app = new Hono<AppEnv>()
-    .use('*', secureHeaders())
+    .use(
+      '*',
+      secureHeaders({
+        /**
+         * hono의 secureHeaders()는 기본적으로 CSP를 넣지 않는다. 세 프론트엔드가
+         * 모두 번들된 자기 오리진 스크립트만 쓰므로 script-src를 'self'로 좁힌다
+         * (인라인 스크립트 없음 — Vite는 외부 파일로 뽑아낸다).
+         *
+         *  - connect-src: 같은 오리진 REST + 같은 오리진 WebSocket
+         *  - img-src: 업로드 이미지(/img)와 data: (아이콘/캔버스 미리보기)
+         *  - frame-ancestors 'none': 클릭재킹 차단 (X-Frame-Options의 최신 대체)
+         *  - 대시보드 지도는 Google Maps JS를 CDN에서 받으므로 해당 오리진만 허용한다.
+         */
+        contentSecurityPolicy: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            'https://maps.googleapis.com',
+            'https://maps.gstatic.com',
+            // /docs(Scalar)는 CDN 스크립트를 쓴다. 문서를 실제로 노출할 때만 허용한다
+            // — 프로덕션 기본값(exposeApiDocs=false)에서는 이 오리진이 빠진다.
+            ...(deps.config.exposeApiDocs ? ['https://cdn.jsdelivr.net'] : []),
+          ],
+          // Tailwind가 런타임에 style 속성을 쓰므로 'unsafe-inline'이 필요하다.
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https://maps.googleapis.com', 'https://maps.gstatic.com'],
+          connectSrc: ["'self'", 'https://maps.googleapis.com'],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'none'"],
+        },
+      }),
+    )
     // 헬스체크 — 배포 환경(Dokploy)의 컨테이너 상태 확인용
     .get('/api/health', (c) => c.json({ ok: true }))
     .route('/api/auth', authRoutes(deps))
@@ -71,7 +105,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     .route('/api/images', imagesRoutes(deps, imagesService))
     .route('/api/push', pushRoutes(deps, pushService, expoPushService, notificationLogRepo))
     .route('/api/safety', safetyRoutes(deps))
-    .route('/api/analytics', analyticsRoutes(analyticsService))
+    .route('/api/analytics', analyticsRoutes(deps, analyticsService))
     .route('/api/admin', adminRoutes(deps, analyticsService, notificationLogRepo))
     .route('/img', imgRoutes(deps, imagesService))
     .route('/', wsRoutes(deps, chatService));

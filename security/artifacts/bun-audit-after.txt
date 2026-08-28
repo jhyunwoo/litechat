@@ -1,0 +1,76 @@
+[0m[1mbun audit [0m[2mv1.3.14 (0d9b296a)[0m
+postcss  <=8.5.22
+  workspace:dashboard › vite
+  workspace:app › expo
+  moderate: PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset - https://github.com/advisories/GHSA-fxqj-rqcc-2cmp
+  high: PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure - https://github.com/advisories/GHSA-r28c-9q8g-f849
+
+brace-expansion  <1.1.17
+  workspace:app › eslint
+  workspace:app › expo
+  workspace:app › eslint-config-expo
+  workspace:app › expo-updates
+  workspace:app › expo-sharing
+  workspace:app › expo-splash-screen
+  workspace:web › vite-plugin-pwa
+  workspace:app › jest
+  workspace:app › jest-expo
+  workspace:app › react-native
+  high: brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+  high: brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+  high: brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+  high: brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+  high: brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+  high: brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+  high: brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups - https://github.com/advisories/GHSA-3jxr-9vmj-r5cp
+  high: brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups - https://github.com/advisories/GHSA-3jxr-9vmj-r5cp
+
+nanoid  <3.3.16
+  workspace:app › expo-router
+  workspace:dashboard › vite
+  workspace:app › expo
+  high: nanoid: non-secure generators can loop indefinitely with negative size - https://github.com/advisories/GHSA-28wg-ghj8-5hjv
+  high: nanoid: custom generators can loop indefinitely when size is zero - https://github.com/advisories/GHSA-2v37-7h3g-55p8
+
+uuid  <11.1.1
+  workspace:app › expo
+  workspace:app › expo-sharing
+  workspace:app › expo-splash-screen
+  moderate: uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided - https://github.com/advisories/GHSA-w5hq-g745-h8pq
+
+fast-uri  >=3.0.0 <3.1.5
+  workspace:app › eslint
+  workspace:web › vite-plugin-pwa
+  high: fast-uri vulnerable to host confusion via backslash authority introducer - https://github.com/advisories/GHSA-7p8r-x3mc-p8w7
+  high: fast-uri vulnerable to host confusion via literal backslash authority delimiter - https://github.com/advisories/GHSA-v2hh-gcrm-f6hx
+
+image-size  <=2.0.2
+  workspace:app › expo
+  workspace:app › react-native
+  workspace:app › react-native-worklets
+  high: image-size: ICNS parser allows denial of service through an infinite loop - https://github.com/advisories/GHSA-w3rx-r6r6-pgpr
+  high: image-size: JXL and HEIF parsers allow denial of service through infinite loops - https://github.com/advisories/GHSA-5p2g-fcmc-qvqq
+
+react-router  >=7.12.0 <7.18.2
+  workspace:dashboard › react-router
+  workspace:web › react-router
+  high: React Router: RSC Mode CSRF Bypass Allows Action Execution Before 400 Response - https://github.com/advisories/GHSA-qwww-vcr4-c8h2
+
+js-yaml  >=3.0.0 <3.15.1
+  workspace:app › eslint
+  workspace:server › hono-openapi
+  workspace:app › expo
+  workspace:app › jest-expo
+  workspace:app › jest
+  workspace:app › react-native
+  high: JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported - https://github.com/advisories/GHSA-5p4m-2wfm-xmqj
+  high: JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported - https://github.com/advisories/GHSA-5p4m-2wfm-xmqj
+
+20 vulnerabilities (18 high, 2 moderate)
+
+To update all dependencies to the latest compatible versions:
+  bun update
+
+To update all dependencies to the latest versions (including breaking changes):
+  bun update --latest
+

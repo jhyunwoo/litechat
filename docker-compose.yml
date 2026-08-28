@@ -12,6 +12,10 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # 이미지가 USER bun(uid/gid 1000)으로 실행되므로 litechat-data 볼륨도 같은 소유자여야
+    # 업로드/SQLite 쓰기가 가능하다. 기존 배포에서 볼륨이 root 소유로 이미 만들어져 있으면
+    # 최초 1회 `chown -R 1000:1000`이 필요하다.
+    user: '1000:1000'
     # 호스트 포트를 공개하지 않는다. Traefik이 dokploy-network를 통해
     # 컨테이너 내부 3000 포트로 직접 라우팅한다(loadbalancer.server.port=3000).
     # 3000:3000 공개는 재배포 시 포트 충돌을 일으키고, Traefik/TLS를 우회해

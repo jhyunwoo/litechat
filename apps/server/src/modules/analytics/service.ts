@@ -66,7 +66,7 @@ export class AnalyticsService {
     if (this.repo.hasSession(identity.sessionId)) return;
 
     const userId = await this.resolveUserId(c);
-    const ip = clientIp(c);
+    const ip = clientIp(c, this.deps);
     const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
     this.repo.insertSession({
       id: identity.sessionId,
@@ -92,7 +92,7 @@ export class AnalyticsService {
     try {
       const identity = this.resolveIdentity(c, body, body.platform);
       const userId = await this.resolveUserId(c);
-      const ip = clientIp(c);
+      const ip = clientIp(c, this.deps);
       const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
       this.repo.insertSession({
         id: identity.sessionId,
@@ -151,7 +151,7 @@ export class AnalyticsService {
   ): Promise<void> {
     try {
       const userId = await this.resolveUserId(c);
-      const ip = clientIp(c);
+      const ip = clientIp(c, this.deps);
       const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
       this.repo.insertSession({
         id: identity.sessionId,

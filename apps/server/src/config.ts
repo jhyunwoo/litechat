@@ -54,6 +54,14 @@ export interface AppConfig {
   passwordTimeCost: number;
   /** 프로덕션에서 OpenAPI/UI를 공개할지 여부 (기본 비활성) */
   exposeApiDocs: boolean;
+  /**
+   * 앱 앞단의 신뢰할 수 있는 리버스 프록시 수 (기본 1 = Traefik/Dokploy).
+   * 이 수만큼만 X-Forwarded-For를 오른쪽에서 세어 클라이언트 주소를 고른다.
+   * 0이면 전달 헤더를 전혀 신뢰하지 않는다(앱을 직접 노출한 경우).
+   */
+  trustedProxyHops: number;
+  /** Cloudflare가 실제 엣지일 때만 true — CF-Connecting-IP를 권위 있는 값으로 쓴다. */
+  trustCfConnectingIp: boolean;
 }
 
 /** 환경 변수 + 부분 오버라이드로 설정 객체를 생성한다. */
@@ -85,6 +93,8 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),
     exposeApiDocs: env.EXPOSE_API_DOCS === 'true' || env.NODE_ENV !== 'production',
+    trustedProxyHops: Number(env.TRUSTED_PROXY_HOPS ?? 1),
+    trustCfConnectingIp: env.TRUST_CF_CONNECTING_IP === 'true',
     ...overrides,
   };
 }

@@ -1,24 +1,26 @@
 /**
- * 클라이언트 IP 추출
+ * 클라이언트 IP 추출 — 레이트리밋과 동일한 신뢰 프록시 규칙을 따른다.
  *
- * 배포 환경(Dokploy/Traefik)이 앞단에서 프록시하므로 X-Forwarded-For를 신뢰한다.
- * 여러 프록시를 거치면 콤마로 이어지는데, 맨 앞 값이 원본 클라이언트다.
- * 로컬 개발 등 헤더가 없는 경우에만 Bun의 커넥션 정보로 폴백한다.
+ * 예전에는 X-Forwarded-For의 맨 앞 항목을 그대로 신뢰했는데, 그 값은 클라이언트가
+ * 임의로 덧붙일 수 있어 분석 IP·지오 위치·Insights 조회 대상이 전부 오염됐다
+ * (LC-SEC-003). 이제 신뢰 홉 수만큼 오른쪽에서 세어 고른다.
  */
 import { getConnInfo } from 'hono/bun';
 import type { Context } from 'hono';
 import type { AppEnv } from '../../app';
+import type { AppDeps } from '../../deps';
+import { resolveClientAddress } from '../../client-address';
 
-export function clientIp(c: Context<AppEnv>): string {
-  const forwardedFor = c.req.header('x-forwarded-for');
-  if (forwardedFor) {
-    const first = forwardedFor.split(',')[0]?.trim();
-    if (first) return first;
-  }
-
+export function clientIp(c: Context<AppEnv>, deps: AppDeps): string {
+  let socketAddress: string | null = null;
   try {
-    return getConnInfo(c).remote.address ?? '0.0.0.0';
+    socketAddress = getConnInfo(c).remote.address ?? null;
   } catch {
-    return '0.0.0.0';
+    socketAddress = null;
   }
+  const address = resolveClientAddress(c.req.raw.headers, socketAddress, {
+    trustedProxyHops: deps.config.trustedProxyHops,
+    trustCfConnectingIp: deps.config.trustCfConnectingIp,
+  });
+  return address === 'unknown' ? '0.0.0.0' : address;
 }

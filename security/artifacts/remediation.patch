@@ -1,0 +1,608 @@
+diff --git a/Dockerfile b/Dockerfile
+index fcd89a0..b4d12d6 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -50,5 +50,10 @@ ENV WEB_STATIC_DIR=/app/apps/web/dist \
+     GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb \
+     PORT=3000
+ 
++# 비root 실행 — oven/bun 이미지에 이미 존재하는 uid/gid 1000의 `bun` 사용자를 쓴다.
++# 업로드/DB가 놓이는 /app/data는 볼륨 마운트 지점이라 소유권을 미리 넘겨 둔다.
++RUN mkdir -p /app/data && chown -R bun:bun /app
++USER bun
++
+ EXPOSE 3000
+ CMD ["bun", "run", "apps/server/src/index.ts"]
+diff --git a/apps/app/package.json b/apps/app/package.json
+index 3b311f2..0e4962c 100644
+--- a/apps/app/package.json
++++ b/apps/app/package.json
+@@ -26,7 +26,7 @@
+     "expo-status-bar": "~57.0.1",
+     "expo-system-ui": "~57.0.2",
+     "expo-updates": "~57.0.17",
+-    "hono": "^4.12.27",
++    "hono": "^4.12.34",
+     "react": "19.2.3",
+     "react-dom": "19.2.3",
+     "react-native": "0.86.2",
+@@ -49,7 +49,7 @@
+     "jest": "~29.7.0",
+     "jest-expo": "~57.0.4",
+     "server": "workspace:*",
+-    "sharp": "^0.33.5",
++    "sharp": "^0.35.0",
+     "test-renderer": "^1.2.0",
+     "typescript": "~6.0.3"
+   },
+diff --git a/apps/server/package.json b/apps/server/package.json
+index 028b519..4871477 100644
+--- a/apps/server/package.json
++++ b/apps/server/package.json
+@@ -12,11 +12,11 @@
+   "dependencies": {
+     "@hono/zod-validator": "^0.4.2",
+     "@litechat/types": "workspace:*",
+-    "hono": "^4.6.14",
++    "hono": "^4.12.34",
+     "hono-openapi": "^0.4.6",
+     "ioredis": "^5.4.1",
+     "maxmind": "^5.0.6",
+-    "sharp": "^0.33.5",
++    "sharp": "^0.35.0",
+     "web-push": "^3.6.7",
+     "zod": "^3.24.1",
+     "zod-openapi": "^4.2.2"
+diff --git a/apps/server/src/app.ts b/apps/server/src/app.ts
+index 9b9f165..ad514ba 100644
+--- a/apps/server/src/app.ts
++++ b/apps/server/src/app.ts
+@@ -62,7 +62,41 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
+   const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
+ 
+   const app = new Hono<AppEnv>()
+-    .use('*', secureHeaders())
++    .use(
++      '*',
++      secureHeaders({
++        /**
++         * hono의 secureHeaders()는 기본적으로 CSP를 넣지 않는다. 세 프론트엔드가
++         * 모두 번들된 자기 오리진 스크립트만 쓰므로 script-src를 'self'로 좁힌다
++         * (인라인 스크립트 없음 — Vite는 외부 파일로 뽑아낸다).
++         *
++         *  - connect-src: 같은 오리진 REST + 같은 오리진 WebSocket
++         *  - img-src: 업로드 이미지(/img)와 data: (아이콘/캔버스 미리보기)
++         *  - frame-ancestors 'none': 클릭재킹 차단 (X-Frame-Options의 최신 대체)
++         *  - 대시보드 지도는 Google Maps JS를 CDN에서 받으므로 해당 오리진만 허용한다.
++         */
++        contentSecurityPolicy: {
++          defaultSrc: ["'self'"],
++          scriptSrc: [
++            "'self'",
++            'https://maps.googleapis.com',
++            'https://maps.gstatic.com',
++            // /docs(Scalar)는 CDN 스크립트를 쓴다. 문서를 실제로 노출할 때만 허용한다
++            // — 프로덕션 기본값(exposeApiDocs=false)에서는 이 오리진이 빠진다.
++            ...(deps.config.exposeApiDocs ? ['https://cdn.jsdelivr.net'] : []),
++          ],
++          // Tailwind가 런타임에 style 속성을 쓰므로 'unsafe-inline'이 필요하다.
++          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
++          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
++          imgSrc: ["'self'", 'data:', 'blob:', 'https://maps.googleapis.com', 'https://maps.gstatic.com'],
++          connectSrc: ["'self'", 'https://maps.googleapis.com'],
++          objectSrc: ["'none'"],
++          baseUri: ["'self'"],
++          formAction: ["'self'"],
++          frameAncestors: ["'none'"],
++        },
++      }),
++    )
+     // 헬스체크 — 배포 환경(Dokploy)의 컨테이너 상태 확인용
+     .get('/api/health', (c) => c.json({ ok: true }))
+     .route('/api/auth', authRoutes(deps))
+@@ -71,7 +105,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
+     .route('/api/images', imagesRoutes(deps, imagesService))
+     .route('/api/push', pushRoutes(deps, pushService, expoPushService, notificationLogRepo))
+     .route('/api/safety', safetyRoutes(deps))
+-    .route('/api/analytics', analyticsRoutes(analyticsService))
++    .route('/api/analytics', analyticsRoutes(deps, analyticsService))
+     .route('/api/admin', adminRoutes(deps, analyticsService, notificationLogRepo))
+     .route('/img', imgRoutes(deps, imagesService))
+     .route('/', wsRoutes(deps, chatService));
+diff --git a/apps/server/src/config.ts b/apps/server/src/config.ts
+index 070d8f2..719d6c6 100644
+--- a/apps/server/src/config.ts
++++ b/apps/server/src/config.ts
+@@ -54,6 +54,14 @@ export interface AppConfig {
+   passwordTimeCost: number;
+   /** 프로덕션에서 OpenAPI/UI를 공개할지 여부 (기본 비활성) */
+   exposeApiDocs: boolean;
++  /**
++   * 앱 앞단의 신뢰할 수 있는 리버스 프록시 수 (기본 1 = Traefik/Dokploy).
++   * 이 수만큼만 X-Forwarded-For를 오른쪽에서 세어 클라이언트 주소를 고른다.
++   * 0이면 전달 헤더를 전혀 신뢰하지 않는다(앱을 직접 노출한 경우).
++   */
++  trustedProxyHops: number;
++  /** Cloudflare가 실제 엣지일 때만 true — CF-Connecting-IP를 권위 있는 값으로 쓴다. */
++  trustCfConnectingIp: boolean;
+ }
+ 
+ /** 환경 변수 + 부분 오버라이드로 설정 객체를 생성한다. */
+@@ -85,6 +93,8 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
+     passwordMemoryCost: Number(env.PASSWORD_MEMORY_COST ?? 65536),
+     passwordTimeCost: Number(env.PASSWORD_TIME_COST ?? 2),
+     exposeApiDocs: env.EXPOSE_API_DOCS === 'true' || env.NODE_ENV !== 'production',
++    trustedProxyHops: Number(env.TRUSTED_PROXY_HOPS ?? 1),
++    trustCfConnectingIp: env.TRUST_CF_CONNECTING_IP === 'true',
+     ...overrides,
+   };
+ }
+diff --git a/apps/server/src/middleware/rate-limit.ts b/apps/server/src/middleware/rate-limit.ts
+index 37b5cca..0ec08e8 100644
+--- a/apps/server/src/middleware/rate-limit.ts
++++ b/apps/server/src/middleware/rate-limit.ts
+@@ -1,12 +1,27 @@
+ import type { MiddlewareHandler } from 'hono';
++import { getConnInfo } from 'hono/bun';
++import type { Context } from 'hono';
++import { resolveClientAddress } from '../client-address';
+ import type { AppDeps } from '../deps';
+ 
+-function clientAddress(headers: Headers): string {
+-  const cloudflare = headers.get('cf-connecting-ip')?.trim();
+-  if (cloudflare) return cloudflare;
+-  const forwarded = headers.get('x-forwarded-for');
+-  if (forwarded) return forwarded.split(',').at(-1)?.trim() || 'unknown';
+-  return 'unknown';
++/**
++ * 레이트리밋 키로 쓸 클라이언트 주소.
++ *
++ * 전달 헤더를 검증 없이 믿으면 공격자가 매 요청 다른 값을 보내 버킷을 새로 만들 수
++ * 있어 로그인/관리자 로그인 무차별 대입 방어가 완전히 무력화된다(LC-SEC-001).
++ * 신뢰 프록시 수를 근거로만 주소를 고른다.
++ */
++function clientAddress(c: Context, deps: AppDeps): string {
++  let socketAddress: string | null = null;
++  try {
++    socketAddress = getConnInfo(c).remote.address ?? null;
++  } catch {
++    // 테스트의 app.request()처럼 소켓이 없는 환경 — 헤더 기반 판단으로 넘어간다.
++  }
++  return resolveClientAddress(c.req.raw.headers, socketAddress, {
++    trustedProxyHops: deps.config.trustedProxyHops,
++    trustCfConnectingIp: deps.config.trustCfConnectingIp,
++  });
+ }
+ 
+ /** Redis-backed fixed-window limiter. Production instances share the same budget. */
+@@ -15,7 +30,7 @@ export function rateLimit(
+   options: { name: string; limit: number; windowSeconds: number },
+ ): MiddlewareHandler {
+   return async (c, next) => {
+-    const address = clientAddress(c.req.raw.headers);
++    const address = clientAddress(c, deps);
+     const key = `rate:${options.name}:${address}`;
+     const { count, retryAfter } = await deps.kv.increment(key, options.windowSeconds);
+     c.header('X-RateLimit-Limit', String(options.limit));
+diff --git a/apps/server/src/modules/analytics/ip.ts b/apps/server/src/modules/analytics/ip.ts
+index 1e97002..585a9d4 100644
+--- a/apps/server/src/modules/analytics/ip.ts
++++ b/apps/server/src/modules/analytics/ip.ts
+@@ -1,24 +1,26 @@
+ /**
+- * 클라이언트 IP 추출
++ * 클라이언트 IP 추출 — 레이트리밋과 동일한 신뢰 프록시 규칙을 따른다.
+  *
+- * 배포 환경(Dokploy/Traefik)이 앞단에서 프록시하므로 X-Forwarded-For를 신뢰한다.
+- * 여러 프록시를 거치면 콤마로 이어지는데, 맨 앞 값이 원본 클라이언트다.
+- * 로컬 개발 등 헤더가 없는 경우에만 Bun의 커넥션 정보로 폴백한다.
++ * 예전에는 X-Forwarded-For의 맨 앞 항목을 그대로 신뢰했는데, 그 값은 클라이언트가
++ * 임의로 덧붙일 수 있어 분석 IP·지오 위치·Insights 조회 대상이 전부 오염됐다
++ * (LC-SEC-003). 이제 신뢰 홉 수만큼 오른쪽에서 세어 고른다.
+  */
+ import { getConnInfo } from 'hono/bun';
+ import type { Context } from 'hono';
+ import type { AppEnv } from '../../app';
++import type { AppDeps } from '../../deps';
++import { resolveClientAddress } from '../../client-address';
+ 
+-export function clientIp(c: Context<AppEnv>): string {
+-  const forwardedFor = c.req.header('x-forwarded-for');
+-  if (forwardedFor) {
+-    const first = forwardedFor.split(',')[0]?.trim();
+-    if (first) return first;
+-  }
+-
++export function clientIp(c: Context<AppEnv>, deps: AppDeps): string {
++  let socketAddress: string | null = null;
+   try {
+-    return getConnInfo(c).remote.address ?? '0.0.0.0';
++    socketAddress = getConnInfo(c).remote.address ?? null;
+   } catch {
+-    return '0.0.0.0';
++    socketAddress = null;
+   }
++  const address = resolveClientAddress(c.req.raw.headers, socketAddress, {
++    trustedProxyHops: deps.config.trustedProxyHops,
++    trustCfConnectingIp: deps.config.trustCfConnectingIp,
++  });
++  return address === 'unknown' ? '0.0.0.0' : address;
+ }
+diff --git a/apps/server/src/modules/analytics/routes.ts b/apps/server/src/modules/analytics/routes.ts
+index 0f67a14..3e71619 100644
+--- a/apps/server/src/modules/analytics/routes.ts
++++ b/apps/server/src/modules/analytics/routes.ts
+@@ -12,10 +12,17 @@ import {
+ } from '@litechat/types';
+ import { Hono } from 'hono';
+ import type { AppEnv } from '../../app';
++import type { AppDeps } from '../../deps';
++import { rateLimit } from '../../middleware/rate-limit';
+ import type { AnalyticsService } from './service';
+ 
+-export function analyticsRoutes(service: AnalyticsService) {
++export function analyticsRoutes(deps: AppDeps, service: AnalyticsService) {
+   return new Hono<AppEnv>()
++    // 수집 엔드포인트는 인증이 없다(로그인 전 방문자도 대상). 클라이언트가 보낸
++    // visitorId/sessionId를 그대로 행 키로 쓰므로, 상한이 없으면 익명 요청만으로
++    // analytics_* 테이블을 무한히 부풀릴 수 있다. 정상 클라이언트의 실제 전송량
++    // (세션당 몇 건)보다 넉넉하되 자동화된 남용은 막는 선으로 제한한다.
++    .use('*', rateLimit(deps, { name: 'analytics', limit: 240, windowSeconds: 600 }))
+     .post('/session', zValidator('json', analyticsSessionSchema), async (c) => {
+       await service.recordSession(c, c.req.valid('json'));
+       return c.body(null, 204);
+diff --git a/apps/server/src/modules/analytics/service.ts b/apps/server/src/modules/analytics/service.ts
+index 206a603..9f8fa68 100644
+--- a/apps/server/src/modules/analytics/service.ts
++++ b/apps/server/src/modules/analytics/service.ts
+@@ -66,7 +66,7 @@ export class AnalyticsService {
+     if (this.repo.hasSession(identity.sessionId)) return;
+ 
+     const userId = await this.resolveUserId(c);
+-    const ip = clientIp(c);
++    const ip = clientIp(c, this.deps);
+     const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
+     this.repo.insertSession({
+       id: identity.sessionId,
+@@ -92,7 +92,7 @@ export class AnalyticsService {
+     try {
+       const identity = this.resolveIdentity(c, body, body.platform);
+       const userId = await this.resolveUserId(c);
+-      const ip = clientIp(c);
++      const ip = clientIp(c, this.deps);
+       const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
+       this.repo.insertSession({
+         id: identity.sessionId,
+@@ -151,7 +151,7 @@ export class AnalyticsService {
+   ): Promise<void> {
+     try {
+       const userId = await this.resolveUserId(c);
+-      const ip = clientIp(c);
++      const ip = clientIp(c, this.deps);
+       const geo = await lookupGeo(this.deps.config.geoipDbPath, ip);
+       this.repo.insertSession({
+         id: identity.sessionId,
+diff --git a/apps/server/src/security-controls.test.ts b/apps/server/src/security-controls.test.ts
+index eb4c404..be8198e 100644
+--- a/apps/server/src/security-controls.test.ts
++++ b/apps/server/src/security-controls.test.ts
+@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
+ import { parseClientFrame } from '@litechat/types';
+ import { createApp } from './app';
+ import { createTestDeps } from './deps';
++import { resolveClientAddress } from './client-address';
+ 
+ describe('release security controls', () => {
+   test('login is rate-limited with Retry-After', async () => {
+@@ -26,4 +27,118 @@ describe('release security controls', () => {
+       parseClientFrame(JSON.stringify({ t: 'm', c: 1, k: 't', x: 'a'.repeat(9000), i: 'tmp' })),
+     ).toBeNull();
+   });
++
++  /**
++   * LC-SEC-001 — 클라이언트가 보낸 엣지 헤더(cf-connecting-ip / x-forwarded-for)를
++   * 그대로 믿으면 요청마다 새 레이트리밋 버킷이 생겨 자격증명 무차별 대입이 무제한이 된다.
++   * 관리자 로그인(5회/15분)이 가장 위험하므로 이 경로로 회귀 테스트를 고정한다.
++   */
++  test('spoofed cf-connecting-ip cannot reset the admin-login rate limit', async () => {
++    const app = createApp(createTestDeps());
++    let response!: Response;
++    for (let attempt = 0; attempt < 12; attempt += 1) {
++      response = await app.request('/api/admin/login', {
++        method: 'POST',
++        headers: {
++          'content-type': 'application/json',
++          // 공격자가 매 요청 다른 엣지 IP를 위조한다. 신뢰 프록시(Traefik)는 실제
++          // 피어 주소를 오른쪽에 덧붙이므로, 위조 항목은 전부 그 왼쪽에 남는다.
++          'cf-connecting-ip': `10.0.0.${attempt}`,
++          'x-forwarded-for': `10.1.1.${attempt}, 203.0.113.7`,
++        },
++        body: JSON.stringify({ username: 'admin', password: `guess-${attempt}` }),
++      });
++    }
++    expect(response.status).toBe(429);
++  });
++
++  test('spoofed x-forwarded-for cannot reset the login rate limit', async () => {
++    const app = createApp(createTestDeps());
++    let response!: Response;
++    for (let attempt = 0; attempt < 25; attempt += 1) {
++      response = await app.request('/api/auth/login', {
++        method: 'POST',
++        headers: {
++          'content-type': 'application/json',
++          // 위조 항목을 몇 개를 덧붙이든 마지막 항목(신뢰 프록시가 관측한 실제 주소)만 쓰인다.
++          'x-forwarded-for': `198.51.100.${attempt}, 192.0.2.${attempt}, 203.0.113.7`,
++        },
++        body: JSON.stringify({ username: 'nobody', password: 'password123' }),
++      });
++    }
++    expect(response.status).toBe(429);
++  });
++
++  /**
++   * LC-SEC-003 — 신뢰 홉 수만큼만 오른쪽에서 세어 클라이언트 주소를 고른다.
++   * 클라이언트가 앞에 임의 항목을 덧붙여도 결과가 바뀌면 안 된다.
++   */
++  describe('resolveClientAddress', () => {
++    const trustOneHop = { trustedProxyHops: 1, trustCfConnectingIp: false };
++
++    test('uses the address the nearest trusted proxy observed, not the leftmost claim', () => {
++      const headers = new Headers({ 'x-forwarded-for': '1.2.3.4, 203.0.113.9' });
++      expect(resolveClientAddress(headers, null, trustOneHop)).toBe('203.0.113.9');
++    });
++
++    test('client-prepended entries cannot change the result', () => {
++      const spoofed = new Headers({ 'x-forwarded-for': 'evil, 9.9.9.9, 203.0.113.9' });
++      expect(resolveClientAddress(spoofed, null, trustOneHop)).toBe('203.0.113.9');
++    });
++
++    test('ignores cf-connecting-ip unless the edge is explicitly trusted', () => {
++      const headers = new Headers({
++        'cf-connecting-ip': '1.2.3.4',
++        'x-forwarded-for': 'spoofed, 203.0.113.9',
++      });
++      expect(resolveClientAddress(headers, null, trustOneHop)).toBe('203.0.113.9');
++      expect(
++        resolveClientAddress(headers, null, { trustedProxyHops: 1, trustCfConnectingIp: true }),
++      ).toBe('1.2.3.4');
++    });
++
++    test('falls back to the socket address instead of a shared "unknown" bucket', () => {
++      expect(resolveClientAddress(new Headers(), '192.0.2.50', trustOneHop)).toBe('192.0.2.50');
++    });
++
++    test('with no trusted proxy, forwarded headers are ignored entirely', () => {
++      const headers = new Headers({ 'x-forwarded-for': '1.2.3.4' });
++      const direct = { trustedProxyHops: 0, trustCfConnectingIp: false };
++      expect(resolveClientAddress(headers, '192.0.2.50', direct)).toBe('192.0.2.50');
++    });
++  });
++
++  /** LC-SEC-005 — CSP가 실제로 실려야 한다 (hono secureHeaders 기본값에는 없다). */
++  test('responses carry a restrictive Content-Security-Policy', async () => {
++    const app = createApp(createTestDeps());
++    const csp = (await app.request('/api/health')).headers.get('content-security-policy') ?? '';
++    expect(csp).toContain("default-src 'self'");
++    expect(csp).toContain("object-src 'none'");
++    expect(csp).toContain("frame-ancestors 'none'");
++    expect(csp).toContain("base-uri 'self'");
++    // 와일드카드나 인라인 스크립트 허용이 슬며시 들어오는 것을 막는다.
++    expect(csp).not.toContain("script-src 'self' *");
++    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
++    expect(csp).not.toMatch(/script-src[^;]*'unsafe-eval'/);
++  });
++
++  test('docs CDN origin is absent from CSP when API docs are disabled', async () => {
++    const app = createApp(createTestDeps({ exposeApiDocs: false }));
++    const csp = (await app.request('/api/health')).headers.get('content-security-policy') ?? '';
++    expect(csp).not.toContain('cdn.jsdelivr.net');
++  });
++
++  /** LC-SEC-006 — 인증 없는 분석 수집 엔드포인트에도 상한이 있어야 한다. */
++  test('unauthenticated analytics ingest is rate limited', async () => {
++    const app = createApp(createTestDeps());
++    let response!: Response;
++    for (let attempt = 0; attempt < 245; attempt += 1) {
++      response = await app.request('/api/analytics/event', {
++        method: 'POST',
++        headers: { 'content-type': 'application/json' },
++        body: JSON.stringify({ path: '/', visitorId: crypto.randomUUID(), sessionId: crypto.randomUUID() }),
++      });
++    }
++    expect(response.status).toBe(429);
++  });
+ });
+diff --git a/apps/web/package.json b/apps/web/package.json
+index 71b4e7e..0e94b99 100644
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -12,7 +12,7 @@
+   "dependencies": {
+     "@litechat/types": "workspace:*",
+     "@tanstack/react-query": "^5.62.11",
+-    "hono": "^4.6.14",
++    "hono": "^4.12.34",
+     "motion": "^12.0.0",
+     "react": "^19.0.0",
+     "react-dom": "^19.0.0",
+diff --git a/bun.lock b/bun.lock
+index 05e0546..2411390 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -37,7 +37,7 @@
+         "expo-status-bar": "~57.0.1",
+         "expo-system-ui": "~57.0.2",
+         "expo-updates": "~57.0.17",
+-        "hono": "^4.12.27",
++        "hono": "^4.12.34",
+         "react": "19.2.3",
+         "react-dom": "19.2.3",
+         "react-native": "0.86.2",
+@@ -60,7 +60,7 @@
+         "jest": "~29.7.0",
+         "jest-expo": "~57.0.4",
+         "server": "workspace:*",
+-        "sharp": "^0.33.5",
++        "sharp": "^0.35.0",
+         "test-renderer": "^1.2.0",
+         "typescript": "~6.0.3",
+       },
+@@ -102,11 +102,11 @@
+       "dependencies": {
+         "@hono/zod-validator": "^0.4.2",
+         "@litechat/types": "workspace:*",
+-        "hono": "^4.6.14",
++        "hono": "^4.12.34",
+         "hono-openapi": "^0.4.6",
+         "ioredis": "^5.4.1",
+         "maxmind": "^5.0.6",
+-        "sharp": "^0.33.5",
++        "sharp": "^0.35.0",
+         "web-push": "^3.6.7",
+         "zod": "^3.24.1",
+         "zod-openapi": "^4.2.2",
+@@ -123,7 +123,7 @@
+       "dependencies": {
+         "@litechat/types": "workspace:*",
+         "@tanstack/react-query": "^5.62.11",
+-        "hono": "^4.6.14",
++        "hono": "^4.12.34",
+         "motion": "^12.0.0",
+         "react": "^19.0.0",
+         "react-dom": "^19.0.0",
+@@ -420,7 +420,7 @@
+ 
+     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
+ 
+-    "@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
++    "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
+ 
+     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w=="],
+ 
+@@ -576,43 +576,59 @@
+ 
+     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
+ 
+-    "@img/sharp-darwin-arm64": ["@img/sharp-darwin-arm64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-darwin-arm64": "1.0.4" }, "os": "darwin", "cpu": "arm64" }, "sha512-UT4p+iz/2H4twwAoLCqfA9UH5pI6DggwKEGuaPy7nCVQ8ZsiY5PIcrRvD1DzuY3qYL07NtIQcWnBSY/heikIFQ=="],
++    "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
+ 
+-    "@img/sharp-darwin-x64": ["@img/sharp-darwin-x64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-darwin-x64": "1.0.4" }, "os": "darwin", "cpu": "x64" }, "sha512-fyHac4jIc1ANYGRDxtiqelIbdWkIuQaI84Mv45KvGRRxSAa7o7d1ZKAOBaYbnepLC1WqxfpimdeWfvqqSGwR2Q=="],
++    "@img/sharp-darwin-arm64": ["@img/sharp-darwin-arm64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-darwin-arm64": "1.3.3" }, "os": "darwin", "cpu": "arm64" }, "sha512-Uhfl4V4lhP2nbUVF9+hyH1+luj86f1gUFeo8ALYxFoULoU+G87D43BfeMP8XHsk9boxAnCY/bf2EHwhA7MuGsA=="],
+ 
+-    "@img/sharp-libvips-darwin-arm64": ["@img/sharp-libvips-darwin-arm64@1.0.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-XblONe153h0O2zuFfTAbQYAX2JhYmDHeWikp1LM9Hul9gVPjFY427k6dFEcOL72O01QxQsWi761svJ/ev9xEDg=="],
++    "@img/sharp-darwin-x64": ["@img/sharp-darwin-x64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-darwin-x64": "1.3.3" }, "os": "darwin", "cpu": "x64" }, "sha512-hWniXY3bG5qKpkKrAwPe4y+VTPmf086YQAnkxWh7uA1YrlRouWGa0M0Mxj3ZjnXFkv7/TD1bTy9lGUK26vRvWw=="],
+ 
+-    "@img/sharp-libvips-darwin-x64": ["@img/sharp-libvips-darwin-x64@1.0.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-xnGR8YuZYfJGmWPvmlunFaWJsb9T/AO2ykoP3Fz/0X5XV2aoYBPkX6xqCQvUTKKiLddarLaxpzNe+b1hjeWHAQ=="],
++    "@img/sharp-freebsd-wasm32": ["@img/sharp-freebsd-wasm32@0.35.4", "", { "dependencies": { "@img/sharp-wasm32": "0.35.4" }, "os": "freebsd" }, "sha512-lIsKw/BU+kjB4eZjxrYrZmwOJYi3Ajrv66iAlBmUPyKc3HpnloevB1g3wxGD9P/5BbQ1brBGl65VRRrCvQDEqA=="],
+ 
+-    "@img/sharp-libvips-linux-arm": ["@img/sharp-libvips-linux-arm@1.0.5", "", { "os": "linux", "cpu": "arm" }, "sha512-gvcC4ACAOPRNATg/ov8/MnbxFDJqf/pDePbBnuBDcjsI8PssmjoKMAz4LtLaVi+OnSb5FK/yIOamqDwGmXW32g=="],
++    "@img/sharp-libvips-darwin-arm64": ["@img/sharp-libvips-darwin-arm64@1.3.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-suTBPTDGrI9WodccaDdwZItTSaBYASlBk1NSfElSHrUfzu3szG6lvIF58+WiFvnfzuK8ZBFS5zE00PxqxnRiPg=="],
+ 
+-    "@img/sharp-libvips-linux-arm64": ["@img/sharp-libvips-linux-arm64@1.0.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-9B+taZ8DlyyqzZQnoeIvDVR/2F4EbMepXMc/NdVbkzsJbzkUjhXv/70GQJ7tdLA4YJgNP25zukcxpX2/SueNrA=="],
++    "@img/sharp-libvips-darwin-x64": ["@img/sharp-libvips-darwin-x64@1.3.3", "", { "os": "darwin", "cpu": "x64" }, "sha512-FVJZ5mITMobmXIz/hPDTw0EintTW5H3WfrxwLqEqjiIihlu+hVRyGrFQ60xl0Lxn7Bt3zdpevPaQi0HEzqz9fw=="],
+ 
+-    "@img/sharp-libvips-linux-s390x": ["@img/sharp-libvips-linux-s390x@1.0.4", "", { "os": "linux", "cpu": "s390x" }, "sha512-u7Wz6ntiSSgGSGcjZ55im6uvTrOxSIS8/dgoVMoiGE9I6JAfU50yH5BoDlYA1tcuGS7g/QNtetJnxA6QEsCVTA=="],
++    "@img/sharp-libvips-linux-arm": ["@img/sharp-libvips-linux-arm@1.3.3", "", { "os": "linux", "cpu": "arm" }, "sha512-3rbU4vqXXc3hY/OiXdl52xZvT0F1yEngWfvqudtPJg/KkyiaQw2DRsFrNzpmLvfavbwOq3qXn36GP8obHRULQA=="],
+ 
+-    "@img/sharp-libvips-linux-x64": ["@img/sharp-libvips-linux-x64@1.0.4", "", { "os": "linux", "cpu": "x64" }, "sha512-MmWmQ3iPFZr0Iev+BAgVMb3ZyC4KeFc3jFxnNbEPas60e1cIfevbtuyf9nDGIzOaW9PdnDciJm+wFFaTlj5xYw=="],
++    "@img/sharp-libvips-linux-arm64": ["@img/sharp-libvips-linux-arm64@1.3.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-0DaL0A6Xu6sQSQFwe4iVCrKWU2cCTItnRsYsCdxAMm9NF6twAA9BKnoqy4hqz4+azQ0JHuA26qiUKsf1XJ/v5A=="],
+ 
+-    "@img/sharp-libvips-linuxmusl-arm64": ["@img/sharp-libvips-linuxmusl-arm64@1.0.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-9Ti+BbTYDcsbp4wfYib8Ctm1ilkugkA/uscUn6UXK1ldpC1JjiXbLfFZtRlBhjPZ5o1NCLiDbg8fhUPKStHoTA=="],
++    "@img/sharp-libvips-linux-ppc64": ["@img/sharp-libvips-linux-ppc64@1.3.3", "", { "os": "linux", "cpu": "ppc64" }, "sha512-cdn1OvUBwsXhbC0zSzJnNzf5MZ/mTrobawDvNXBTxe8VtqKAm0sRuEY2Evzovb/w9JMk4TvRxqt1mekSuJz64w=="],
+ 
+-    "@img/sharp-libvips-linuxmusl-x64": ["@img/sharp-libvips-linuxmusl-x64@1.0.4", "", { "os": "linux", "cpu": "x64" }, "sha512-viYN1KX9m+/hGkJtvYYp+CCLgnJXwiQB39damAO7WMdKWlIhmYTfHjwSbQeUK/20vY154mwezd9HflVFM1wVSw=="],
++    "@img/sharp-libvips-linux-riscv64": ["@img/sharp-libvips-linux-riscv64@1.3.3", "", { "os": "linux", "cpu": "none" }, "sha512-HjPVx7yKz+0lqdhDlTw1tt90wamBoxhiXpvl1XZpJLiHH4RCJ5yDTqH+VlYPv2fwFs89JFw4c1IexYOcQUi4IQ=="],
+ 
+-    "@img/sharp-linux-arm": ["@img/sharp-linux-arm@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linux-arm": "1.0.5" }, "os": "linux", "cpu": "arm" }, "sha512-JTS1eldqZbJxjvKaAkxhZmBqPRGmxgu+qFKSInv8moZ2AmT5Yib3EQ1c6gp493HvrvV8QgdOXdyaIBrhvFhBMQ=="],
++    "@img/sharp-libvips-linux-s390x": ["@img/sharp-libvips-linux-s390x@1.3.3", "", { "os": "linux", "cpu": "s390x" }, "sha512-neWLh+3yCNThxnfy3c4BbVBeGgt9aftno+XbT56iK28RgeDs3UOFWviLWlUu0bArYVYJaFDK+RRohbicUNCm8Q=="],
+ 
+-    "@img/sharp-linux-arm64": ["@img/sharp-linux-arm64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linux-arm64": "1.0.4" }, "os": "linux", "cpu": "arm64" }, "sha512-JMVv+AMRyGOHtO1RFBiJy/MBsgz0x4AWrT6QoEVVTyh1E39TrCUpTRI7mx9VksGX4awWASxqCYLCV4wBZHAYxA=="],
++    "@img/sharp-libvips-linux-x64": ["@img/sharp-libvips-linux-x64@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-4vKmvAst9nrowcqquKFAyZJUDolUaIp8uRiN0mWFguJ1IplC9/pitXtlnnlU4aa/eJw3J7i67V+pwUL+wZGdsA=="],
+ 
+-    "@img/sharp-linux-s390x": ["@img/sharp-linux-s390x@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linux-s390x": "1.0.4" }, "os": "linux", "cpu": "s390x" }, "sha512-y/5PCd+mP4CA/sPDKl2961b+C9d+vPAveS33s6Z3zfASk2j5upL6fXVPZi7ztePZ5CuH+1kW8JtvxgbuXHRa4Q=="],
++    "@img/sharp-libvips-linuxmusl-arm64": ["@img/sharp-libvips-linuxmusl-arm64@1.3.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-Y9kQaLMuNoB0bPYOOdcZMaseNrFpPodIWWMrx+CZyydf2xn68j9WYc6sWWRrDwNkzCQjKYfc68L7jKjGlHMibw=="],
+ 
+-    "@img/sharp-linux-x64": ["@img/sharp-linux-x64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linux-x64": "1.0.4" }, "os": "linux", "cpu": "x64" }, "sha512-opC+Ok5pRNAzuvq1AG0ar+1owsu842/Ab+4qvU879ippJBHvyY5n2mxF1izXqkPYlGuP/M556uh53jRLJmzTWA=="],
++    "@img/sharp-libvips-linuxmusl-x64": ["@img/sharp-libvips-linuxmusl-x64@1.3.3", "", { "os": "linux", "cpu": "x64" }, "sha512-fj8Mv0HHfD1Rr+4I68+3agJynxDWtBFgicTbSOb9Bke6pIwzGcJ+RX/yHjmiEGFMCavY/dxvem7MyNaJF+wDiw=="],
+ 
+-    "@img/sharp-linuxmusl-arm64": ["@img/sharp-linuxmusl-arm64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-arm64": "1.0.4" }, "os": "linux", "cpu": "arm64" }, "sha512-XrHMZwGQGvJg2V/oRSUfSAfjfPxO+4DkiRh6p2AFjLQztWUuY/o8Mq0eMQVIY7HJ1CDQUJlxGGZRw1a5bqmd1g=="],
++    "@img/sharp-linux-arm": ["@img/sharp-linux-arm@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-arm": "1.3.3" }, "os": "linux", "cpu": "arm" }, "sha512-7OAS8gI0EReKGVN2HssHlM6umJgxF5VI3xN0p9FA91p/YO+ou5hiNghLdZ5BEHztwaaK5+bLKRf8x/o2L2nk9A=="],
+ 
+-    "@img/sharp-linuxmusl-x64": ["@img/sharp-linuxmusl-x64@0.33.5", "", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-x64": "1.0.4" }, "os": "linux", "cpu": "x64" }, "sha512-WT+d/cgqKkkKySYmqoZ8y3pxx7lx9vVejxW/W4DOFMYVSkErR+w7mf2u8m/y4+xHe7yY9DAXQMWQhpnMuFfScw=="],
++    "@img/sharp-linux-arm64": ["@img/sharp-linux-arm64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-arm64": "1.3.3" }, "os": "linux", "cpu": "arm64" }, "sha512-De4jpEnAU8Hd5oT0j1G3uL4ZvTuipVMn7YC6vPaJhy6/7EwEae0SVAoBrUMYQbkLGDm85taVWwuPc1a44LTzCQ=="],
+ 
+-    "@img/sharp-wasm32": ["@img/sharp-wasm32@0.33.5", "", { "dependencies": { "@emnapi/runtime": "^1.2.0" }, "cpu": "none" }, "sha512-ykUW4LVGaMcU9lu9thv85CbRMAwfeadCJHRsg2GmeRa/cJxsVY9Rbd57JcMxBkKHag5U/x7TSBpScF4U8ElVzg=="],
++    "@img/sharp-linux-ppc64": ["@img/sharp-linux-ppc64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-ppc64": "1.3.3" }, "os": "linux", "cpu": "ppc64" }, "sha512-2oYZJeIl4kCcMGk4ouZVjnkCtFrpQFlNEtJ6GbxzhHQchwH0NH/qEb9ykmOl29dqwMq+JhFdZn+1ak2FKhI9fQ=="],
+ 
+-    "@img/sharp-win32-ia32": ["@img/sharp-win32-ia32@0.33.5", "", { "os": "win32", "cpu": "ia32" }, "sha512-T36PblLaTwuVJ/zw/LaH0PdZkRz5rd3SmMHX8GSmR7vtNSP5Z6bQkExdSK7xGWyxLw4sUknBuugTelgw2faBbQ=="],
++    "@img/sharp-linux-riscv64": ["@img/sharp-linux-riscv64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-riscv64": "1.3.3" }, "os": "linux", "cpu": "none" }, "sha512-cPbNChoRURAWdebDIHSenxRpgEdy7JkPydSnUxRm9VvKD7m0/xVaR/8Fzlu81pk5nHEvHH87UZUA7cTtwnbJSA=="],
+ 
+-    "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.33.5", "", { "os": "win32", "cpu": "x64" }, "sha512-MpY/o8/8kj+EcnxwvrP4aTJSWw/aZ7JIGR4aBeZkZw5B7/Jn+tY9/VNwtcoGmdT7GfggGIU4kygOMSbYnOrAbg=="],
++    "@img/sharp-linux-s390x": ["@img/sharp-linux-s390x@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-s390x": "1.3.3" }, "os": "linux", "cpu": "s390x" }, "sha512-RY0JFY8Fd6RonCBtHz+DvadaPkXDSI1AUn6yWL9TipqkZ1vY8w8evqdgyDFnkm4/K1ve1TvZiaePP5oSd4+WVQ=="],
++
++    "@img/sharp-linux-x64": ["@img/sharp-linux-x64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linux-x64": "1.3.3" }, "os": "linux", "cpu": "x64" }, "sha512-9qvvEAuk8k89TfWUoX2htWjbAMX8p+NxCppjpcg5k6xMsjhBQPTsoIh36h9Qde4WRuGpJeYnOjdosDn/cnv+OA=="],
++
++    "@img/sharp-linuxmusl-arm64": ["@img/sharp-linuxmusl-arm64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-arm64": "1.3.3" }, "os": "linux", "cpu": "arm64" }, "sha512-KB5jxpfWQTr0nc3xdHtWChdbifHrBGsd2SM62Eyxrl8afikm+f5qGBU75SJIZBT/S1MC8XyacdlXBMSWq6OURA=="],
++
++    "@img/sharp-linuxmusl-x64": ["@img/sharp-linuxmusl-x64@0.35.4", "", { "optionalDependencies": { "@img/sharp-libvips-linuxmusl-x64": "1.3.3" }, "os": "linux", "cpu": "x64" }, "sha512-f+eZJZIQNEEd26RPSW+76chwOf1XtA2Y/O+5ocVyLliHkeih3e+jhLVBdNTd2rS3IbNXK8+ug93Vf5ZXtF5Lxg=="],
++
++    "@img/sharp-wasm32": ["@img/sharp-wasm32@0.35.4", "", { "dependencies": { "@emnapi/runtime": "^1.11.3" } }, "sha512-zQnl4Kwp7Q6NHsENtU2T/00Zi+w3AQNwz3+UaTyVBy2FpXrzXzGjndpK61onhZjRtRpQXxCTeqw19bVyXOh7jA=="],
++
++    "@img/sharp-webcontainers-wasm32": ["@img/sharp-webcontainers-wasm32@0.35.4", "", { "dependencies": { "@img/sharp-wasm32": "0.35.4" }, "cpu": "none" }, "sha512-ESfNkywmCfPNyaZjxooddJQiQ+l/nTpGEOGthxiLnIHXC/CmcBixnfwUleX9mCz9ovrUUvKMap/pm8RYbzfwaA=="],
++
++    "@img/sharp-win32-arm64": ["@img/sharp-win32-arm64@0.35.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-iNdlBX9gLVvqe2I3uIJSIKTq6wckP/DYxZtcqxm09x5Gi24DnFBmPAWZmr60ZyYMG0xlzo6goG3670ar+RXvRw=="],
++
++    "@img/sharp-win32-ia32": ["@img/sharp-win32-ia32@0.35.4", "", { "os": "win32", "cpu": "ia32" }, "sha512-kqRsbaa5CS6KHlpxnN7WhE6vAAugXyZButpRdvDWetlv6Qv4N9WTcrWzF7tXfB9T7MsoadqdI8hmwLq6UlLvtw=="],
++
++    "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.4", "", { "os": "win32", "cpu": "x64" }, "sha512-XtmnYhBcrORsJ4XJngyzr/EWP0hRZLAZRFaApdKuviyqF78+ylxh2y06ZmtULAMOnObJ3ucpN0AcwSWnMowTRg=="],
+ 
+     "@ioredis/commands": ["@ioredis/commands@1.10.0", "", {}, "sha512-UmeW7z4LfctwoQ5wkhVzgq8tXkreED2xZGpX+Bg+zA+WJFZCT6c062AfCK/Dfk81xZnnwdhJCUMkitihRaoC2Q=="],
+ 
+@@ -1614,7 +1630,7 @@
+ 
+     "hoist-non-react-statics": ["hoist-non-react-statics@3.3.2", "", { "dependencies": { "react-is": "^16.7.0" } }, "sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw=="],
+ 
+-    "hono": ["hono@4.12.27", "", {}, "sha512-1yrb/+w6HWQJrUCLkJ2IF5jNIPvvFkblV5RNOYl6bV+OA6p9GLcMpHFFGTosSvHvcAUibuUukRqhlYI4z32C7Q=="],
++    "hono": ["hono@4.13.5", "", {}, "sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw=="],
+ 
+     "hono-openapi": ["hono-openapi@0.4.8", "", { "dependencies": { "json-schema-walker": "^2.0.0" }, "peerDependencies": { "@hono/arktype-validator": "^2.0.0", "@hono/effect-validator": "^1.2.0", "@hono/typebox-validator": "^0.2.0 || ^0.3.0", "@hono/valibot-validator": "^0.5.1", "@hono/zod-validator": "^0.4.1", "@sinclair/typebox": "^0.34.9", "@valibot/to-json-schema": "^1.0.0-beta.3", "arktype": "^2.0.0", "effect": "^3.11.3", "hono": "^4.6.13", "openapi-types": "^12.1.3", "valibot": "^1.0.0-beta.9", "zod": "^3.23.8", "zod-openapi": "^4.0.0" }, "optionalPeers": ["@hono/arktype-validator", "@hono/effect-validator", "@hono/typebox-validator", "@hono/valibot-validator", "@hono/zod-validator", "@sinclair/typebox", "@valibot/to-json-schema", "arktype", "effect", "hono", "valibot", "zod", "zod-openapi"] }, "sha512-LYr5xdtD49M7hEAduV1PftOMzuT8ZNvkyWfh1DThkLsIr4RkvDb12UxgIiFbwrJB6FLtFXLoOZL9x4IeDk2+VA=="],
+ 
+@@ -2292,7 +2308,7 @@
+ 
+     "shallowequal": ["shallowequal@1.1.0", "", {}, "sha512-y0m1JoUZSlPAjXVtPPW70aZWfIL/dSP7AFkRnniLCrK/8MDKog3TySTBmckD+RObVxH0v4Tox67+F14PdED2oQ=="],
+ 
+-    "sharp": ["sharp@0.33.5", "", { "dependencies": { "color": "^4.2.3", "detect-libc": "^2.0.3", "semver": "^7.6.3" }, "optionalDependencies": { "@img/sharp-darwin-arm64": "0.33.5", "@img/sharp-darwin-x64": "0.33.5", "@img/sharp-libvips-darwin-arm64": "1.0.4", "@img/sharp-libvips-darwin-x64": "1.0.4", "@img/sharp-libvips-linux-arm": "1.0.5", "@img/sharp-libvips-linux-arm64": "1.0.4", "@img/sharp-libvips-linux-s390x": "1.0.4", "@img/sharp-libvips-linux-x64": "1.0.4", "@img/sharp-libvips-linuxmusl-arm64": "1.0.4", "@img/sharp-libvips-linuxmusl-x64": "1.0.4", "@img/sharp-linux-arm": "0.33.5", "@img/sharp-linux-arm64": "0.33.5", "@img/sharp-linux-s390x": "0.33.5", "@img/sharp-linux-x64": "0.33.5", "@img/sharp-linuxmusl-arm64": "0.33.5", "@img/sharp-linuxmusl-x64": "0.33.5", "@img/sharp-wasm32": "0.33.5", "@img/sharp-win32-ia32": "0.33.5", "@img/sharp-win32-x64": "0.33.5" } }, "sha512-haPVm1EkS9pgvHrQ/F3Xy+hgcuMV0Wm9vfIBSiwZ05k+xgb0PkBQpGsAA/oWdDobNaZTH5ppvHtzCFbnSEwHVw=="],
++    "sharp": ["sharp@0.35.4", "", { "dependencies": { "@img/colour": "^1.1.0", "detect-libc": "^2.1.2", "semver": "^7.8.5" }, "optionalDependencies": { "@img/sharp-darwin-arm64": "0.35.4", "@img/sharp-darwin-x64": "0.35.4", "@img/sharp-freebsd-wasm32": "0.35.4", "@img/sharp-libvips-darwin-arm64": "1.3.3", "@img/sharp-libvips-darwin-x64": "1.3.3", "@img/sharp-libvips-linux-arm": "1.3.3", "@img/sharp-libvips-linux-arm64": "1.3.3", "@img/sharp-libvips-linux-ppc64": "1.3.3", "@img/sharp-libvips-linux-riscv64": "1.3.3", "@img/sharp-libvips-linux-s390x": "1.3.3", "@img/sharp-libvips-linux-x64": "1.3.3", "@img/sharp-libvips-linuxmusl-arm64": "1.3.3", "@img/sharp-libvips-linuxmusl-x64": "1.3.3", "@img/sharp-linux-arm": "0.35.4", "@img/sharp-linux-arm64": "0.35.4", "@img/sharp-linux-ppc64": "0.35.4", "@img/sharp-linux-riscv64": "0.35.4", "@img/sharp-linux-s390x": "0.35.4", "@img/sharp-linux-x64": "0.35.4", "@img/sharp-linuxmusl-arm64": "0.35.4", "@img/sharp-linuxmusl-x64": "0.35.4", "@img/sharp-webcontainers-wasm32": "0.35.4", "@img/sharp-win32-arm64": "0.35.4", "@img/sharp-win32-ia32": "0.35.4", "@img/sharp-win32-x64": "0.35.4" }, "peerDependencies": { "@types/node": "*" }, "optionalPeers": ["@types/node"] }, "sha512-n++8XWcj+jCOr2IOl7h8LbKnGBDY4aPbmprMONBNFdn0ImXqpGVv5zliDs0V9HbmbCQLpbuo2ej9rAoOQTvMDA=="],
+ 
+     "shebang-command": ["shebang-command@2.0.0", "", { "dependencies": { "shebang-regex": "^3.0.0" } }, "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA=="],
+ 
+diff --git a/docker-compose.yml b/docker-compose.yml
+index fbc9614..6d1370e 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -12,6 +12,10 @@ services:
+   app:
+     build: .
+     restart: unless-stopped
++    # 이미지가 USER bun(uid/gid 1000)으로 실행되므로 litechat-data 볼륨도 같은 소유자여야
++    # 업로드/SQLite 쓰기가 가능하다. 기존 배포에서 볼륨이 root 소유로 이미 만들어져 있으면
++    # 최초 1회 `chown -R 1000:1000`이 필요하다.
++    user: '1000:1000'
+     # 호스트 포트를 공개하지 않는다. Traefik이 dokploy-network를 통해
+     # 컨테이너 내부 3000 포트로 직접 라우팅한다(loadbalancer.server.port=3000).
+     # 3000:3000 공개는 재배포 시 포트 충돌을 일으키고, Traefik/TLS를 우회해
+ Dockerfile                                   |   5 ++
+ apps/app/package.json                        |   4 +-
+ apps/server/package.json                     |   4 +-
+ apps/server/src/app.ts                       |  38 ++++++++-
+ apps/server/src/config.ts                    |  10 +++
+ apps/server/src/middleware/rate-limit.ts     |  29 +++++--
+ apps/server/src/modules/analytics/ip.ts      |  28 ++++---
+ apps/server/src/modules/analytics/routes.ts  |   9 ++-
+ apps/server/src/modules/analytics/service.ts |   6 +-
+ apps/server/src/security-controls.test.ts    | 115 +++++++++++++++++++++++++++
+ apps/web/package.json                        |   2 +-
+ bun.lock                                     |  70 +++++++++-------
+ docker-compose.yml                           |   4 +
+ 13 files changed, 266 insertions(+), 58 deletions(-)

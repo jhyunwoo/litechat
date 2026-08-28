@@ -50,5 +50,10 @@ ENV WEB_STATIC_DIR=/app/apps/web/dist \
     GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb \
     PORT=3000
 
+# 비root 실행 — oven/bun 이미지에 이미 존재하는 uid/gid 1000의 `bun` 사용자를 쓴다.
+# 업로드/DB가 놓이는 /app/data는 볼륨 마운트 지점이라 소유권을 미리 넘겨 둔다.
+RUN mkdir -p /app/data && chown -R bun:bun /app
+USER bun
+
 EXPOSE 3000
 CMD ["bun", "run", "apps/server/src/index.ts"]
