@@ -1,7 +1,7 @@
 /**
  * 로그인 / 회원가입 화면 — 갤러리 히어로 구성.
- * 왼쪽(모바일은 상단)은 블랙 타일에 모노 버블 로고 + 워드마크, 오른쪽은 화이트 폼 패널.
- * 표면 색 전환(블랙 ↔ 화이트)이 곧 구획이다 — 보더/그림자 없음 (DESIGN.md).
+ * 왼쪽(모바일은 상단)은 따뜻한 나이트 타일에 브랜드 심벌 + 워드마크,
+ * 오른쪽은 크림 캔버스의 폼 패널이다.
  */
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -44,15 +44,15 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
-      {/* 브랜드 히어로 — 블랙 타일 (모바일은 상단 밴드, 데스크탑은 좌측 패널) */}
-      <div className="pt-safe flex shrink-0 items-center gap-3 bg-ink px-6 py-5 text-white md:w-[45%] md:max-w-2xl md:flex-col md:items-start md:justify-center md:gap-6 md:px-16 lg:px-24">
-        <Logo className="h-8 w-8 md:h-16 md:w-16" />
+      {/* 브랜드 히어로 — 따뜻한 나이트 타일 (모바일은 상단 밴드, 데스크탑은 좌측 패널) */}
+      <div className="pt-safe flex shrink-0 items-center gap-3 bg-brand-dark px-6 py-5 text-cream md:w-[45%] md:max-w-2xl md:flex-col md:items-start md:justify-center md:gap-6 md:px-16 lg:px-24">
+        <Logo className="h-9 w-9 text-brand-peach md:h-16 md:w-16" />
         <div>
           <h1 className="display text-3xl md:text-6xl">litechat</h1>
-          <p className="display-airy mt-4 hidden max-w-sm text-2xl text-white/70 md:block">
-            가볍고 빠른 채팅.
+          <p className="display-airy mt-4 hidden max-w-sm text-2xl text-cream/70 md:block">
+            가볍게 이어지는 우리 대화.
             <br />
-            친구와 지금 바로 대화를 시작하세요.
+            친구와 편안하게 이야기를 나눠요.
           </p>
         </div>
       </div>

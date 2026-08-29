@@ -1,8 +1,8 @@
 /**
  * 로그인 / 회원가입 화면 (웹 AuthPage 포팅 — 한 화면에서 모드 전환)
  *
- * 상단은 잉크 블랙 히어로 밴드(워드마크) — 웹 AuthPage의 블랙 타일과 같은 문법.
- * 밴드 색은 스킴과 무관한 브랜드 블랙이라 팔레트가 아닌 상수로 둔다.
+ * 상단은 따뜻한 나이트 히어로 밴드(심벌 + 워드마크) — 웹 AuthPage와 같은 문법.
+ * 밴드 색은 스킴과 무관한 브랜드 표면이라 팔레트가 아닌 상수로 둔다.
  */
 import { useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import {
   Linking,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Image } from 'expo-image';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/data/auth';
@@ -23,10 +24,10 @@ import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 import { WEB_URL } from '@/lib/env';
 
-/* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md 잉크 블랙 + 화이트) */
-const HERO_BG = '#1d1d1f';
-const HERO_INK = '#ffffff';
-const HERO_INK_MUTE = 'rgba(255, 255, 255, 0.7)';
+/* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md 나이트 + 크림) */
+const HERO_BG = '#211A19';
+const HERO_INK = '#FFF8F0';
+const HERO_INK_MUTE = 'rgba(255, 248, 240, 0.72)';
 
 export default function SignIn() {
   const styles = useStyles();
@@ -66,10 +67,18 @@ export default function SignIn() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.screen}>
-      {/* 브랜드 히어로 — 잉크 블랙 타일 (표면 색 전환이 곧 구획) */}
+      {/* 브랜드 히어로 — 나이트 타일 (표면 색 전환이 곧 구획) */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
-        <Text style={styles.heroTitle}>litechat</Text>
-        <Text style={styles.heroTagline}>가볍고 빠른 채팅</Text>
+        <Image
+          source={require('../../assets/images/brand-symbol-on-dark.png')}
+          style={styles.heroMark}
+          contentFit="contain"
+          accessibilityElementsHidden
+        />
+        <View>
+          <Text style={styles.heroTitle}>litechat</Text>
+          <Text style={styles.heroTagline}>가볍게 이어지는 우리 대화</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -175,7 +184,14 @@ const useStyles = makeStyles(({ colors, type }) => ({
     backgroundColor: HERO_BG,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
+    flexDirection: 'row',
+    gap: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroMark: {
+    width: 58,
+    height: 58,
   },
   heroTitle: {
     ...type.displayLg,

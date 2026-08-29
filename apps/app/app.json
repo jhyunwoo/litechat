@@ -105,7 +105,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#FFF8F0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -131,11 +131,11 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FFF8F0",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 128,
           "dark": {
-            "backgroundColor": "#000000",
+            "backgroundColor": "#211A19",
             "image": "./assets/images/splash-icon-dark.png"
           }
         }
@@ -151,8 +151,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#1d1d1f",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#E8785D",
           "defaultChannel": "messages"
         }
       ],

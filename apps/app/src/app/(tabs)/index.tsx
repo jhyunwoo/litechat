@@ -242,7 +242,9 @@ const useStyles = makeStyles(({ colors, type }) => ({
     backgroundColor: colors.canvas,
   },
   listPaneSplit: {
-    flex: 0,
+    flexBasis: 360,
+    flexGrow: 0,
+    flexShrink: 0,
     width: 360,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: colors.hairline,

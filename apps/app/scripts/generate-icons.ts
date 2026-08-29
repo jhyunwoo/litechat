@@ -1,110 +1,220 @@
 /**
- * 브랜드 아이콘/스플래시 생성기 — B&W 모노 버블 (DESIGN.md 모노크롬 시스템)
+ * litechat brand asset generator.
  *
- * 글리프: 꼬리 달린 말풍선 + 펀치아웃(투명) 타이핑 도트 3개.
- * 하나의 글리프에서 iOS 라이트/다크/틴트, 스플래시(라이트/다크), 안드로이드 변형,
- * web PWA 아이콘, dashboard 파비콘까지 모두 만든다 (apps/lite는 제외).
+ * One canonical vector (`brand/litechat-symbol.svg`) produces the Expo, web,
+ * dashboard, social, and store icon families. `apps/lite` is intentionally not
+ * read from or written to by this script.
  *
- * 실행:
- *   cd apps/app && bun scripts/generate-icons.ts
+ * Run from the repository root with `bun run brand:generate`.
  */
 import sharp from 'sharp';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const OUT_APP = path.resolve(import.meta.dir, '../assets/images');
-const OUT_WEB = path.resolve(import.meta.dir, '../../web/public');
-const OUT_DASH = path.resolve(import.meta.dir, '../../dashboard/public');
+const REPO = path.resolve(import.meta.dir, '../../..');
+const SOURCE = path.join(REPO, 'brand/litechat-symbol.svg');
+const PALETTE_SOURCE = path.join(REPO, 'brand/palette.json');
+const STORE_FONT = path.join(REPO, 'store-assets/source/NotoSansKR-VF.otf');
+const OUT_APP = path.join(REPO, 'apps/app/assets/images');
+const OUT_WEB = path.join(REPO, 'apps/web/public');
+const OUT_DASH = path.join(REPO, 'apps/dashboard/public');
+const OUT_STORE_SOURCE = path.join(REPO, 'store-assets/source');
+const OUT_PLAY = path.join(REPO, 'store-assets/play-store/ko');
 
-/* B&W 팔레트 — 잉크 블랙(#1d1d1f)은 DESIGN.md의 텍스트/브랜드 블랙 */
-const INK = '#1d1d1f';
-const WHITE = '#ffffff';
+type Palette = {
+  cream: string;
+  creamSoft: string;
+  clay: string;
+  clayPress: string;
+  cocoa: string;
+  night: string;
+  peach: string;
+  lavender: string;
+  white: string;
+  black: string;
+};
 
-/**
- * 말풍선 마스크 (1024 좌표계, 중앙 배치)
- * scale/offset으로 안드로이드 세이프존 등에 맞춘다.
- */
-function bubbleMask(scale = 1): string {
-  const s = (n: number) => 512 + (n - 512) * scale;
-  return `
-    <mask id="bubble">
-      <!-- 말풍선 본체 + 꼬리 -->
-      <path fill="white" d="
-        M ${s(232)} ${s(408)}
-        C ${s(232)} ${s(333)}, ${s(293)} ${s(272)}, ${s(368)} ${s(272)}
-        L ${s(656)} ${s(272)}
-        C ${s(731)} ${s(272)}, ${s(792)} ${s(333)}, ${s(792)} ${s(408)}
-        L ${s(792)} ${s(536)}
-        C ${s(792)} ${s(611)}, ${s(731)} ${s(672)}, ${s(656)} ${s(672)}
-        L ${s(430)} ${s(672)}
-        C ${s(392)} ${s(742)}, ${s(330)} ${s(786)}, ${s(246)} ${s(806)}
-        C ${s(298)} ${s(762)}, ${s(324)} ${s(716)}, ${s(330)} ${s(668)}
-        C ${s(273)} ${s(654)}, ${s(232)} ${s(600)}, ${s(232)} ${s(536)}
-        Z"/>
-      <!-- 타이핑 도트 3개 — 펀치아웃 -->
-      <circle cx="${s(402)}" cy="${s(472)}" r="${42 * scale}" fill="black"/>
-      <circle cx="${s(512)}" cy="${s(472)}" r="${42 * scale}" fill="black"/>
-      <circle cx="${s(622)}" cy="${s(472)}" r="${42 * scale}" fill="black"/>
-    </mask>`;
-}
+const palette = JSON.parse(await readFile(PALETTE_SOURCE, 'utf8')) as Palette;
+const canonicalSvg = await readFile(SOURCE, 'utf8');
+const canonicalPathMatch = canonicalSvg.match(/<path\b[^>]*\/>/);
+if (!canonicalPathMatch) throw new Error(`Canonical symbol path missing: ${SOURCE}`);
+const canonicalPath = canonicalPathMatch[0];
 
-/** 단색 글리프 — 마스크를 씌운 풀블리드 rect (도트는 배경이 비쳐 보인다) */
-function glyph(fill: string, scale = 1): string {
-  return `${bubbleMask(scale)}
-    <rect width="1024" height="1024" fill="${fill}" mask="url(#bubble)"/>`;
-}
+const squareSvg = (body: string, size = 1024) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 1024 1024">${body}</svg>`;
 
-/** 풀블리드 단색 배경 */
 const solid = (fill: string) => `<rect width="1024" height="1024" fill="${fill}"/>`;
 
-/** 라운드 사각 배경 — 작은 파비콘이 다크 탭바에서도 보이도록 흰 칩을 깐다 */
-const chip = (fill: string) => `<rect width="1024" height="1024" rx="160" fill="${fill}"/>`;
-
-const svg = (body: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">${body}</svg>`;
-
-async function render(outDir: string, name: string, body: string, size = 1024): Promise<void> {
-  await sharp(Buffer.from(svg(body))).resize(size, size).png().toFile(path.join(outDir, name));
-  console.log(`✓ ${path.relative(path.resolve(import.meta.dir, '../..'), path.join(outDir, name))} (${size}px)`);
+function symbol(fill: string, scale = 1): string {
+  const pathElement = canonicalPath.replace('currentColor', fill);
+  if (scale === 1) return pathElement;
+  return `<g transform="translate(512 512) scale(${scale}) translate(-512 -512)">${pathElement}</g>`;
 }
 
-await mkdir(OUT_APP, { recursive: true });
-await mkdir(OUT_WEB, { recursive: true });
-await mkdir(OUT_DASH, { recursive: true });
+function iconSurface(background: string, foreground: string, scale = 1): string {
+  return solid(background) + symbol(foreground, scale);
+}
 
-// ── apps/app (Expo) ──────────────────────────────────────────
-// iOS 라이트 — 흰 배경 + 잉크 글리프
-await render(OUT_APP, 'icon.png', solid(WHITE) + glyph(INK, 1.1));
-// iOS 다크 — 투명 배경 + 흰 글리프 (시스템이 어두운 배경 제공)
-await render(OUT_APP, 'icon-dark.png', glyph(WHITE, 1.1));
-// iOS 틴트 — 그레이스케일 글리프 (시스템이 색을 입힘)
-await render(OUT_APP, 'icon-tinted.png', glyph(WHITE, 1.1));
-// 스플래시 — 단색이라 라이트/다크 겸용이 불가해 두 장을 만든다
-await render(OUT_APP, 'splash-icon.png', glyph(INK));
-await render(OUT_APP, 'splash-icon-dark.png', glyph(WHITE));
-// 안드로이드 어댑티브 — 포그라운드(세이프존 66%), 배경(흰 단색), 모노크롬
-await render(OUT_APP, 'android-icon-foreground.png', glyph(INK, 0.58));
-await render(OUT_APP, 'android-icon-background.png', solid(WHITE));
-await render(OUT_APP, 'android-icon-monochrome.png', glyph(WHITE, 0.58));
-// expo web 파비콘
-await render(OUT_APP, 'favicon.png', chip(WHITE) + glyph(INK, 1.15), 48);
+async function render(
+  outDir: string,
+  name: string,
+  body: string,
+  size: number,
+  options: { opaque?: boolean; rgba?: boolean; background?: string } = {},
+): Promise<void> {
+  await mkdir(outDir, { recursive: true });
+  let image = sharp(Buffer.from(squareSvg(body))).resize(size, size, { fit: 'fill' });
+  if (options.opaque) {
+    image = image.flatten({ background: options.background ?? palette.white }).removeAlpha();
+  } else if (options.rgba) {
+    image = image.ensureAlpha(1);
+  }
+  await image.png({ compressionLevel: 9 }).toFile(path.join(outDir, name));
+  console.log(`✓ ${path.relative(REPO, path.join(outDir, name))} (${size}×${size})`);
+}
 
-// ── apps/web (PWA) ───────────────────────────────────────────
-// 512는 manifest에서 maskable로도 선언 — 글리프를 0.8로 줄여 세이프존을 지킨다
-await render(OUT_WEB, 'icon-192.png', solid(WHITE) + glyph(INK, 0.8), 192);
-await render(OUT_WEB, 'icon-512.png', solid(WHITE) + glyph(INK, 0.8), 512);
+await Promise.all(
+  [OUT_APP, OUT_WEB, OUT_DASH, OUT_STORE_SOURCE, OUT_PLAY].map((dir) =>
+    mkdir(dir, { recursive: true }),
+  ),
+);
 
-// ── apps/dashboard ───────────────────────────────────────────
-// SVG 파비콘 — 브라우저 탭 테마를 따라 라이트=잉크/다크=화이트로 스스로 전환한다
-const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <style>.g{fill:${INK}}@media (prefers-color-scheme:dark){.g{fill:${WHITE}}}</style>
-  ${bubbleMask(1.15)}
-  <rect class="g" width="1024" height="1024" mask="url(#bubble)"/>
-</svg>
-`;
-await writeFile(path.join(OUT_DASH, 'favicon.svg'), faviconSvg);
-console.log('✓ dashboard/public/favicon.svg');
-// 구형 브라우저 폴백 — 흰 칩 + 잉크 글리프
-await render(OUT_DASH, 'favicon-32.png', chip(WHITE) + glyph(INK, 1.15), 32);
+// Expo / native app ---------------------------------------------------------
+await render(OUT_APP, 'icon.png', iconSurface(palette.cream, palette.clay), 1024, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(OUT_APP, 'icon-dark.png', iconSurface(palette.night, palette.peach), 1024, {
+  opaque: true,
+  background: palette.night,
+});
+await render(OUT_APP, 'icon-tinted.png', symbol(palette.white), 1024, { rgba: true });
+await render(OUT_APP, 'splash-icon.png', symbol(palette.clay, 0.82), 1024, { rgba: true });
+await render(OUT_APP, 'splash-icon-dark.png', symbol(palette.peach, 0.82), 1024, { rgba: true });
+await render(OUT_APP, 'brand-symbol-on-dark.png', symbol(palette.peach), 512, { rgba: true });
+await render(OUT_APP, 'android-icon-foreground.png', symbol(palette.clay, 0.72), 1024, {
+  rgba: true,
+});
+await render(OUT_APP, 'android-icon-background.png', solid(palette.cream), 1024, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(OUT_APP, 'android-icon-monochrome.png', symbol(palette.white, 0.72), 1024, {
+  rgba: true,
+});
+await render(OUT_APP, 'notification-icon.png', symbol(palette.white, 0.58), 1024, {
+  rgba: true,
+});
+await render(OUT_APP, 'favicon.png', iconSurface(palette.cream, palette.clay, 1.1), 48, {
+  opaque: true,
+  background: palette.cream,
+});
 
-console.log('done');
+// Web / PWA ----------------------------------------------------------------
+await copyFile(SOURCE, path.join(OUT_WEB, 'brand-symbol.svg'));
+await render(OUT_WEB, 'icon-192.png', iconSurface(palette.cream, palette.clay), 192, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(OUT_WEB, 'icon-512.png', iconSurface(palette.cream, palette.clay), 512, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(
+  OUT_WEB,
+  'icon-maskable-512.png',
+  iconSurface(palette.clay, palette.cream, 0.72),
+  512,
+  {
+    opaque: true,
+    background: palette.clay,
+  },
+);
+await render(OUT_WEB, 'apple-touch-icon.png', iconSurface(palette.cream, palette.clay), 180, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(OUT_WEB, 'favicon-32.png', iconSurface(palette.cream, palette.clay, 1.1), 32, {
+  opaque: true,
+  background: palette.cream,
+});
+await render(OUT_WEB, 'notification-badge.png', symbol(palette.white, 0.68), 96, {
+  rgba: true,
+});
+
+const webFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="192" fill="${palette.cream}"/>
+  ${symbol(palette.clay, 1.08)}
+</svg>\n`;
+await writeFile(path.join(OUT_WEB, 'favicon.svg'), webFavicon);
+
+const ogBody = `<rect width="1200" height="630" fill="${palette.cream}"/>
+  <path d="M0 515C220 430 310 620 555 545s356-18 645-120v205H0Z" fill="${palette.peach}" opacity=".45"/>
+  <g transform="translate(86 129) scale(.36)">${canonicalPath.replace('currentColor', palette.clay)}</g>`;
+const [ogWordmark, ogTagline] = await Promise.all([
+  sharp({
+    text: {
+      text: `<span foreground="${palette.cocoa}" font_weight="700" font_size="96256">litechat</span>`,
+      font: 'Noto Sans KR',
+      fontfile: STORE_FONT,
+      width: 560,
+      height: 120,
+      rgba: true,
+    },
+  })
+    .png()
+    .toBuffer(),
+  sharp({
+    text: {
+      text: `<span foreground="${palette.cocoa}" font_weight="400" font_size="36864">가볍게 이어지는 우리 대화</span>`,
+      font: 'Noto Sans KR',
+      fontfile: STORE_FONT,
+      width: 620,
+      height: 64,
+      rgba: true,
+    },
+  })
+    .png()
+    .toBuffer(),
+]);
+await sharp(
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">${ogBody}</svg>`,
+  ),
+)
+  .composite([
+    { input: ogWordmark, left: 455, top: 202 },
+    { input: ogTagline, left: 459, top: 326 },
+  ])
+  .flatten({ background: palette.cream })
+  .removeAlpha()
+  .png({ compressionLevel: 9 })
+  .toFile(path.join(OUT_WEB, 'og-image.png'));
+console.log('✓ apps/web/public/og-image.png (1200×630)');
+
+// Dashboard ----------------------------------------------------------------
+await copyFile(SOURCE, path.join(OUT_DASH, 'brand-symbol.svg'));
+const dashboardFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <style>.bg{fill:${palette.cream}}.mark{color:${palette.clay}}@media(prefers-color-scheme:dark){.bg{fill:${palette.night}}.mark{color:${palette.peach}}}</style>
+  <rect class="bg" width="1024" height="1024" rx="192"/>
+  <g class="mark">${canonicalPath}</g>
+</svg>\n`;
+await writeFile(path.join(OUT_DASH, 'favicon.svg'), dashboardFavicon);
+await render(OUT_DASH, 'favicon-32.png', iconSurface(palette.night, palette.peach, 1.08), 32, {
+  opaque: true,
+  background: palette.night,
+});
+
+// Store masters -------------------------------------------------------------
+await render(
+  OUT_STORE_SOURCE,
+  'brand-master-2048.png',
+  iconSurface(palette.cream, palette.clay),
+  2048,
+  { opaque: true, background: palette.cream },
+);
+await render(OUT_PLAY, 'icon-512.png', iconSurface(palette.cream, palette.clay), 512, {
+  rgba: true,
+});
+
+console.log('Brand generation complete. apps/lite was not touched.');

@@ -7,7 +7,7 @@ Suggested values describe only shipped functionality. Items marked **MANUAL** re
 | Field                | Suggested value / action                                  |
 | -------------------- | --------------------------------------------------------- |
 | App name             | `litechat`                                                |
-| Short description    | `친구와 빠르게 연결되는 가벼운 1:1 채팅`                  |
+| Short description    | `친구를 찾고 편안하게 이어지는 가벼운 1:1 채팅`           |
 | Category             | Communication                                             |
 | Contact email        | `admin@moveto.kr` — **MANUAL:** confirm it is monitored   |
 | Website              | `https://chat.moveto.kr`                                  |
@@ -18,15 +18,25 @@ Suggested values describe only shipped functionality. Items marked **MANUAL** re
 
 ### Full description
 
-> litechat은 친구와 빠르게 연결되는 가벼운 1:1 채팅 서비스입니다.
+> 가까운 사람과 나누는 대화는 가벼워야 하니까.
 >
-> 아이디로 친구를 검색하고 요청을 주고받을 수 있습니다. 친구가 되면 텍스트, 이모지와 사진으로 실시간 대화를 나누고 선택적으로 새 메시지 알림을 받을 수 있습니다.
+> litechat은 복잡한 기능을 덜어내고 1:1 대화에 집중한 메신저입니다. 친구의 아이디를 검색해 요청을 보내고, 서로 연결되면 바로 대화를 시작할 수 있습니다.
 >
-> 사용자 안전을 위해 메시지와 사용자를 신고하거나 차단할 수 있으며, 운영자가 실제 신고를 검토합니다. 프로필에서 개인정보처리방침과 지원 정보를 확인하고 계정을 직접 영구 삭제할 수 있습니다.
+> 편안한 대화
+> 텍스트와 이모지를 실시간으로 주고받고, 일상의 사진도 대화 속에서 자연스럽게 공유할 수 있습니다.
+>
+> 내가 고르는 알림과 화면
+> 새 메시지 알림은 필요할 때만 켜세요. 알림을 허용하지 않아도 채팅 기능을 사용할 수 있습니다. 시스템, 밝은 화면, 어두운 화면 중 보기 편한 테마도 선택할 수 있습니다.
+>
+> 가까이 둔 안전 기능
+> 불편한 메시지나 대화 상대를 신고하고, 원하지 않는 사용자를 차단할 수 있습니다. 차단한 사용자는 별도 화면에서 확인하고 관리할 수 있습니다.
+>
+> 직접 관리하는 계정
+> 프로필에서 개인정보처리방침과 지원 정보를 확인할 수 있습니다. 앱 안에서 계정과 개인정보 설정을 관리하고, 원하면 계정을 영구 삭제할 수 있습니다.
 
 ### Release notes
 
-> 첫 공개 버전: 친구 검색/요청, 실시간 1:1 채팅, 사진과 이모지, 선택적 알림, 신고·차단, 계정 삭제를 지원합니다.
+> litechat의 첫 공개 버전입니다. 친구 찾기, 1:1 채팅, 사진·이모지, 선택적 알림, 신고·차단과 계정 관리를 담았습니다.
 
 ## Data Safety
 
@@ -62,12 +72,20 @@ Use the Google worksheet in [PRIVACY_DATA_MAP.md](./PRIVACY_DATA_MAP.md). Collec
 
 ## Graphics and screenshots
 
-Existing source: 1024×1024 app icon plus adaptive foreground/background, monochrome icon, notification icon and splash art. Missing store-specific assets:
+Store-specific assets are generated independently from the launcher/adaptive icon:
 
-- **MANUAL:** 512×512 Play icon exported from final branding.
-- **MANUAL:** 1024×500 JPEG or 24-bit PNG feature graphic with no alpha ([official specification](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en-419)).
-- **MANUAL:** at least two phone screenshots; capture the seven flows listed in `APP_STORE_SUBMISSION.md` using test data.
-- Because the app is responsive and advertises tablet support on iOS, provide 7-inch and 10-inch Android tablet screenshots and perform a large-screen device test rather than opting out accidentally.
+| Asset             | Location                                                         | Dimensions            | Count / purpose              |
+| ----------------- | ---------------------------------------------------------------- | --------------------- | ---------------------------- |
+| Play store icon   | `store-assets/play-store/ko/icon-512.png`                        | 512×512               | Listing icon, PNG under 1 MB |
+| Feature graphic   | `store-assets/play-store/ko/feature-graphic.png`                 | 1024×500              | Opaque 24-bit PNG            |
+| Phone screenshots | `store-assets/play-store/ko/phone/*.jpg`                         | 1080×1920             | Seven portrait images        |
+| 7-inch tablet     | `store-assets/play-store/ko/tablet-7/*.jpg`                      | 1920×1080             | Six landscape images         |
+| 10-inch tablet    | `store-assets/play-store/ko/tablet-10/*.jpg`                     | 1920×1080             | Six landscape images         |
+| Android captures  | `store-assets/captures/android/{phone,tablet-7,tablet-10}/*.jpg` | Device-profile output | Replaceable source UI        |
+
+All generated listing images pass `bun run store-assets:validate`; the feature graphic has no alpha and uses no badges, ranking, pricing, review, or install claims. See [Google's official graphic specification](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en).
+
+The current automated source captures use the real Expo application, seeded server, and fictional Korean data rendered through Chromium because no Android emulator is installed here. They are final-format submission previews, not Play-build emulator captures. **MANUAL final gate:** overwrite the Android capture inputs from the final internal-test build, rerun `bun run store-assets:compose && bun run store-assets:validate`, and perform a phone/7-inch/10-inch visual comparison before upload.
 
 ## Personal-account closed testing gate
 
@@ -89,6 +107,7 @@ See [Google's current production-access requirement](https://support.google.com/
 - [ ] Play App Signing certificate is recorded if App Links are added later. Current app uses only `litechat://` and declares no App Links.
 - [ ] Demo account and reviewer instructions entered under App Access.
 - [ ] Data Safety, content rating, target audience and account-deletion declarations submitted by owner.
-- [ ] Store icon, feature graphic and phone/tablet screenshots uploaded.
+- [x] Store icon, feature graphic and phone/tablet preview sets generated and validated.
+- [ ] Final internal-test-build captures substituted, recomposed and uploaded.
 - [ ] Physical-device smoke test covers install/relaunch, denied permissions, offline/401/429/500 handling, push navigation, block/report and deletion.
 - [ ] Closed-testing applicability confirmed and requirement completed if applicable.

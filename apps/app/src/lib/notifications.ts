@@ -100,7 +100,9 @@ export function useNotificationDeepLink(ready: boolean): void {
   const handledId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!ready) return;
+    // expo-notifications does not implement notification-response APIs on web.
+    // The primary web client has its own service-worker deep-link handling.
+    if (!ready || Platform.OS === 'web') return;
 
     function open(notification: Notifications.Notification) {
       if (notification.request.identifier === handledId.current) return;
@@ -131,6 +133,7 @@ export function useNotificationDeepLink(ready: boolean): void {
  */
 export function useNotificationReceivedAck(): void {
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const logId = notification.request.content.data?.n;
       if (typeof logId !== 'number') return;

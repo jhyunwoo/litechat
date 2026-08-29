@@ -1,22 +1,22 @@
 /**
- * 관리자 대시보드 스타일 — B&W 디자인 시스템의 다크 트랙.
- * (마케팅/웹은 흰 캔버스, 관리 도구는 순수 블랙으로 극성이 뒤집힌다 — PLAN.md 결정)
- * 표면 회색 단계는 DESIGN.md의 near-black tile 값(#272729 계열)을 따른다.
+ * 관리자 대시보드 스타일 — litechat 브랜드의 절제된 다크 트랙.
+ * (마케팅/웹은 크림 캔버스, 관리 도구는 나이트 캔버스로 극성이 뒤집힌다.)
+ * 표면 단계는 DESIGN.md의 나이트/코코아 계열을 따른다.
  */
 @import 'tailwindcss';
 
 @theme {
-  /* 블랙 셸 위에서 "인터랙티브"는 흰색 — bg-primary에는 반드시 text-black을 짝지을 것 */
-  --color-primary: #ffffff;
-  --color-primary-soft: #a1a1a6;
-  --color-shell: #000000;
-  --color-card: #272729;
-  --color-hairline: #3a3a3c;
-  --color-ink: #ffffff;
-  --color-ink-mute: #a1a1a6;
-  --color-series-sessions: #ffffff;
-  --color-series-events: #86868b;
-  /* 상태(에러) 기능색 — 모노크롬 시스템에서 유일한 유채색, 블랙 위 4.5:1 확보 */
+  /* 나이트 셸 위의 인터랙티브 포인트는 피치 */
+  --color-primary: #f4c5b7;
+  --color-primary-soft: #e8785d;
+  --color-shell: #211a19;
+  --color-card: #2b2220;
+  --color-hairline: #4d3b36;
+  --color-ink: #fff8f0;
+  --color-ink-mute: #bba9a1;
+  --color-series-sessions: #f4c5b7;
+  --color-series-events: #b7a6d9;
+  /* 상태(에러) 기능색 — 나이트 위에서 충분한 대비 확보 */
   --color-danger: #ff5f57;
 }
 
@@ -32,8 +32,15 @@ body {
   /* 네이티브 컨트롤(날짜 선택기, select 팝업)도 다크로 렌더링 */
   color-scheme: dark;
   font-family:
-    'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
-    'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+    'SF Pro Display',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Apple SD Gothic Neo',
+    'Pretendard',
+    'Segoe UI',
+    Roboto,
+    'Noto Sans KR',
+    sans-serif;
   /* DESIGN.md 웨이트 사다리 — 본문 400, 300은 드문 에어리 강조 전용 */
   font-weight: 400;
   font-feature-settings: 'ss01';
@@ -52,7 +59,7 @@ body {
 
 /* 지도 위 글래스모피즘 패널/frosted 바 — 지도가 흐릿하게 비쳐 보인다 */
 .glass {
-  background: rgb(0 0 0 / 0.45);
+  background: rgb(33 26 25 / 0.72);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
 }

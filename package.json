@@ -12,6 +12,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
+    "brand:generate": "bun apps/app/scripts/generate-icons.ts",
+    "brand:preview": "bun apps/app/scripts/preview-icons.ts",
+    "store-assets:capture": "bun store-assets/scripts/capture-app-ui.ts",
+    "store-assets:compose": "bun store-assets/scripts/compose-store-assets.ts",
+    "store-assets:validate": "bun store-assets/scripts/validate-store-assets.ts",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,css,html}\""
   },
   "devDependencies": {

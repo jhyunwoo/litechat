@@ -1,76 +1,124 @@
-/**
- * 아이콘/스플래시 미리보기 합성 — 사용자 확인용 한 장짜리 시트
- *
- * 실행: cd apps/app && bun scripts/preview-icons.ts <출력경로.png>
- */
-import sharp from 'sharp';
+/** Build a visual QA contact sheet for every important logo behavior. */
+import sharp, { type OverlayOptions } from 'sharp';
 import path from 'node:path';
 
-const IMAGES = path.resolve(import.meta.dir, '../assets/images');
-const out = process.argv[2] ?? '/tmp/icon-preview.png';
+const REPO = path.resolve(import.meta.dir, '../../..');
+const IMAGES = path.join(REPO, 'apps/app/assets/images');
+const out = path.resolve(
+  process.argv[2] ?? path.join(REPO, 'store-assets/previews/brand-contact-sheet.png'),
+);
+const W = 1800;
+const H = 1180;
+const cream = '#FFF8F0';
+const cocoa = '#3B2823';
+const night = '#211A19';
+const lavender = '#B7A6D9';
 
-/** iOS 아이콘 라운드 마스크 (연속 곡률 근사 — 미리보기 용도) */
-function roundedMask(size: number): Buffer {
-  const r = Math.round(size * 0.2237);
-  return Buffer.from(
-    `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" fill="white"/></svg>`,
-  );
-}
-
-async function iosIcon(file: string, size: number, bg?: string): Promise<Buffer> {
-  let base = sharp(path.join(IMAGES, file)).resize(size, size);
-  if (bg) {
-    // 다크 아이콘 미리보기 — 시스템 다크 배경 위에 얹는다
-    base = sharp({
-      create: { width: size, height: size, channels: 4, background: bg },
-    }).composite([{ input: await base.png().toBuffer() }]);
-  }
-  return sharp(await base.png().toBuffer())
-    .composite([{ input: roundedMask(size), blend: 'dest-in' }])
-    .png()
-    .toBuffer();
-}
-
-/** 스플래시 목업 — 배경색 캔버스 중앙에 로고 (다크는 흰 글리프 전용 파일) */
-async function splashMock(bg: string, w: number, h: number, file = 'splash-icon.png'): Promise<Buffer> {
-  const logo = await sharp(path.join(IMAGES, file)).resize(160, 160).png().toBuffer();
-  return sharp({ create: { width: w, height: h, channels: 4, background: bg } })
-    .composite([{ input: logo, top: Math.round(h / 2 - 80), left: Math.round(w / 2 - 80) }])
-    .png()
-    .toBuffer();
-}
-
-const SHEET_W = 1180;
-const SHEET_H = 620;
-const sheet = sharp({
-  create: { width: SHEET_W, height: SHEET_H, channels: 4, background: '#f6f9fc' },
-});
-
-const [light, dark, tinted, splashLight, splashDark] = await Promise.all([
-  iosIcon('icon.png', 220),
-  iosIcon('icon-dark.png', 220, '#1c1c1e'),
-  iosIcon('icon-tinted.png', 220, '#8e8e93'),
-  splashMock('#ffffff', 280, 560),
-  splashMock('#000000', 280, 560, 'splash-icon-dark.png'),
-]);
-
-const label = (text: string, x: number, y: number) =>
+const text = (value: string, width: number, height = 44, color = cocoa, size = 28) =>
   Buffer.from(
-    `<svg width="240" height="30"><text x="0" y="20" font-family="sans-serif" font-size="20" fill="#64748d">${text}</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><text x="0" y="${Math.round(size * 1.15)}" font-family="Arial,sans-serif" font-size="${size}" font-weight="600" fill="${color}">${value}</text></svg>`,
   );
+
+const mask = (shape: 'circle' | 'squircle', size: number) =>
+  Buffer.from(
+    shape === 'circle'
+      ? `<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`
+      : `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * 0.22)}" fill="white"/></svg>`,
+  );
+
+async function tile(
+  file: string,
+  size: number,
+  background?: string,
+  shape?: 'circle' | 'squircle',
+) {
+  const icon = await sharp(path.join(IMAGES, file)).resize(size, size).png().toBuffer();
+  const composed = await sharp({
+    create: { width: size, height: size, channels: 4, background: background ?? '#ffffff00' },
+  })
+    .composite([{ input: icon }])
+    .png()
+    .toBuffer();
+
+  if (!shape) return composed;
+
+  return sharp(composed)
+    .composite([{ input: mask(shape, size), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
+
+const [iosLight, iosDark, iosTinted, androidCircle, androidSquircle, splashLight, splashDark] =
+  await Promise.all([
+    tile('icon.png', 280, cream, 'squircle'),
+    tile('icon-dark.png', 280, night, 'squircle'),
+    tile('icon-tinted.png', 280, lavender, 'squircle'),
+    tile('icon.png', 280, cream, 'circle'),
+    tile('icon.png', 280, cream, 'squircle'),
+    tile('splash-icon.png', 180, cream),
+    tile('splash-icon-dark.png', 180, night),
+  ]);
+
+const sheet = sharp({ create: { width: W, height: H, channels: 4, background: '#F7F2ED' } });
+const composites: OverlayOptions[] = [
+  { input: text('litechat brand QA', 700, 56, cocoa, 42), left: 60, top: 44 },
+  { input: iosLight, left: 60, top: 140 },
+  { input: text('iOS default', 260), left: 60, top: 435 },
+  { input: iosDark, left: 370, top: 140 },
+  { input: text('iOS dark', 260), left: 370, top: 435 },
+  { input: iosTinted, left: 680, top: 140 },
+  { input: text('iOS tinted approximation', 330), left: 680, top: 435 },
+  { input: androidCircle, left: 1050, top: 140 },
+  { input: text('Android circle', 280), left: 1050, top: 435 },
+  { input: androidSquircle, left: 1360, top: 140 },
+  { input: text('Android squircle', 300), left: 1360, top: 435 },
+  { input: splashLight, left: 60, top: 600 },
+  { input: splashDark, left: 270, top: 600 },
+  { input: text('splash light / dark', 430), left: 60, top: 795 },
+];
+
+let x = 560;
+for (const size of [16, 24, 32, 64, 128]) {
+  const rendered = await tile('icon.png', size, cream, 'squircle');
+  composites.push({ input: rendered, left: x, top: 655 - Math.round(size / 2) });
+  composites.push({ input: text(`${size}px`, 90, 34, cocoa, 20), left: x, top: 760 });
+  x += Math.max(120, size + 46);
+}
+
+for (const [sourceSize, displaySize] of [
+  [512, 150],
+  [1024, 150],
+] as const) {
+  const rendered = await tile('icon.png', displaySize, cream, 'squircle');
+  composites.push({ input: rendered, left: x, top: 580 });
+  composites.push({
+    input: text(`${sourceSize}px source`, 150, 34, cocoa, 20),
+    left: x,
+    top: 760,
+  });
+  x += 190;
+}
+
+for (const [index, bg] of ['#FFFFFF', '#000000', cream, '#E8785D', night].entries()) {
+  const iconFile =
+    index === 1 || index === 3 || index === 4 ? 'splash-icon-dark.png' : 'splash-icon.png';
+  const swatch = await sharp({ create: { width: 250, height: 210, channels: 4, background: bg } })
+    .composite([
+      {
+        input: await sharp(path.join(IMAGES, iconFile)).resize(130, 130).png().toBuffer(),
+        left: 60,
+        top: 40,
+      },
+    ])
+    .png()
+    .toBuffer();
+  composites.push({ input: swatch, left: 60 + index * 335, top: 900 });
+}
 
 await sheet
-  .composite([
-    { input: light, top: 80, left: 40 },
-    { input: label('라이트', 0, 0), top: 320, left: 40 },
-    { input: dark, top: 80, left: 300 },
-    { input: label('다크', 0, 0), top: 320, left: 300 },
-    { input: tinted, top: 80, left: 560 },
-    { input: label('틴트', 0, 0), top: 320, left: 560 },
-    { input: splashLight, top: 30, left: 830 },
-    { input: splashDark, top: 30, left: 830 + 290 - 260 + 260 },
-  ])
-  .png()
+  .composite(composites)
+  .flatten({ background: '#F7F2ED' })
+  .removeAlpha()
+  .png({ compressionLevel: 9 })
   .toFile(out);
-
 console.log(`preview: ${out}`);

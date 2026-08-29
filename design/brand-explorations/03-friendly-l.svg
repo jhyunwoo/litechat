@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Friendly L companion concept</title>
+  <desc id="desc">A soft lowercase L-like character with a conversation notch and a single eye.</desc>
+  <rect width="1024" height="1024" rx="192" fill="#fff8f0"/>
+  <path fill="#e8785d" d="M294 250c0-83 67-150 150-150s150 67 150 150v317c0 57 28 86 84 86 35 0 70-13 105-40 33-25 81-18 106 15 24 33 18 79-14 104-67 53-138 79-213 79-142 0-236-91-236-229V250H294Z"/>
+  <circle cx="454" cy="286" r="36" fill="#fff8f0"/>
+  <path fill="#fff8f0" d="M513 526c57 12 102 47 124 99-62 8-113-9-154-51l30-48Z"/>
+</svg>

@@ -4,6 +4,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router';
 import { useAdminAuth } from './auth';
+import { BrandMark } from './components/BrandMark';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
@@ -77,7 +78,10 @@ function Shell() {
     >
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 py-2.5 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
         <div className="flex items-center justify-between gap-4 lg:contents">
-          <h1 className="display text-base lg:text-lg">litechat 대시보드</h1>
+          <div className="flex items-center gap-2 text-primary">
+            <BrandMark className="h-6 w-6" />
+            <h1 className="display text-base text-ink lg:text-lg">litechat 대시보드</h1>
+          </div>
           <div className="lg:order-last lg:ml-auto">{account}</div>
         </div>
         {nav}

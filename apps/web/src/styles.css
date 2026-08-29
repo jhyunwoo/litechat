@@ -1,8 +1,8 @@
 /**
- * 전역 스타일 — Tailwind CSS 4 + B&W 디자인 토큰 (DESIGN.md 모노크롬 적용)
+ * 전역 스타일 — Tailwind CSS 4 + 따뜻한 litechat 브랜드 토큰
  *
  * 핵심 규칙:
- *  - 인터랙티브(CTA/링크)는 잉크 블랙(#1d1d1f) 하나 — 두 번째 액센트 색은 없다
+ *  - 인터랙티브 텍스트는 대비가 높은 코코아, 브랜드 포인트는 클레이/피치
  *  - 본문 17px / weight 400 / 1.47 / 네거티브 트래킹, 디스플레이는 600 ("Apple tight")
  *  - 버튼은 pill(9999px), 인풋도 pill(검색 인풋 문법), 카드는 12px 라운드
  *  - 그라디언트/그림자 금지 — 표면 색 전환(화이트 ↔ 블랙 타일)이 구획을 만든다
@@ -11,26 +11,26 @@
 @import 'tailwindcss';
 
 @theme {
-  /* B&W 색상 토큰 — primary = 잉크 블랙 (모든 "클릭할 수 있음" 신호) */
-  --color-primary: #1d1d1f;
-  --color-primary-deep: #000000;
-  --color-primary-press: #000000;
-  --color-primary-soft: #7a7a7a;
-  --color-primary-subdued: #d2d2d7;
-  --color-brand-dark: #000000;
-  --color-ink: #1d1d1f;
-  --color-ink-secondary: #333333;
-  --color-ink-mute: #7a7a7a;
-  --color-canvas-soft: #f5f5f7;
-  --color-cream: #fafafc;
-  --color-hairline: #e0e0e0;
-  --color-hairline-input: #d2d2d7;
+  --color-primary: #3b2823;
+  --color-primary-deep: #211a19;
+  --color-primary-press: #211a19;
+  --color-primary-soft: #e8785d;
+  --color-primary-subdued: #f4c5b7;
+  --color-brand-dark: #211a19;
+  --color-brand-peach: #f4c5b7;
+  --color-ink: #3b2823;
+  --color-ink-secondary: #5b433c;
+  --color-ink-mute: #75645e;
+  --color-canvas-soft: #fff8f0;
+  --color-cream: #fff8f0;
+  --color-hairline: #e9dcd3;
+  --color-hairline-input: #d8c7bd;
   /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
   --color-ruby: #d64545;
 
   /* 채팅 말풍선 — 내 것은 잉크 블랙, 상대는 파치먼트 */
-  --color-bubble-me: #1d1d1f;
-  --color-bubble-peer: #f5f5f7;
+  --color-bubble-me: #3b2823;
+  --color-bubble-peer: #fff8f0;
 }
 
 html,
@@ -40,6 +40,7 @@ body,
 }
 
 body {
+  background: #fffdf9;
   /* 시스템 폰트 스택 (SF Pro 대체) — 웹폰트 다운로드 없이 브랜드 리듬 유지 */
   font-family:
     'SF Pro Display',

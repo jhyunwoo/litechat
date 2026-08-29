@@ -31,7 +31,7 @@ self.addEventListener('push', (event) => {
   const showNotification = self.registration.showNotification(payload.title ?? 'litechat', {
     body: payload.body ?? '',
     icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    badge: '/notification-badge.png',
     tag: `conv-${payload.c ?? 0}`, // 같은 대화방 알림은 하나로 합친다
     data: { c: payload.c },
   });

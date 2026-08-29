@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Two voices concept</title>
+  <desc id="desc">Two offset rounded conversation forms leaning toward one another.</desc>
+  <rect width="1024" height="1024" rx="192" fill="#fff8f0"/>
+  <path fill="#b7a6d9" d="M165 309c0-100 81-181 181-181h208c100 0 181 81 181 181v144c0 100-81 181-181 181h-67c-46 48-105 82-177 101 28-34 45-71 49-111-108-18-194-112-194-225V309Z"/>
+  <path fill="#e8785d" d="M406 456c0-93 75-168 168-168h119c93 0 168 75 168 168v125c0 93-75 168-168 168h-28c-39 52-93 94-162 126 20-38 31-77 31-116-74-18-128-84-128-163V456Z"/>
+  <path fill="#fff8f0" d="M486 364c31-47 84-76 144-76h63c93 0 168 75 168 168v26c-72-62-167-98-271-98-36 0-70 5-104 13v-33Z" opacity=".9"/>
+</svg>

@@ -1,9 +1,9 @@
 /**
- * 디자인 토큰 — B&W 디자인 시스템(DESIGN.md 모노크롬)의 네이티브 전사 + 다크 팔레트
+ * 디자인 토큰 — 따뜻한 litechat 브랜드 팔레트의 네이티브 전사 + 다크 팔레트
  *
  * 핵심 규칙:
- *   - 인터랙티브(primary)는 잉크 블랙 하나(다크에선 화이트), 화면당 채워진 버튼 하나
- *   - 본문은 ink(#1d1d1f) — 순수 검정이 아닌 잉크 블랙 (다크에선 파치먼트 화이트)
+ *   - 인터랙티브(primary)는 코코아(다크에선 피치), 화면당 채워진 버튼 하나
+ *   - 본문은 코코아 잉크(#3B2823), 다크 캔버스는 나이트(#211A19)
  *   - 디스플레이 타이포는 600 웨이트 + 음수 자간 ("Apple tight"), 본문은 400
  *   - 버튼은 필(9999) 형태, 카드 라운드는 12. 장식 그라디언트 금지
  *
@@ -13,50 +13,49 @@
 import { Platform } from 'react-native';
 
 export const lightColors = {
-  primary: '#1d1d1f',
-  primaryDeep: '#000000',
-  primaryPress: '#000000',
-  primarySoft: '#7a7a7a',
-  primarySubdued: '#d2d2d7',
-  brandDark: '#000000',
-  ink: '#1d1d1f',
-  inkSecondary: '#333333',
-  inkMute: '#7a7a7a',
-  onPrimary: '#ffffff',
-  canvas: '#ffffff',
-  canvasSoft: '#f5f5f7',
-  canvasCream: '#fafafc',
-  hairline: '#e0e0e0',
-  hairlineInput: '#d2d2d7',
+  primary: '#3B2823',
+  primaryDeep: '#211A19',
+  primaryPress: '#211A19',
+  primarySoft: '#E8785D',
+  primarySubdued: '#F4C5B7',
+  brandDark: '#211A19',
+  ink: '#3B2823',
+  inkSecondary: '#5B433C',
+  inkMute: '#75645E',
+  onPrimary: '#FFF8F0',
+  canvas: '#FFFDF9',
+  canvasSoft: '#FFF8F0',
+  canvasCream: '#F8EEE6',
+  hairline: '#E9DCD3',
+  hairlineInput: '#D8C7BD',
   /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
   ruby: '#d64545',
   /* 모노크롬 전환으로 시각적 용도가 사라진 키 — Palette 타입 보존용 중간 회색 */
-  magenta: '#a1a1a6',
-  shadowBlue: '#000000',
+  magenta: '#E8785D',
+  shadowBlue: '#3B2823',
 } as const;
 
 export type Palette = Record<keyof typeof lightColors, string>;
 
-/** 다크 팔레트 — 순수 블랙 캔버스 위 화이트 인터랙티브 (극성 반전) */
+/** 다크 팔레트 — 나이트 캔버스 위 피치 인터랙티브 */
 export const darkColors: Palette = {
-  primary: '#ffffff',
-  primaryDeep: '#e0e0e0',
-  primaryPress: '#d2d2d7',
-  primarySoft: '#a1a1a6',
-  primarySubdued: '#3a3a3c',
-  brandDark: '#f5f5f7',
-  ink: '#f5f5f7',
-  inkSecondary: '#d2d2d7',
-  inkMute: '#a1a1a6',
-  /* 다크의 primary는 화이트 — 그 위 라벨은 잉크 블랙 */
-  onPrimary: '#1d1d1f',
-  canvas: '#000000',
-  canvasSoft: '#1d1d1f',
-  canvasCream: '#272729',
-  hairline: '#3a3a3c',
-  hairlineInput: '#48484a',
+  primary: '#F4C5B7',
+  primaryDeep: '#FFF8F0',
+  primaryPress: '#E9AE9D',
+  primarySoft: '#E8785D',
+  primarySubdued: '#5B3830',
+  brandDark: '#F4C5B7',
+  ink: '#FFF8F0',
+  inkSecondary: '#E9DCD3',
+  inkMute: '#BBA9A1',
+  onPrimary: '#211A19',
+  canvas: '#211A19',
+  canvasSoft: '#2B2220',
+  canvasCream: '#352925',
+  hairline: '#4D3B36',
+  hairlineInput: '#604B45',
   ruby: '#ff6b6b',
-  magenta: '#6e6e73',
+  magenta: '#E8785D',
   shadowBlue: '#000000',
 };
 
