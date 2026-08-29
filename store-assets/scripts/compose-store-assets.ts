@@ -1,5 +1,5 @@
 /** Compose deterministic App Store and Google Play marketing assets. */
-import { mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -211,8 +211,25 @@ async function composeSet(
   selectedStories = stories,
 ) {
   for (const [index, story] of selectedStories.entries()) {
+    const captureDirectory = path.join(ROOT, 'captures', captures);
+    let input: string | undefined;
+    for (const extension of ['png', 'jpg', 'jpeg']) {
+      const candidate = path.join(captureDirectory, `${story.file}.${extension}`);
+      try {
+        await access(candidate);
+        input = candidate;
+        break;
+      } catch {
+        // Try the next supported native capture format.
+      }
+    }
+    if (!input) {
+      throw new Error(
+        `Capture missing: ${path.join(captureDirectory, `${story.file}.{png,jpg,jpeg}`)}`,
+      );
+    }
     await composeScreenshot(
-      path.join(ROOT, 'captures', captures, `${story.file}.jpg`),
+      input,
       path.join(ROOT, destination, `${story.file}.jpg`),
       story,
       layout,

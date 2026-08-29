@@ -50,14 +50,14 @@ store-assets/
 
 The checked-in captures are the actual Expo application UI and backend behavior rendered in system Chromium. This environment does not contain Xcode/iOS Simulator, `adb`, or an Android emulator, so these images are explicitly **submission previews**, not captures from a signed native build. They are not fabricated screens and contain no placeholder features, but the store owner must replace the capture inputs from the final TestFlight/internal-test binaries before upload.
 
-Keep the same filenames. After replacement, rerun composition and validation; no script change is needed.
+Keep the same filename stems. Native PNG is preferred; JPEG is also accepted, and PNG takes precedence if both exist. After replacement, rerun composition and validation; no script change is needed.
 
 ### iOS replacement
 
 1. Install/run the final build on an iPhone 16 Pro Max simulator profile (1320×2868 output) and an iPad Pro 13-inch profile (2064×2752 output).
 2. Populate the same fictional data on a non-production screenshot account.
 3. Capture each numbered flow with Simulator's screenshot command or `xcrun simctl io booted screenshot`.
-4. Save opaque JPEG/PNG inputs under `captures/ios/iphone` and `captures/ios/ipad` using the existing filenames.
+4. Save opaque PNG or JPEG inputs under `captures/ios/iphone` and `captures/ios/ipad` using the existing filename stems.
 
 Useful discovery command:
 
@@ -69,7 +69,7 @@ xcrun simctl list devices available
 
 1. Install the final internal-test build on phone 1080×1920, 7-inch 1920×1080, and 10-inch 1920×1080 emulator/device profiles.
 2. Populate the same fictional data and capture the numbered flows with the system screenshot action or `adb exec-out screencap -p`.
-3. Save the inputs under the matching `captures/android` directories and filenames.
+3. Save PNG or JPEG inputs under the matching `captures/android` directories using the existing filename stems.
 
 Verify source dimensions before composing:
 
