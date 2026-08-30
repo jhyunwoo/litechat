@@ -61,6 +61,35 @@ describe('ChatRoomView 전송 흐름', () => {
     expect(screen.getByText(/첫 메시지를 보내/)).toBeTruthy();
   });
 
+  test('메시지 목록과 입력창을 키보드 대응 레이어에 배치한다', async () => {
+    await setup([{ id: 1, c: CONV, s: 2, k: 't', x: '최근 메시지', ts: 100 }]);
+
+    expect(screen.getByTestId('chat-messages')).toBeTruthy();
+    expect(screen.getByTestId('chat-composer')).toBeTruthy();
+  });
+
+  test('과거 메시지를 보는 동안 최신 메시지 이동 버튼을 표시한다', async () => {
+    await setup([{ id: 1, c: CONV, s: 2, k: 't', x: '최근 메시지', ts: 100 }]);
+
+    await fireEvent.scroll(screen.getByTestId('chat-messages'), {
+      nativeEvent: {
+        contentOffset: { x: 0, y: 100 },
+        contentSize: { width: 390, height: 1_000 },
+        layoutMeasurement: { width: 390, height: 600 },
+      },
+    });
+    expect(screen.getByLabelText('최신 메시지로 이동')).toBeTruthy();
+
+    await fireEvent.scroll(screen.getByTestId('chat-messages'), {
+      nativeEvent: {
+        contentOffset: { x: 0, y: 400 },
+        contentSize: { width: 390, height: 1_000 },
+        layoutMeasurement: { width: 390, height: 600 },
+      },
+    });
+    expect(screen.queryByLabelText('최신 메시지로 이동')).toBeNull();
+  });
+
   test('입력 → 전송: WS 프레임 발송 + 낙관적 말풍선 표시', async () => {
     await setup([]);
 

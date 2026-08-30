@@ -79,6 +79,33 @@ test('전체 여정: 가입 → 친구 추가/수락 → 실시간 채팅 → �
   await expect(bob.getByText(/원본 저장/)).toBeVisible();
   await bob.keyboard.press('Escape');
 
+  // ── 긴 대화의 과거 페이지네이션: 연속 스크롤에도 중복 없이 한 번씩만 표시
+  const conversationUrl = new URL(alice.url());
+  const conversationId = conversationUrl.pathname.split('/').at(-1)!;
+  const historyResponses = await Promise.all(
+    Array.from({ length: 40 }, (_, index) =>
+      alice.request.post(`${BASE}/api/chat/${conversationId}/messages`, {
+        data: { k: 't', x: `history-${index + 1}` },
+      }),
+    ),
+  );
+  expect(historyResponses.every((response) => response.ok())).toBe(true);
+
+  await alice.reload();
+  const messageList = alice.getByTestId('chat-messages');
+  await messageList.evaluate((element) => {
+    element.scrollTop = 0;
+    for (let index = 0; index < 5; index++) element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(alice.getByRole('button', { name: '최신 메시지로 이동' })).toBeVisible();
+  await expect(messageList.getByText('history-1', { exact: true })).toHaveCount(1);
+  for (let index = 1; index <= 40; index++) {
+    await expect(messageList.getByText(`history-${index}`, { exact: true })).toHaveCount(1);
+  }
+
+  await alice.getByRole('button', { name: '최신 메시지로 이동' }).click();
+  await expect(alice.getByRole('button', { name: '최신 메시지로 이동' })).toBeHidden();
+
   await aliceContext.close();
   await bobContext.close();
 });

@@ -6,7 +6,7 @@
 import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { QueryClient } from '@tanstack/react-query';
 import { socket } from '@/lib/ws';
-import { handleFrame, markRead, sendMessage } from '../data';
+import { handleFrame, loadOlderMessages, markRead, sendMessage } from '../data';
 
 // WS 소켓 모킹 — 각 테스트에서 send 반환값을 조절한다.
 jest.mock('@/lib/ws', () => ({
@@ -16,12 +16,16 @@ jest.mock('@/lib/ws', () => ({
 // REST 클라이언트 모킹 — 폴백 경로 검증용
 const mockPostMessage = jest.fn();
 const mockPostRead = jest.fn();
+const mockGetMessages = jest.fn();
 jest.mock('@/lib/api', () => ({
   api: {
     api: {
       chat: {
         ':id': {
-          messages: { $post: (...args: unknown[]) => mockPostMessage(...args) },
+          messages: {
+            $get: (...args: unknown[]) => mockGetMessages(...args),
+            $post: (...args: unknown[]) => mockPostMessage(...args),
+          },
           read: { $post: (...args: unknown[]) => mockPostRead(...args) },
         },
       },
@@ -167,5 +171,51 @@ describe('markRead', () => {
     markRead(queryClient, CONV, -3);
     expect(socket.send).not.toHaveBeenCalled();
     expect(mockPostRead).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadOlderMessages', () => {
+  test('동시 호출을 한 요청으로 합치고 기존 ID는 다시 넣지 않는다', async () => {
+    const queryClient = makeClient();
+    const current = Array.from({ length: 30 }, (_, index) => ({
+      id: index + 31,
+      c: CONV,
+      s: PEER,
+      k: 't' as const,
+      x: String(index + 31),
+      ts: index + 31,
+    }));
+    queryClient.setQueryData(['messages', CONV], current);
+
+    let resolveRequest!: (value: { ok: boolean; json(): Promise<unknown> }) => void;
+    mockGetMessages.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+
+    const first = loadOlderMessages(queryClient, CONV);
+    const second = loadOlderMessages(queryClient, CONV);
+    expect(mockGetMessages).toHaveBeenCalledTimes(1);
+    expect(mockGetMessages).toHaveBeenCalledWith({
+      param: { id: String(CONV) },
+      query: { before: '31', limit: '30' },
+    });
+
+    resolveRequest({
+      ok: true,
+      json: async () => ({
+        messages: [
+          { id: 29, c: CONV, s: PEER, k: 't', x: '29', ts: 29 },
+          { id: 30, c: CONV, s: PEER, k: 't', x: '30', ts: 30 },
+          { id: 31, c: CONV, s: PEER, k: 't', x: '중복', ts: 31 },
+        ],
+      }),
+    });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    const ids = messagesIn(queryClient).map((message) => message.id);
+    expect(ids).toEqual([29, 30, ...current.map((message) => message.id)]);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

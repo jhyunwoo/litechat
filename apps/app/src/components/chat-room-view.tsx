@@ -13,13 +13,13 @@ import type { FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, type LayoutChangeEvent, Pressable, Text, View } from 'react-native';
 import {
-  KeyboardAvoidingView,
+  KeyboardStickyView,
   useKeyboardHandler,
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
-import Animated, { runOnJS, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
 import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
@@ -36,6 +36,10 @@ interface Props {
 }
 
 export function ChatRoomView({ convId, meId }: Props) {
+  return <ChatRoomViewContent key={convId} convId={convId} meId={meId} />;
+}
+
+function ChatRoomViewContent({ convId, meId }: Props) {
   const styles = useStyles();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -46,8 +50,11 @@ export function ChatRoomView({ convId, meId }: Props) {
 
   const [viewing, setViewing] = useState<WireMessage | null>(null);
   const [error, setError] = useState('');
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
+  const [composerLayoutHeight, setComposerLayoutHeight] = useState(0);
   const focused = useRef(false);
   const listRef = useRef<FlashListRef<Row>>(null);
+  const composerHeight = useSharedValue(0);
 
   // 키보드가 열리면 최신 메시지가 컴포저 위에 보이도록 바닥으로 스크롤한다.
   const scrollToEnd = useCallback(() => {
@@ -64,11 +71,19 @@ export function ChatRoomView({ convId, meId }: Props) {
   );
 
   // 컴포저 하단 여백: 키보드가 닫혀 있을 때만 홈 인디케이터 인셋을 채운다.
-  // (키보드가 열리면 KeyboardAvoidingView가 그 영역을 이미 덮으므로 0으로 접는다)
+  // 컴포저 전체 높이는 메시지 리스트의 동적 하단 inset으로도 전달한다.
   const { progress } = useReanimatedKeyboardAnimation();
   const composerPad = useAnimatedStyle(() => ({
     paddingBottom: insets.bottom * (1 - progress.value),
   }));
+  const onComposerLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      composerHeight.set(height);
+      setComposerLayoutHeight(height);
+    },
+    [composerHeight],
+  );
 
   // 화면이 보이는 동안: 이 방의 푸시 알림 억제 + 읽음 처리 활성화
   useFocusEffect(
@@ -94,6 +109,7 @@ export function ChatRoomView({ convId, meId }: Props) {
     (kind: MessageKind, content: string) => sendMessage(queryClient, meId, convId, kind, content),
     [queryClient, meId, convId],
   );
+  const onLoadError = useCallback((cause: unknown) => setError(errorMessage(cause)), []);
 
   const reportMessage = useCallback(
     (message: WireMessage) => {
@@ -141,10 +157,11 @@ export function ChatRoomView({ convId, meId }: Props) {
   );
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.list}>
         {messages && (
           <MessageList
+            key={convId}
             convId={convId}
             meId={meId}
             messages={messages}
@@ -152,26 +169,53 @@ export function ChatRoomView({ convId, meId }: Props) {
             onImagePress={setViewing}
             onMessageLongPress={reportMessage}
             listRef={listRef}
+            composerHeight={composerHeight}
+            onAwayFromBottomChange={setAwayFromBottom}
+            onLoadError={onLoadError}
           />
+        )}
+
+        {awayFromBottom && (
+          <Pressable
+            onPress={scrollToEnd}
+            accessibilityRole="button"
+            accessibilityLabel="최신 메시지로 이동"
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.latestButton,
+              { bottom: composerLayoutHeight + spacing.md },
+              pressed && styles.latestButtonPressed,
+            ]}
+          >
+            <Text style={styles.latestButtonText} aria-hidden>
+              ↓
+            </Text>
+          </Pressable>
         )}
       </View>
 
-      {error !== '' && (
-        <Pressable onPress={() => setError('')}>
-          <Text style={styles.error}>{error}</Text>
-        </Pressable>
-      )}
+      <KeyboardStickyView
+        style={styles.composer}
+        testID="chat-composer"
+        onLayout={onComposerLayout}
+      >
+        {error !== '' && (
+          <Pressable onPress={() => setError('')}>
+            <Text style={styles.error}>{error}</Text>
+          </Pressable>
+        )}
 
-      <Animated.View style={composerPad}>
-        <Composer onSend={onSend} onError={(err) => setError(errorMessage(err))} />
-      </Animated.View>
+        <Animated.View style={composerPad}>
+          <Composer onSend={onSend} onError={(err) => setError(errorMessage(err))} />
+        </Animated.View>
+      </KeyboardStickyView>
 
       <ImageViewer message={viewing} onClose={() => setViewing(null)} />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, shadowPanel }) => ({
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -179,6 +223,36 @@ const useStyles = makeStyles(({ colors }) => ({
   list: {
     flex: 1,
     minHeight: 0,
+  },
+  composer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
+  },
+  latestButton: {
+    position: 'absolute',
+    right: spacing.lg,
+    zIndex: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.canvas,
+    ...shadowPanel,
+  },
+  latestButtonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
+  },
+  latestButtonText: {
+    fontSize: 21,
+    lineHeight: 24,
+    color: colors.ink,
   },
   error: {
     paddingHorizontal: spacing.lg,

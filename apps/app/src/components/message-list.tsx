@@ -11,7 +11,15 @@ import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewProps,
+  Text,
+  View,
+} from 'react-native';
+import { KeyboardChatScrollView } from 'react-native-keyboard-controller';
+import type { SharedValue } from 'react-native-reanimated';
 import { loadOlderMessages } from '@/data/data';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
@@ -36,6 +44,12 @@ interface Props {
   onMessageLongPress?: (message: WireMessage) => void;
   /** 키보드가 열릴 때 부모가 바닥으로 스크롤하기 위한 ref */
   listRef?: React.Ref<FlashListRef<Row>>;
+  /** 입력창이 메시지를 가리지 않도록 확보할 동적 하단 높이 */
+  composerHeight: SharedValue<number>;
+  /** 최신 메시지 영역에서 벗어났는지 부모에 알린다. */
+  onAwayFromBottomChange?: (away: boolean) => void;
+  /** 과거 메시지 로드 실패를 채팅방 오류 UI로 전달한다. */
+  onLoadError?: (cause: unknown) => void;
 }
 
 export function MessageList({
@@ -46,11 +60,15 @@ export function MessageList({
   onImagePress,
   onMessageLongPress,
   listRef,
+  composerHeight,
+  onAwayFromBottomChange,
+  onLoadError,
 }: Props) {
   const styles = useStyles();
   const queryClient = useQueryClient();
-  const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlder = useRef(false);
   const exhausted = useRef(false);
+  const awayFromBottom = useRef(false);
   // 첫 렌더에 존재한 메시지 id 집합 — 이후 도착분에만 등장 애니메이션을 준다.
   const [initialIds] = useState(() => new Set(messages.map((m) => m.id)));
 
@@ -76,15 +94,28 @@ export function MessageList({
 
   /** 위(과거) 끝에 도달 — 이전 페이지 로드 */
   const onStartReached = useCallback(async () => {
-    if (loadingOlder || exhausted.current || messages.length < 30) return;
-    setLoadingOlder(true);
+    if (loadingOlder.current || exhausted.current || messages.length < 30) return;
+    loadingOlder.current = true;
     try {
       const loaded = await loadOlderMessages(queryClient, convId);
       if (!loaded) exhausted.current = true;
+    } catch (cause) {
+      onLoadError?.(cause);
     } finally {
-      setLoadingOlder(false);
+      loadingOlder.current = false;
     }
-  }, [loadingOlder, messages.length, queryClient, convId]);
+  }, [messages.length, queryClient, convId, onLoadError]);
+
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const next = contentSize.height - layoutMeasurement.height - contentOffset.y >= 80;
+      if (awayFromBottom.current === next) return;
+      awayFromBottom.current = next;
+      onAwayFromBottomChange?.(next);
+    },
+    [onAwayFromBottomChange],
+  );
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Row>) => (
@@ -100,6 +131,21 @@ export function MessageList({
       />
     ),
     [onImagePress, onMessageLongPress],
+  );
+
+  // FlashList의 가상화를 유지하면서 키보드 높이와 스크롤 inset을 UI 스레드에서 동기화한다.
+  const renderScrollComponent = useCallback(
+    (props: ScrollViewProps) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        extraContentPadding={composerHeight}
+        keyboardLiftBehavior="always"
+        testID="chat-messages"
+      />
+    ),
+    [composerHeight],
   );
 
   if (messages.length === 0) {
@@ -123,9 +169,12 @@ export function MessageList({
       }}
       onStartReached={() => void onStartReached()}
       onStartReachedThreshold={0.3}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
+      renderScrollComponent={renderScrollComponent}
     />
   );
 }

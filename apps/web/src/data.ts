@@ -9,12 +9,7 @@
  * 실시간 프레임은 RealtimeSync(useRealtimeSync)가 받아 캐시를 직접 갱신한다.
  * → 추가 REST 호출 없이 화면이 즉시 반영된다 (트래픽 절약 + 저지연).
  */
-import type {
-  ConversationSummary,
-  MessageKind,
-  ServerFrame,
-  WireMessage,
-} from '@litechat/types';
+import type { ConversationSummary, MessageKind, ServerFrame, WireMessage } from '@litechat/types';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api, unwrap } from './api';
@@ -23,6 +18,9 @@ import { socket } from './ws';
 
 /** 페이지당 메시지 수 */
 const PAGE_SIZE = 30;
+
+/** QueryClient/대화별 과거 페이지 요청 — 같은 커서의 중복 요청을 하나로 합친다. */
+const olderMessageRequests = new WeakMap<QueryClient, Map<number, Promise<boolean>>>();
 
 /* ------------------------------------------------------------------ */
 /* 조회 훅                                                              */
@@ -260,17 +258,48 @@ export async function loadOlderMessages(
   queryClient: QueryClient,
   convId: number,
 ): Promise<boolean> {
-  const current = queryClient.getQueryData<WireMessage[]>(['messages', convId]);
-  const oldest = current?.find((m) => m.id > 0);
-  if (!oldest) return false;
-  const res = await api.api.chat[':id'].messages.$get({
-    param: { id: String(convId) },
-    query: { before: String(oldest.id), limit: String(PAGE_SIZE) },
-  });
-  const { messages } = await unwrap<{ messages: WireMessage[] }>(res);
-  if (messages.length === 0) return false;
-  queryClient.setQueryData<WireMessage[]>(['messages', convId], (old) =>
-    old ? [...messages, ...old] : messages,
-  );
-  return true;
+  let requests = olderMessageRequests.get(queryClient);
+  if (!requests) {
+    requests = new Map();
+    olderMessageRequests.set(queryClient, requests);
+  }
+
+  const pending = requests.get(convId);
+  if (pending) return pending;
+
+  const request = (async () => {
+    try {
+      const current = queryClient.getQueryData<WireMessage[]>(['messages', convId]);
+      const oldest = current?.find((m) => m.id > 0);
+      if (!oldest) return false;
+      const res = await api.api.chat[':id'].messages.$get({
+        param: { id: String(convId) },
+        query: { before: String(oldest.id), limit: String(PAGE_SIZE) },
+      });
+      const { messages } = await unwrap<{ messages: WireMessage[] }>(res);
+      if (messages.length === 0) return false;
+
+      let added = false;
+      queryClient.setQueryData<WireMessage[]>(['messages', convId], (old) => {
+        if (!old) {
+          added = messages.length > 0;
+          return messages;
+        }
+        const seen = new Set(old.map((message) => message.id));
+        const uniqueOlder = messages.filter((message) => {
+          if (seen.has(message.id)) return false;
+          seen.add(message.id);
+          return true;
+        });
+        added = uniqueOlder.length > 0;
+        return added ? [...uniqueOlder, ...old] : old;
+      });
+      return added;
+    } finally {
+      requests.delete(convId);
+    }
+  })();
+
+  requests.set(convId, request);
+  return request;
 }

@@ -12,13 +12,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } fro
 import { useNavigate, useParams } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
 import { useAuth } from '../auth';
-import {
-  loadOlderMessages,
-  markRead,
-  sendMessage,
-  useConversations,
-  useMessages,
-} from '../data';
+import { loadOlderMessages, markRead, sendMessage, useConversations, useMessages } from '../data';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ImageViewer } from '../components/ImageViewer';
 import { WebcamCapture } from '../components/WebcamCapture';
@@ -27,9 +21,13 @@ import { Icon } from '../components/Icon';
 import { isEmojiOnly } from '../lib/format';
 
 export default function ChatRoom() {
-  // 실시간 동기화는 Shell 한 곳에서만 구독한다(중복 구독 시 메시지·안읽음이 2배가 됨).
   const { id } = useParams();
   const convId = Number(id);
+  return <ChatRoomContent key={convId} convId={convId} />;
+}
+
+function ChatRoomContent({ convId }: { convId: number }) {
+  // 실시간 동기화는 Shell 한 곳에서만 구독한다(중복 구독 시 메시지·안읽음이 2배가 됨).
   const { me } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -50,6 +48,9 @@ export default function ChatRoom() {
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const stickToBottom = useRef(true);
+  const loadingOlder = useRef(false);
+  const olderMessagesExhausted = useRef(false);
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
 
   // 새 메시지가 오면 (하단에 붙어 있을 때) 자동 스크롤
   const lastId = messages?.at(-1)?.id;
@@ -79,17 +80,40 @@ export default function ChatRoom() {
   async function onScroll() {
     const el = listRef.current;
     if (!el) return;
-    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (el.scrollTop < 60 && messages && messages.length >= 30) {
+    const isAwayFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight >= 80;
+    stickToBottom.current = !isAwayFromBottom;
+    setAwayFromBottom(isAwayFromBottom);
+    if (
+      el.scrollTop < 60 &&
+      messages &&
+      messages.length >= 30 &&
+      !loadingOlder.current &&
+      !olderMessagesExhausted.current
+    ) {
+      loadingOlder.current = true;
       const prevHeight = el.scrollHeight;
-      const loaded = await loadOlderMessages(queryClient, convId);
-      if (loaded) {
-        // 스크롤 위치를 유지한다 (내용이 위로 늘어난 만큼 보정).
-        requestAnimationFrame(() => {
-          el.scrollTop += el.scrollHeight - prevHeight;
-        });
+      try {
+        const loaded = await loadOlderMessages(queryClient, convId);
+        if (loaded) {
+          // 스크롤 위치를 유지한다 (내용이 위로 늘어난 만큼 보정).
+          requestAnimationFrame(() => {
+            el.scrollTop += el.scrollHeight - prevHeight;
+          });
+        } else {
+          olderMessagesExhausted.current = true;
+        }
+      } catch (cause) {
+        setError(errorMessage(cause));
+      } finally {
+        loadingOlder.current = false;
       }
     }
+  }
+
+  function scrollToLatest() {
+    stickToBottom.current = true;
+    const el = listRef.current;
+    el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }
 
   /** 텍스트/이모지 전송 */
@@ -159,31 +183,50 @@ export default function ChatRoom() {
       </header>
 
       {/* 메시지 목록 */}
-      <div ref={listRef} onScroll={() => void onScroll()} className="scroll-thin min-h-0 flex-1 overflow-y-auto py-3">
-        <div className="mx-auto w-full max-w-3xl">
-        {messages?.map((message, index) => {
-          const mine = message.s === me?.id;
-          const next = messages[index + 1];
-          // 같은 사람의 연속 메시지 묶음에서 마지막인지 (꼬리와 시간 표시는 마지막에만)
-          const isTail = !next || next.s !== message.s || next.ts - message.ts > 60;
-          return (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              mine={mine}
-              pending={message.id < 0}
-              read={mine && (conversation?.peerRead ?? 0) >= message.id && message.id > 0}
-              isTail={isTail}
-              onImageClick={setViewing}
-            />
-          );
-        })}
-        {messages?.length === 0 && (
-          <p className="py-16 text-center text-sm text-ink-mute">
-            첫 메시지를 보내 대화를 시작해 보세요 👋
-          </p>
-        )}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          data-testid="chat-messages"
+          onScroll={() => void onScroll()}
+          className="scroll-thin h-full overflow-y-auto py-3"
+        >
+          <div className="mx-auto w-full max-w-3xl">
+            {messages?.map((message, index) => {
+              const mine = message.s === me?.id;
+              const next = messages[index + 1];
+              // 같은 사람의 연속 메시지 묶음에서 마지막인지 (꼬리와 시간 표시는 마지막에만)
+              const isTail = !next || next.s !== message.s || next.ts - message.ts > 60;
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  mine={mine}
+                  pending={message.id < 0}
+                  read={mine && (conversation?.peerRead ?? 0) >= message.id && message.id > 0}
+                  isTail={isTail}
+                  onImageClick={setViewing}
+                />
+              );
+            })}
+            {messages?.length === 0 && (
+              <p className="py-16 text-center text-sm text-ink-mute">
+                첫 메시지를 보내 대화를 시작해 보세요 👋
+              </p>
+            )}
+          </div>
         </div>
+
+        {awayFromBottom && (
+          <button
+            type="button"
+            onClick={scrollToLatest}
+            aria-label="최신 메시지로 이동"
+            title="최신 메시지로 이동"
+            className="absolute right-4 bottom-4 z-10 flex size-11 items-center justify-center rounded-full border border-hairline bg-white text-xl text-ink shadow-lg transition hover:bg-canvas-soft active:scale-95"
+          >
+            <span aria-hidden>↓</span>
+          </button>
+        )}
       </div>
 
       {error && (
