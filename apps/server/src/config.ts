@@ -21,6 +21,8 @@ export interface AppConfig {
   webHost: string;
   /** Lite 사이트 호스트명 (Host 헤더 라우팅용) */
   liteHost: string;
+  /** Lite 사이트로 함께 라우팅할 추가 호스트명 */
+  liteHostAliases: readonly string[];
   /** Full Chat 정적 파일 디렉터리 (빌드 산출물) */
   webStaticDir: string;
   /** Lite 정적 파일 디렉터리 (빌드 산출물) */
@@ -76,6 +78,10 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     sessionTtlSeconds: Number(env.SESSION_TTL_SECONDS ?? 60 * 60 * 24 * 30),
     webHost: env.WEB_HOST ?? 'chat.moveto.kr',
     liteHost: env.LITE_HOST ?? 'litechat.moveto.kr',
+    liteHostAliases: (env.LITE_HOST_ALIASES ?? 'lc.moveto.kr')
+      .split(',')
+      .map((host) => host.trim())
+      .filter(Boolean),
     webStaticDir: env.WEB_STATIC_DIR ?? '../web/dist',
     liteStaticDir: env.LITE_STATIC_DIR ?? '../lite/dist',
     vapidPublicKey: env.VAPID_PUBLIC_KEY ?? '',

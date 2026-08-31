@@ -100,19 +100,25 @@ VAPID_PUBLIC_KEY=<generate-vapid-keys 출력값>
 VAPID_PRIVATE_KEY=<generate-vapid-keys 출력값>
 ```
 
-`COOKIE_DOMAIN`, `WEB_HOST`, `LITE_HOST` 등 나머지는 `docker-compose.yml`에 기본값이 박혀 있으므로,
+`COOKIE_DOMAIN`, `WEB_HOST`, `LITE_HOST`, `LITE_HOST_ALIASES` 등 나머지는 `docker-compose.yml`에 기본값이 박혀 있으므로,
 도메인을 바꾸지 않는 한 추가 설정이 필요 없다. 다른 도메인을 쓴다면 compose 파일의 값을 직접 수정한다.
 
 ### 4. 도메인 연결
 
-Dokploy의 **Domains** 탭에서 `app` 서비스(포트 `3000`)에 두 도메인을 모두 연결한다.
+Dokploy의 **Domains** 탭에서 `app` 서비스(포트 `3000`)에 기본 도메인을 연결한다.
 
 | 도메인 | 용도 |
 | --- | --- |
 | `chat.moveto.kr` | Full Chat |
 | `litechat.moveto.kr` | Lite Chat |
+| `lc.moveto.kr` | Lite Chat 별칭 (`docker-compose.yml`의 Traefik 라벨로 연결) |
+| `dash.moveto.kr` | 관리자 Dashboard |
 
-Dokploy가 내장 Traefik으로 두 도메인 모두 `app:3000`으로 라우팅하고, Let's Encrypt 인증서를 자동 발급한다.
+`lc.moveto.kr`은 Cloudflare DNS에 `CNAME lc → litechat.moveto.kr`(DNS only) 레코드를 추가한다. Compose 서비스를
+전체 재배포하면 Dokploy의 내장 Traefik이 라벨을 읽어 이 별칭을 `app:3000`으로 라우팅하고 Let's Encrypt 인증서를 발급한다.
+Docker Compose 도메인 라벨 변경은 컨테이너 재시작만으로 반영되지 않으므로 반드시 전체 재배포해야 한다.
+
+Dokploy가 모든 도메인을 `app:3000`으로 라우팅하면,
 서버가 `Host` 헤더를 보고 어떤 프론트엔드를 서빙할지 스스로 분기하므로 별도의 경로 라우팅 설정은 필요 없다.
 
 ### 5. 볼륨 확인
@@ -152,6 +158,7 @@ curl http://localhost:3000/api/health
 | `COOKIE_DOMAIN` | (없음) | 세션 쿠키 Domain. 배포 시 `.moveto.kr` |
 | `SESSION_TTL_SECONDS` | `2592000` (30일) | 세션 만료 시간(슬라이딩) |
 | `WEB_HOST` / `LITE_HOST` | `chat.moveto.kr` / `litechat.moveto.kr` | Host 라우팅 기준 |
+| `LITE_HOST_ALIASES` | `lc.moveto.kr` | 쉼표로 구분한 Lite Chat 추가 호스트명 |
 | `WEB_STATIC_DIR` / `LITE_STATIC_DIR` | `../web/dist` / `../lite/dist` | 정적 번들 경로 |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | (없음) | 비우면 푸시 기능 비활성화 |
 | `VAPID_SUBJECT` | `mailto:admin@moveto.kr` | VAPID 연락처 |

@@ -1,9 +1,10 @@
 /**
  * 정적 파일 서빙 + Host 헤더 기반 프론트엔드 라우팅
  *
- * 하나의 컨테이너가 세 도메인을 모두 서빙한다:
+ * 하나의 컨테이너가 네 도메인을 모두 서빙한다:
  *   - chat.moveto.kr     → apps/web       빌드 산출물 (Full Chat)
  *   - litechat.moveto.kr → apps/lite      빌드 산출물 (Lite Chat)
+ *   - lc.moveto.kr       → apps/lite      빌드 산출물 (Lite Chat 별칭)
  *   - dash.moveto.kr     → apps/dashboard 빌드 산출물 (관리자 대시보드)
  *
  * 전송량 최소화를 위한 규칙:
@@ -14,6 +15,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { join, extname } from 'node:path';
 import type { AppEnv } from './app';
+import type { AppConfig } from './config';
 import type { AppDeps } from './deps';
 import { ensureVisitorCookies } from './modules/analytics/cookies';
 import type { AnalyticsService } from './modules/analytics/service';
@@ -33,6 +35,17 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
 };
 
+/** 포트와 대소문자 차이를 무시하고 Lite 기본/별칭 호스트인지 판별한다. */
+export function isLiteFrontendHost(
+  hostHeader: string | undefined,
+  config: Pick<AppConfig, 'liteHost' | 'liteHostAliases'>,
+): boolean {
+  const host = (hostHeader ?? '').split(':')[0]?.trim().toLowerCase() ?? '';
+  return [config.liteHost, ...config.liteHostAliases].some(
+    (candidate) => candidate.toLowerCase() === host,
+  );
+}
+
 /**
  * 요청 Host에 따라 web/lite/dashboard 정적 디렉터리에서 파일을 서빙하는 미들웨어를 만든다.
  * API/WS/이미지 경로 뒤에 마지막 핸들러로 등록해야 한다.
@@ -49,8 +62,9 @@ export function serveFrontend(
   return async (c) => {
     // Host 헤더에서 포트를 제거해 사이트를 구분한다. 그 외(chat 도메인, localhost 등)는
     // 기본적으로 Full Chat을 서빙한다.
-    const host = (c.req.header('host') ?? '').split(':')[0] ?? '';
-    const isLite = host === config.liteHost;
+    const hostHeader = c.req.header('host');
+    const host = (hostHeader ?? '').split(':')[0]?.trim().toLowerCase() ?? '';
+    const isLite = isLiteFrontendHost(hostHeader, config);
     const root = isLite
       ? config.liteStaticDir
       : host === config.dashboardHost

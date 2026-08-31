@@ -1,9 +1,9 @@
 # litechat 배포 구성 (Dokploy)
 #
-# Traefik(Dokploy 내장)이 chat.moveto.kr / litechat.moveto.kr / dash.moveto.kr
-# 세 도메인을 모두 app:3000 으로 라우팅하면, 서버가 Host 헤더로 사이트를 구분한다.
-# dash.moveto.kr의 DNS/Traefik 라우팅 등록은 기존 두 서브도메인과 동일한 방식으로
-# Dokploy에서 수동으로 추가해야 한다(이 파일만으로는 라우팅이 생기지 않는다).
+# Traefik(Dokploy 내장)이 chat.moveto.kr / litechat.moveto.kr / lc.moveto.kr /
+# dash.moveto.kr 네 도메인을 모두 app:3000 으로 라우팅하면, 서버가 Host 헤더로 사이트를 구분한다.
+# dash.moveto.kr의 DNS/Traefik 라우팅 등록은 기존 도메인과 동일한 방식으로
+# Dokploy에서 수동으로 추가해야 한다. lc.moveto.kr 별칭은 아래 Traefik 라벨이 담당한다.
 #
 # GeoLite2-City.mmdb(GeoIP 조회용, MaxMind 라이선스 바이너리)는 git에 커밋하지 않고
 # litechat-data 볼륨(/app/data/GeoLite2-City.mmdb)에 운영자가 직접 배치해야 한다.
@@ -24,9 +24,10 @@ services:
       - '3000'
     environment:
       REDIS_URL: redis://redis:6379
-      COOKIE_DOMAIN: .moveto.kr        # 두 서브도메인이 세션 쿠키를 공유
+      COOKIE_DOMAIN: .moveto.kr        # moveto.kr 서브도메인들이 세션 쿠키를 공유
       WEB_HOST: chat.moveto.kr
       LITE_HOST: litechat.moveto.kr
+      LITE_HOST_ALIASES: ${LITE_HOST_ALIASES:-lc.moveto.kr}
       DASHBOARD_HOST: ${DASHBOARD_HOST:-dash.moveto.kr}
       # Web Push (한 번 생성해 Dokploy 환경 변수로 주입):
       #   bunx web-push generate-vapid-keys
@@ -49,6 +50,15 @@ services:
     networks:
       - dokploy-network
       - default
+    # lc.moveto.kr 별칭은 Compose 재배포만으로 Traefik 라우팅과 TLS 인증서가 구성된다.
+    # 기존 도메인은 Dokploy Domains 탭에서 관리 중이므로 이 별칭만 별도 라우터로 선언한다.
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.litechat-lc-moveto.rule=Host(`lc.moveto.kr`)'
+      - 'traefik.http.routers.litechat-lc-moveto.entrypoints=websecure'
+      - 'traefik.http.routers.litechat-lc-moveto.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.litechat-lc-moveto.service=litechat-lc-moveto'
+      - 'traefik.http.services.litechat-lc-moveto.loadbalancer.server.port=3000'
     depends_on:
       redis:
         condition: service_healthy
@@ -100,7 +110,7 @@ volumes:
 
 networks:
   # Dokploy가 Traefik과 함께 사용하는 외부 네트워크. 이 네트워크에 연결돼야
-  # chat.moveto.kr / litechat.moveto.kr 로 라우팅된다.
+  # chat.moveto.kr / litechat.moveto.kr / lc.moveto.kr 로 라우팅된다.
   dokploy-network:
     external: true
   default: {}
