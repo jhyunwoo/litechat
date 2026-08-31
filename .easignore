@@ -56,3 +56,6 @@ yarn-error.log*
 e2e/.data/
 data/GeoLite2-*
 apps/server/data/GeoLite2-*
+
+# Store listing source files and generated screenshots are not native build inputs.
+store-assets/
