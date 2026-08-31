@@ -1,9 +1,9 @@
 /**
- * 디자인 토큰 — 따뜻한 litechat 브랜드 팔레트의 네이티브 전사 + 다크 팔레트
+ * 디자인 토큰 — DESIGN.md의 Action Blue + 중립 표면을 네이티브로 전사한다.
  *
  * 핵심 규칙:
- *   - 인터랙티브(primary)는 코코아(다크에선 피치), 화면당 채워진 버튼 하나
- *   - 본문은 코코아 잉크(#3B2823), 다크 캔버스는 나이트(#211A19)
+ *   - 모든 인터랙션은 Action Blue 하나로 통일하고, 다크 위 링크만 Sky Blue를 쓴다.
+ *   - 라이트 본문은 Near-Black Ink, 다크 캔버스는 Near-Black Tile을 쓴다.
  *   - 디스플레이 타이포는 600 웨이트 + 음수 자간 ("Apple tight"), 본문은 400
  *   - 버튼은 필(9999) 형태, 카드 라운드는 12. 장식 그라디언트 금지
  *
@@ -13,49 +13,55 @@
 import { Platform } from 'react-native';
 
 export const lightColors = {
-  primary: '#3B2823',
-  primaryDeep: '#211A19',
-  primaryPress: '#211A19',
-  primarySoft: '#E8785D',
-  primarySubdued: '#F4C5B7',
-  brandDark: '#211A19',
-  ink: '#3B2823',
-  inkSecondary: '#5B433C',
-  inkMute: '#75645E',
-  onPrimary: '#FFF8F0',
-  canvas: '#FFFDF9',
-  canvasSoft: '#FFF8F0',
-  canvasCream: '#F8EEE6',
-  hairline: '#E9DCD3',
-  hairlineInput: '#D8C7BD',
+  primary: '#0066CC',
+  primaryFocus: '#0071E3',
+  primaryOnDark: '#2997FF',
+  link: '#0066CC',
+  primaryDeep: '#1D1D1F',
+  primaryPress: '#0066CC',
+  primarySoft: '#0066CC',
+  primarySubdued: '#D2D2D7',
+  brandDark: '#272729',
+  ink: '#1D1D1F',
+  inkSecondary: '#333333',
+  inkMute: '#7A7A7A',
+  onPrimary: '#FFFFFF',
+  canvas: '#FFFFFF',
+  canvasSoft: '#F5F5F7',
+  canvasCream: '#FAFAFC',
+  hairline: '#E0E0E0',
+  hairlineInput: '#E0E0E0',
   /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
   ruby: '#d64545',
-  /* 모노크롬 전환으로 시각적 용도가 사라진 키 — Palette 타입 보존용 중간 회색 */
-  magenta: '#E8785D',
-  shadowBlue: '#3B2823',
+  /* 이전 API 호환용 키 — 두 번째 브랜드 액센트를 만들지 않고 primary와 동일하게 둔다. */
+  magenta: '#0066CC',
+  shadowBlue: '#000000',
 } as const;
 
 export type Palette = Record<keyof typeof lightColors, string>;
 
-/** 다크 팔레트 — 나이트 캔버스 위 피치 인터랙티브 */
+/** 다크 팔레트 — Near-Black Tile 위 Action/Sky Blue 인터랙티브 */
 export const darkColors: Palette = {
-  primary: '#F4C5B7',
-  primaryDeep: '#FFF8F0',
-  primaryPress: '#E9AE9D',
-  primarySoft: '#E8785D',
-  primarySubdued: '#5B3830',
-  brandDark: '#F4C5B7',
-  ink: '#FFF8F0',
-  inkSecondary: '#E9DCD3',
-  inkMute: '#BBA9A1',
-  onPrimary: '#211A19',
-  canvas: '#211A19',
-  canvasSoft: '#2B2220',
-  canvasCream: '#352925',
-  hairline: '#4D3B36',
-  hairlineInput: '#604B45',
+  primary: '#0066CC',
+  primaryFocus: '#0071E3',
+  primaryOnDark: '#2997FF',
+  link: '#2997FF',
+  primaryDeep: '#FFFFFF',
+  primaryPress: '#0066CC',
+  primarySoft: '#2997FF',
+  primarySubdued: '#333333',
+  brandDark: '#2997FF',
+  ink: '#FFFFFF',
+  inkSecondary: '#CCCCCC',
+  inkMute: '#CCCCCC',
+  onPrimary: '#FFFFFF',
+  canvas: '#272729',
+  canvasSoft: '#2A2A2C',
+  canvasCream: '#252527',
+  hairline: '#333333',
+  hairlineInput: '#7A7A7A',
   ruby: '#ff6b6b',
-  magenta: '#E8785D',
+  magenta: '#2997FF',
   shadowBlue: '#000000',
 };
 
@@ -147,7 +153,7 @@ export function makeType(c: Palette) {
 
 export type TypeScale = ReturnType<typeof makeType>;
 
-/** 그림자 — 모노크롬: 검정 저불투명 lift (양 스킴 공통, 팔레트의 shadowBlue를 따른다) */
+/** 그림자 — 검정 저불투명 lift (양 스킴 공통, 팔레트의 shadowBlue를 따른다) */
 export function makeShadows(c: Palette) {
   return {
     /** 카드 lift 그림자 (Level 1) */

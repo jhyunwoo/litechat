@@ -271,7 +271,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  detailMenuText: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
+  detailMenuText: { color: colors.link, fontSize: 18, letterSpacing: 1 },
   detailEmpty: {
     flex: 1,
     alignItems: 'center',

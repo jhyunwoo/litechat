@@ -289,7 +289,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
             onKeyDown={onKeyDown}
             placeholder="메시지 보내기"
             rows={1}
-            className="max-h-28 flex-1 resize-none rounded-2xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:ring-2 focus:ring-primary-subdued"
+            className="max-h-28 flex-1 resize-none rounded-2xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:ring-2 focus:ring-primary-focus"
           />
           <button
             onClick={() => void submit()}

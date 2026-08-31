@@ -6,19 +6,19 @@
  * 시리즈 2는 색(회색)에 더해 점선(dash)으로도 구분한다 — 색각 이상/인쇄 대비.
  */
 export const chart = {
-  grid: '#3a3a3c',
-  axis: '#a1a1a6',
+  grid: '#333333',
+  axis: '#CCCCCC',
   /** 시리즈 1 — 흰색 실선 */
   series1: '#ffffff',
   /** 시리즈 2 — 중간 회색 + 점선 (색만으로 구분하지 않는다) */
-  series2: '#86868b',
+  series2: '#7A7A7A',
   series2Dash: '6 3',
 } as const;
 
 /** Tooltip contentStyle — 카드 표면/헤어라인과 동일한 다크 팝오버 */
 export const tooltipStyle = {
-  background: '#272729',
-  border: '1px solid #3a3a3c',
+  background: '#2A2A2C',
+  border: '1px solid #333333',
   borderRadius: 8,
 } as const;
 

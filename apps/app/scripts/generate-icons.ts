@@ -22,16 +22,27 @@ const OUT_STORE_SOURCE = path.join(REPO, 'store-assets/source');
 const OUT_PLAY = path.join(REPO, 'store-assets/play-store/ko');
 
 type Palette = {
-  cream: string;
-  creamSoft: string;
-  clay: string;
-  clayPress: string;
-  cocoa: string;
-  night: string;
-  peach: string;
-  lavender: string;
-  white: string;
-  black: string;
+  primary: string;
+  primaryFocus: string;
+  primaryOnDark: string;
+  ink: string;
+  body: string;
+  bodyOnDark: string;
+  bodyMuted: string;
+  inkMuted80: string;
+  inkMuted48: string;
+  dividerSoft: string;
+  hairline: string;
+  canvas: string;
+  canvasParchment: string;
+  surfacePearl: string;
+  surfaceTile1: string;
+  surfaceTile2: string;
+  surfaceTile3: string;
+  surfaceBlack: string;
+  surfaceChipTranslucent: string;
+  onPrimary: string;
+  onDark: string;
 };
 
 const palette = JSON.parse(await readFile(PALETTE_SOURCE, 'utf8')) as Palette;
@@ -65,7 +76,7 @@ async function render(
   await mkdir(outDir, { recursive: true });
   let image = sharp(Buffer.from(squareSvg(body))).resize(size, size, { fit: 'fill' });
   if (options.opaque) {
-    image = image.flatten({ background: options.background ?? palette.white }).removeAlpha();
+    image = image.flatten({ background: options.background ?? palette.canvas }).removeAlpha();
   } else if (options.rgba) {
     image = image.ensureAlpha(1);
   }
@@ -80,81 +91,91 @@ await Promise.all(
 );
 
 // Expo / native app ---------------------------------------------------------
-await render(OUT_APP, 'icon.png', iconSurface(palette.cream, palette.clay), 1024, {
+await render(OUT_APP, 'icon.png', iconSurface(palette.canvas, palette.primary), 1024, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
 });
-await render(OUT_APP, 'icon-dark.png', iconSurface(palette.night, palette.peach), 1024, {
-  opaque: true,
-  background: palette.night,
-});
-await render(OUT_APP, 'icon-tinted.png', symbol(palette.white), 1024, { rgba: true });
-await render(OUT_APP, 'splash-icon.png', symbol(palette.clay, 0.82), 1024, { rgba: true });
-await render(OUT_APP, 'splash-icon-dark.png', symbol(palette.peach, 0.82), 1024, { rgba: true });
-await render(OUT_APP, 'brand-symbol-on-dark.png', symbol(palette.peach), 512, { rgba: true });
-await render(OUT_APP, 'android-icon-foreground.png', symbol(palette.clay, 0.72), 1024, {
+await render(
+  OUT_APP,
+  'icon-dark.png',
+  iconSurface(palette.surfaceTile1, palette.primaryOnDark),
+  1024,
+  {
+    opaque: true,
+    background: palette.surfaceTile1,
+  },
+);
+await render(OUT_APP, 'icon-tinted.png', symbol(palette.onPrimary), 1024, { rgba: true });
+await render(OUT_APP, 'splash-icon.png', symbol(palette.primary, 0.82), 1024, { rgba: true });
+await render(OUT_APP, 'splash-icon-dark.png', symbol(palette.primaryOnDark, 0.82), 1024, {
   rgba: true,
 });
-await render(OUT_APP, 'android-icon-background.png', solid(palette.cream), 1024, {
-  opaque: true,
-  background: palette.cream,
-});
-await render(OUT_APP, 'android-icon-monochrome.png', symbol(palette.white, 0.72), 1024, {
+await render(OUT_APP, 'brand-symbol-on-dark.png', symbol(palette.primaryOnDark), 512, {
   rgba: true,
 });
-await render(OUT_APP, 'notification-icon.png', symbol(palette.white, 0.58), 1024, {
+await render(OUT_APP, 'android-icon-foreground.png', symbol(palette.primary, 0.72), 1024, {
   rgba: true,
 });
-await render(OUT_APP, 'favicon.png', iconSurface(palette.cream, palette.clay, 1.1), 48, {
+await render(OUT_APP, 'android-icon-background.png', solid(palette.canvas), 1024, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
+});
+await render(OUT_APP, 'android-icon-monochrome.png', symbol(palette.onPrimary, 0.72), 1024, {
+  rgba: true,
+});
+await render(OUT_APP, 'notification-icon.png', symbol(palette.onPrimary, 0.58), 1024, {
+  rgba: true,
+});
+await render(OUT_APP, 'favicon.png', iconSurface(palette.canvas, palette.primary, 1.1), 48, {
+  opaque: true,
+  background: palette.canvas,
 });
 
 // Web / PWA ----------------------------------------------------------------
 await copyFile(SOURCE, path.join(OUT_WEB, 'brand-symbol.svg'));
-await render(OUT_WEB, 'icon-192.png', iconSurface(palette.cream, palette.clay), 192, {
+await render(OUT_WEB, 'icon-192.png', iconSurface(palette.canvas, palette.primary), 192, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
 });
-await render(OUT_WEB, 'icon-512.png', iconSurface(palette.cream, palette.clay), 512, {
+await render(OUT_WEB, 'icon-512.png', iconSurface(palette.canvas, palette.primary), 512, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
 });
 await render(
   OUT_WEB,
   'icon-maskable-512.png',
-  iconSurface(palette.clay, palette.cream, 0.72),
+  iconSurface(palette.primary, palette.onPrimary, 0.72),
   512,
   {
     opaque: true,
-    background: palette.clay,
+    background: palette.primary,
   },
 );
-await render(OUT_WEB, 'apple-touch-icon.png', iconSurface(palette.cream, palette.clay), 180, {
+await render(OUT_WEB, 'apple-touch-icon.png', iconSurface(palette.canvas, palette.primary), 180, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
 });
-await render(OUT_WEB, 'favicon-32.png', iconSurface(palette.cream, palette.clay, 1.1), 32, {
+await render(OUT_WEB, 'favicon-32.png', iconSurface(palette.canvas, palette.primary, 1.1), 32, {
   opaque: true,
-  background: palette.cream,
+  background: palette.canvas,
 });
-await render(OUT_WEB, 'notification-badge.png', symbol(palette.white, 0.68), 96, {
+await render(OUT_WEB, 'notification-badge.png', symbol(palette.onPrimary, 0.68), 96, {
   rgba: true,
 });
 
 const webFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="192" fill="${palette.cream}"/>
-  ${symbol(palette.clay, 1.08)}
+  <rect width="1024" height="1024" rx="192" fill="${palette.canvas}"/>
+  ${symbol(palette.primary, 1.08)}
 </svg>\n`;
 await writeFile(path.join(OUT_WEB, 'favicon.svg'), webFavicon);
 
-const ogBody = `<rect width="1200" height="630" fill="${palette.cream}"/>
-  <path d="M0 515C220 430 310 620 555 545s356-18 645-120v205H0Z" fill="${palette.peach}" opacity=".45"/>
-  <g transform="translate(86 129) scale(.36)">${canonicalPath.replace('currentColor', palette.clay)}</g>`;
+const ogBody = `<rect width="1200" height="630" fill="${palette.canvas}"/>
+  <path d="M0 515C220 430 310 620 555 545s356-18 645-120v205H0Z" fill="${palette.canvasParchment}"/>
+  <g transform="translate(86 129) scale(.36)">${canonicalPath.replace('currentColor', palette.primary)}</g>`;
 const [ogWordmark, ogTagline] = await Promise.all([
   sharp({
     text: {
-      text: `<span foreground="${palette.cocoa}" font_weight="700" font_size="96256">litechat</span>`,
+      text: `<span foreground="${palette.ink}" font_weight="700" font_size="96256">litechat</span>`,
       font: 'Noto Sans KR',
       fontfile: STORE_FONT,
       width: 560,
@@ -166,7 +187,7 @@ const [ogWordmark, ogTagline] = await Promise.all([
     .toBuffer(),
   sharp({
     text: {
-      text: `<span foreground="${palette.cocoa}" font_weight="400" font_size="36864">가볍게 이어지는 우리 대화</span>`,
+      text: `<span foreground="${palette.ink}" font_weight="400" font_size="36864">가볍게 이어지는 우리 대화</span>`,
       font: 'Noto Sans KR',
       fontfile: STORE_FONT,
       width: 620,
@@ -186,7 +207,7 @@ await sharp(
     { input: ogWordmark, left: 455, top: 202 },
     { input: ogTagline, left: 459, top: 326 },
   ])
-  .flatten({ background: palette.cream })
+  .flatten({ background: palette.canvas })
   .removeAlpha()
   .png({ compressionLevel: 9 })
   .toFile(path.join(OUT_WEB, 'og-image.png'));
@@ -195,25 +216,28 @@ console.log('✓ apps/web/public/og-image.png (1200×630)');
 // Dashboard ----------------------------------------------------------------
 await copyFile(SOURCE, path.join(OUT_DASH, 'brand-symbol.svg'));
 const dashboardFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <style>.bg{fill:${palette.cream}}.mark{color:${palette.clay}}@media(prefers-color-scheme:dark){.bg{fill:${palette.night}}.mark{color:${palette.peach}}}</style>
+  <style>.bg{fill:${palette.canvas}}.mark{color:${palette.primary}}@media(prefers-color-scheme:dark){.bg{fill:${palette.surfaceTile1}}.mark{color:${palette.primaryOnDark}}}</style>
   <rect class="bg" width="1024" height="1024" rx="192"/>
   <g class="mark">${canonicalPath}</g>
 </svg>\n`;
 await writeFile(path.join(OUT_DASH, 'favicon.svg'), dashboardFavicon);
-await render(OUT_DASH, 'favicon-32.png', iconSurface(palette.night, palette.peach, 1.08), 32, {
-  opaque: true,
-  background: palette.night,
-});
+await render(
+  OUT_DASH,
+  'favicon-32.png',
+  iconSurface(palette.surfaceTile1, palette.primaryOnDark, 1.08),
+  32,
+  { opaque: true, background: palette.surfaceTile1 },
+);
 
 // Store masters -------------------------------------------------------------
 await render(
   OUT_STORE_SOURCE,
   'brand-master-2048.png',
-  iconSurface(palette.cream, palette.clay),
+  iconSurface(palette.canvas, palette.primary),
   2048,
-  { opaque: true, background: palette.cream },
+  { opaque: true, background: palette.canvas },
 );
-await render(OUT_PLAY, 'icon-512.png', iconSurface(palette.cream, palette.clay), 512, {
+await render(OUT_PLAY, 'icon-512.png', iconSurface(palette.canvas, palette.primary), 512, {
   rgba: true,
 });
 

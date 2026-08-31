@@ -103,7 +103,7 @@ export default function ReportsPage() {
                 </button>
                 <button
                   onClick={() => void resolve(report.id, 'actioned')}
-                  className="rounded-full bg-primary px-4 py-2 text-black"
+                  className="rounded-full bg-primary px-4 py-2 text-white"
                 >
                   조치 완료
                 </button>

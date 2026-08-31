@@ -41,7 +41,7 @@ export default function LoginPage() {
         onSubmit={onSubmit}
         className="w-full max-w-xs rounded-xl border border-hairline bg-card p-6 sm:p-8"
       >
-        <div className="mb-6 flex flex-col items-center gap-3 text-primary">
+        <div className="mb-6 flex flex-col items-center gap-3 text-primary-on-dark">
           <BrandMark className="h-12 w-12" />
           <h1 className="display text-center text-2xl text-ink">litechat 대시보드</h1>
         </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="mt-2 rounded-full bg-primary py-2.5 font-normal text-black transition active:scale-95 disabled:opacity-50"
+            className="mt-2 rounded-full bg-primary py-2.5 font-normal text-white transition active:scale-95 disabled:opacity-50"
           >
             {busy ? '로그인 중…' : '로그인'}
           </button>

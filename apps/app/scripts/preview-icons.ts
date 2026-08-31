@@ -1,20 +1,26 @@
 /** Build a visual QA contact sheet for every important logo behavior. */
 import sharp, { type OverlayOptions } from 'sharp';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const REPO = path.resolve(import.meta.dir, '../../..');
+const palette = JSON.parse(await readFile(path.join(REPO, 'brand/palette.json'), 'utf8')) as Record<
+  string,
+  string
+>;
 const IMAGES = path.join(REPO, 'apps/app/assets/images');
 const out = path.resolve(
   process.argv[2] ?? path.join(REPO, 'store-assets/previews/brand-contact-sheet.png'),
 );
 const W = 1800;
 const H = 1180;
-const cream = '#FFF8F0';
-const cocoa = '#3B2823';
-const night = '#211A19';
-const lavender = '#B7A6D9';
+const canvas = palette.canvas;
+const ink = palette.ink;
+const darkTile = palette.surfaceTile1;
+const primary = palette.primary;
+const sheetBackground = palette.surfacePearl;
 
-const text = (value: string, width: number, height = 44, color = cocoa, size = 28) =>
+const text = (value: string, width: number, height = 44, color = ink, size = 28) =>
   Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><text x="0" y="${Math.round(size * 1.15)}" font-family="Arial,sans-serif" font-size="${size}" font-weight="600" fill="${color}">${value}</text></svg>`,
   );
@@ -50,18 +56,20 @@ async function tile(
 
 const [iosLight, iosDark, iosTinted, androidCircle, androidSquircle, splashLight, splashDark] =
   await Promise.all([
-    tile('icon.png', 280, cream, 'squircle'),
-    tile('icon-dark.png', 280, night, 'squircle'),
-    tile('icon-tinted.png', 280, lavender, 'squircle'),
-    tile('icon.png', 280, cream, 'circle'),
-    tile('icon.png', 280, cream, 'squircle'),
-    tile('splash-icon.png', 180, cream),
-    tile('splash-icon-dark.png', 180, night),
+    tile('icon.png', 280, canvas, 'squircle'),
+    tile('icon-dark.png', 280, darkTile, 'squircle'),
+    tile('icon-tinted.png', 280, primary, 'squircle'),
+    tile('icon.png', 280, canvas, 'circle'),
+    tile('icon.png', 280, canvas, 'squircle'),
+    tile('splash-icon.png', 180, canvas),
+    tile('splash-icon-dark.png', 180, darkTile),
   ]);
 
-const sheet = sharp({ create: { width: W, height: H, channels: 4, background: '#F7F2ED' } });
+const sheet = sharp({
+  create: { width: W, height: H, channels: 4, background: sheetBackground },
+});
 const composites: OverlayOptions[] = [
-  { input: text('litechat brand QA', 700, 56, cocoa, 42), left: 60, top: 44 },
+  { input: text('litechat brand QA', 700, 56, ink, 42), left: 60, top: 44 },
   { input: iosLight, left: 60, top: 140 },
   { input: text('iOS default', 260), left: 60, top: 435 },
   { input: iosDark, left: 370, top: 140 },
@@ -79,9 +87,9 @@ const composites: OverlayOptions[] = [
 
 let x = 560;
 for (const size of [16, 24, 32, 64, 128]) {
-  const rendered = await tile('icon.png', size, cream, 'squircle');
+  const rendered = await tile('icon.png', size, canvas, 'squircle');
   composites.push({ input: rendered, left: x, top: 655 - Math.round(size / 2) });
-  composites.push({ input: text(`${size}px`, 90, 34, cocoa, 20), left: x, top: 760 });
+  composites.push({ input: text(`${size}px`, 90, 34, ink, 20), left: x, top: 760 });
   x += Math.max(120, size + 46);
 }
 
@@ -89,20 +97,26 @@ for (const [sourceSize, displaySize] of [
   [512, 150],
   [1024, 150],
 ] as const) {
-  const rendered = await tile('icon.png', displaySize, cream, 'squircle');
+  const rendered = await tile('icon.png', displaySize, canvas, 'squircle');
   composites.push({ input: rendered, left: x, top: 580 });
   composites.push({
-    input: text(`${sourceSize}px source`, 150, 34, cocoa, 20),
+    input: text(`${sourceSize}px source`, 150, 34, ink, 20),
     left: x,
     top: 760,
   });
   x += 190;
 }
 
-for (const [index, bg] of ['#FFFFFF', '#000000', cream, '#E8785D', night].entries()) {
-  const iconFile =
-    index === 1 || index === 3 || index === 4 ? 'splash-icon-dark.png' : 'splash-icon.png';
-  const swatch = await sharp({ create: { width: 250, height: 210, channels: 4, background: bg } })
+for (const [index, { background, iconFile }] of [
+  { background: palette.canvas, iconFile: 'splash-icon.png' },
+  { background: palette.surfaceBlack, iconFile: 'splash-icon-dark.png' },
+  { background: palette.canvasParchment, iconFile: 'splash-icon.png' },
+  { background: palette.primary, iconFile: 'icon-tinted.png' },
+  { background: palette.surfaceTile1, iconFile: 'splash-icon-dark.png' },
+].entries()) {
+  const swatch = await sharp({
+    create: { width: 250, height: 210, channels: 4, background },
+  })
     .composite([
       {
         input: await sharp(path.join(IMAGES, iconFile)).resize(130, 130).png().toBuffer(),
@@ -117,7 +131,7 @@ for (const [index, bg] of ['#FFFFFF', '#000000', cream, '#E8785D', night].entrie
 
 await sheet
   .composite(composites)
-  .flatten({ background: '#F7F2ED' })
+  .flatten({ background: sheetBackground })
   .removeAlpha()
   .png({ compressionLevel: 9 })
   .toFile(out);

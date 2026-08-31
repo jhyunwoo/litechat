@@ -62,18 +62,18 @@ export const LIMIT_OPTIONS = [50, 100, 200] as const;
 /** GeoLite2 정확도가 없는 레거시 밀도 지점에 쓰는 보수적 기본 반경 (도시 수준) */
 export const DEFAULT_ACCURACY_KM = 25;
 
-/** 핀 팔레트 — 선택 = 브랜드 인디고(흰 테두리, 반경 원과 한 쌍), 비선택 = 중간 회색 */
+/** 핀 팔레트 — 선택 = Action Blue(흰 테두리, 반경 원과 한 쌍), 비선택 = 중간 회색 */
 export const PIN = {
-  selectedBg: '#533afd',
-  normalBg: '#6e6e73',
+  selectedBg: '#0066CC',
+  normalBg: '#7A7A7A',
   border: '#ffffff',
   glyph: '#ffffff',
 } as const;
 
 /** 선택 강조 액센트 — 어두운 지도 + 흰 원들 사이에서 선택 기록(핀+원)을 즉시 구분 */
 export const SELECTED_CIRCLE = {
-  stroke: '#7c6cff', // 밝은 인디고 — 어두운 타일 위 시인성
-  fill: '#533afd', // 웹앱 브랜드 인디고
+  stroke: '#2997FF', // Sky Blue — 어두운 타일 위 시인성
+  fill: '#0066CC', // Action Blue
 } as const;
 
 /** 사설(프록시 내부) IP 여부 — true면 프록시가 X-Forwarded-For를 안 넘긴 것으로 진단한다. */

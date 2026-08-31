@@ -15,13 +15,7 @@
  * 목록 맨 위에 카드를 끼워 넣으면 시야 밖에 생기고 목록이 밀렸다.
  */
 import { useEffect, useRef, useState } from 'react';
-import type {
-  GeoStatus,
-  Insights,
-  InsightsResult,
-  SessionRow,
-  UserVisit,
-} from '../../api';
+import type { GeoStatus, Insights, InsightsResult, SessionRow, UserVisit } from '../../api';
 import { GeoDiagnostics } from './GeoDiagnostics';
 import { formatDate, formatTime, LIMIT_OPTIONS, type SessionFilters } from './shared';
 
@@ -100,7 +94,7 @@ export function AccessPanel(props: AccessPanelProps) {
             key={t.id}
             onClick={() => onTab(t.id)}
             className={`rounded-full px-3 py-1.5 text-xs transition-colors ${
-              tab === t.id ? 'bg-primary text-black' : 'text-ink-mute hover:text-white'
+              tab === t.id ? 'bg-primary text-white' : 'text-ink-mute hover:text-white'
             }`}
           >
             {t.label}
@@ -427,7 +421,7 @@ function UsersTab({
             onClick={() => onSelectUser(user)}
             className={`rounded-md px-3 py-2 text-left text-sm transition-colors ${
               selectedUser?.userId === user.userId
-                ? 'bg-primary text-black'
+                ? 'bg-primary text-white'
                 : 'text-ink-mute hover:bg-white/8 hover:text-white'
             }`}
           >

@@ -82,7 +82,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     borderBottomWidth: 1,
     borderBottomColor: colors.hairline,
   },
-  back: { width: 40, fontSize: 32, lineHeight: 36, color: colors.primary },
+  back: { width: 40, fontSize: 32, lineHeight: 36, color: colors.link },
   title: { ...type.headingMd },
   content: { padding: spacing.lg, maxWidth: 620, width: '100%', alignSelf: 'center' },
   row: {
@@ -97,7 +97,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
   nickname: { color: colors.ink, fontSize: 15 },
   username: { color: colors.inkMute, fontSize: 12 },
   unblock: { minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center' },
-  unblockLabel: { color: colors.primary, textDecorationLine: 'underline' },
+  unblockLabel: { color: colors.link, textDecorationLine: 'underline' },
   hint: { color: colors.inkMute, textAlign: 'center', marginTop: spacing.xl },
   error: { color: colors.ruby, textAlign: 'center', marginTop: spacing.xl },
 }));

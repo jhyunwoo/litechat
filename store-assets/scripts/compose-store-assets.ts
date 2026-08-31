@@ -128,15 +128,15 @@ async function textLayer(
 }
 
 function backgroundSvg(width: number, height: number, index: number) {
-  const accent = index % 2 === 0 ? PALETTE.peach : PALETTE.lavender;
-  const path = canonicalPath.replace('currentColor', PALETTE.clay);
+  const accent = index % 2 === 0 ? PALETTE.canvasParchment : PALETTE.surfaceChipTranslucent;
+  const path = canonicalPath.replace('currentColor', PALETTE.primary);
   const scale = Math.min(width, height) / 1024;
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <rect width="${width}" height="${height}" fill="${PALETTE.cream}"/>
+      <rect width="${width}" height="${height}" fill="${PALETTE.canvas}"/>
       <path d="M0 ${height * 0.88}C${width * 0.2} ${height * 0.8} ${width * 0.34} ${height * 0.98} ${width * 0.58} ${height * 0.91}S${width * 0.84} ${height * 0.81} ${width} ${height * 0.86}V${height}H0Z" fill="${accent}" opacity=".2"/>
       <g transform="translate(${width * 0.78} ${-height * 0.07}) scale(${scale * 0.34})" opacity=".055">${path}</g>
-      <circle cx="${width * 0.08}" cy="${height * 0.72}" r="${Math.min(width, height) * 0.12}" fill="${PALETTE.clay}" opacity=".035"/>
+      <circle cx="${width * 0.08}" cy="${height * 0.72}" r="${Math.min(width, height) * 0.12}" fill="${PALETTE.primary}" opacity=".035"/>
     </svg>
   `);
 }
@@ -169,7 +169,7 @@ async function composeScreenshot(
       layout.headline.width,
       layout.headline.height,
       layout.headline.size,
-      PALETTE.cocoa,
+      PALETTE.ink,
       700,
     ),
     textLayer(
@@ -177,12 +177,12 @@ async function composeScreenshot(
       layout.supporting.width,
       layout.supporting.height,
       layout.supporting.size,
-      PALETTE.cocoa,
+      PALETTE.ink,
       400,
     ),
   ]);
   const frameUnderlay = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.frame.width + 8}" height="${layout.frame.height + 8}"><rect x="4" y="4" width="${layout.frame.width}" height="${layout.frame.height}" rx="${layout.frame.radius + 2}" fill="${PALETTE.cocoa}" opacity=".12"/></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.frame.width + 8}" height="${layout.frame.height + 8}"><rect x="4" y="4" width="${layout.frame.width}" height="${layout.frame.height}" rx="${layout.frame.radius + 2}" fill="${PALETTE.ink}" opacity=".12"/></svg>`,
   );
 
   await mkdir(path.dirname(output), { recursive: true });
@@ -197,7 +197,7 @@ async function composeScreenshot(
       },
       { input: capture, left: layout.frame.left, top: layout.frame.top },
     ])
-    .flatten({ background: PALETTE.cream })
+    .flatten({ background: PALETTE.canvas })
     .removeAlpha()
     .jpeg({ quality: 94, chromaSubsampling: '4:4:4', mozjpeg: true })
     .toFile(output);
@@ -257,20 +257,20 @@ await composeSet(
 async function composeFeatureGraphic() {
   const width = 1024;
   const height = 500;
-  const pathElement = canonicalPath.replace('currentColor', PALETTE.clay);
+  const pathElement = canonicalPath.replace('currentColor', PALETTE.primary);
   const base = Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <rect width="1024" height="500" fill="${PALETTE.cream}"/>
-      <path d="M0 390C175 330 285 485 474 410s340-33 550-116v206H0Z" fill="${PALETTE.peach}" opacity=".52"/>
-      <path d="M730-120C900-82 1001 57 965 200s-182 228-329 180c-113-37-169-130-132-233 39-108 104-194 226-267Z" fill="${PALETTE.lavender}" opacity=".2"/>
+      <rect width="1024" height="500" fill="${PALETTE.canvas}"/>
+      <path d="M0 390C175 330 285 485 474 410s340-33 550-116v206H0Z" fill="${PALETTE.canvasParchment}"/>
+      <path d="M730-120C900-82 1001 57 965 200s-182 228-329 180c-113-37-169-130-132-233 39-108 104-194 226-267Z" fill="${PALETTE.surfaceChipTranslucent}" opacity=".42"/>
       <g transform="translate(618 -4) scale(.42)" opacity=".95">${pathElement}</g>
-      <circle cx="822" cy="344" r="28" fill="${PALETTE.clay}" opacity=".28"/>
-      <circle cx="888" cy="359" r="18" fill="${PALETTE.cocoa}" opacity=".22"/>
+      <circle cx="822" cy="344" r="28" fill="${PALETTE.primary}" opacity=".28"/>
+      <circle cx="888" cy="359" r="18" fill="${PALETTE.ink}" opacity=".22"/>
     </svg>
   `);
   const [wordmark, tagline] = await Promise.all([
-    textLayer('litechat', 460, 100, 66, PALETTE.cocoa, 700),
-    textLayer('가볍게 이어지는 우리 대화', 480, 58, 27, PALETTE.cocoa, 400),
+    textLayer('litechat', 460, 100, 66, PALETTE.ink, 700),
+    textLayer('가볍게 이어지는 우리 대화', 480, 58, 27, PALETTE.ink, 400),
   ]);
   const destination = path.join(ROOT, 'play-store/ko/feature-graphic.png');
   await sharp(base)
@@ -278,7 +278,7 @@ async function composeFeatureGraphic() {
       { input: wordmark, left: 96, top: 151 },
       { input: tagline, left: 100, top: 262 },
     ])
-    .flatten({ background: PALETTE.cream })
+    .flatten({ background: PALETTE.canvas })
     .removeAlpha()
     .png({ compressionLevel: 9, palette: false })
     .toFile(destination);

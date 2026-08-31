@@ -104,7 +104,7 @@ export default function FriendsTab() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="아이디로 검색 (Ctrl+K)"
-            className="w-full rounded-xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:bg-canvas-soft focus:ring-2 focus:ring-primary-subdued"
+            className="w-full rounded-xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:bg-canvas-soft focus:ring-2 focus:ring-primary-focus"
             autoCapitalize="none"
           />
         </div>

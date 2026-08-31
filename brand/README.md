@@ -10,5 +10,6 @@ selected soft conversation pebble has the clearest small-size silhouette, keeps
 its inner opening in monochrome, and remains optically centered under circular
 and squircle masks.
 
-`palette.json` is consumed by the generator. Product theme files repeat the
-small palette locally so app packages remain build-independent.
+`palette.json` mirrors the color tokens in `DESIGN.md` and is consumed by the
+asset generator. Product theme files repeat the small palette locally so app
+packages remain build-independent.

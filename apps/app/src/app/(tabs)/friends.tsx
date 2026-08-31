@@ -228,7 +228,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     paddingVertical: spacing.sm,
     textAlign: 'center',
     fontSize: 14,
-    color: colors.primary,
+    color: colors.link,
   },
   section: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -279,7 +279,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
   },
   relLink: {
     fontSize: 12,
-    color: colors.primary,
+    color: colors.link,
   },
   actions: {
     flexDirection: 'row',

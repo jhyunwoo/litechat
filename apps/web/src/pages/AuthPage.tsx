@@ -1,7 +1,7 @@
 /**
  * 로그인 / 회원가입 화면 — 갤러리 히어로 구성.
- * 왼쪽(모바일은 상단)은 따뜻한 나이트 타일에 브랜드 심벌 + 워드마크,
- * 오른쪽은 크림 캔버스의 폼 패널이다.
+ * 왼쪽(모바일은 상단)은 니어블랙 타일에 브랜드 심벌 + 워드마크,
+ * 오른쪽은 흰 캔버스의 폼 패널이다.
  */
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -40,16 +40,16 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   // 인풋도 pill — 검색 인풋과 같은 문법 (16px은 iOS 자동 줌 방지)
   const inputClass =
-    'w-full rounded-full border border-hairline-input bg-white px-5 py-2.5 text-[16px] outline-none focus:border-primary transition-colors';
+    'w-full rounded-full border border-hairline-input bg-white px-5 py-2.5 text-[16px] outline-none focus:border-primary-focus transition-colors';
 
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
-      {/* 브랜드 히어로 — 따뜻한 나이트 타일 (모바일은 상단 밴드, 데스크탑은 좌측 패널) */}
-      <div className="pt-safe flex shrink-0 items-center gap-3 bg-brand-dark px-6 py-5 text-cream md:w-[45%] md:max-w-2xl md:flex-col md:items-start md:justify-center md:gap-6 md:px-16 lg:px-24">
-        <Logo className="h-9 w-9 text-brand-peach md:h-16 md:w-16" />
+      {/* 브랜드 히어로 — 니어블랙 타일 (모바일은 상단 밴드, 데스크탑은 좌측 패널) */}
+      <div className="pt-safe flex shrink-0 items-center gap-3 bg-brand-dark px-6 py-5 text-white md:w-[45%] md:max-w-2xl md:flex-col md:items-start md:justify-center md:gap-6 md:px-16 lg:px-24">
+        <Logo className="h-9 w-9 text-primary-on-dark md:h-16 md:w-16" />
         <div>
           <h1 className="display text-3xl md:text-6xl">litechat</h1>
-          <p className="display-airy mt-4 hidden max-w-sm text-2xl text-cream/70 md:block">
+          <p className="display-airy mt-4 hidden max-w-sm text-2xl text-white/70 md:block">
             가볍게 이어지는 우리 대화.
             <br />
             친구와 편안하게 이야기를 나눠요.
@@ -105,7 +105,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               </p>
             )}
 
-            {/* button-primary pill — 밴드당 하나뿐인 채워진 블랙 CTA */}
+            {/* button-primary pill — 밴드당 하나뿐인 Action Blue CTA */}
             <button
               type="submit"
               disabled={busy}

@@ -21,7 +21,7 @@ export default function TabLayout() {
   useBadgeSync(conversations);
 
   return (
-    <NativeTabs tintColor={colors.primary}>
+    <NativeTabs tintColor={colors.link}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>채팅</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="message.fill" />

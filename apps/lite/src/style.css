@@ -1,10 +1,10 @@
-/* Lite Chat — Excel 위장 스킨. lite 한정으로 DESIGN.md 대신 적용된다.
+/* Lite Chat — Excel 위장 스킨. 레이아웃은 위장 목적을 유지하고 색은 DESIGN.md를 따른다.
    구경꾼에게 스프레드시트 작업처럼 보이는 것이 목표. 주석/공백은 빌드에서 제거된다. */
 *, ::before, ::after { box-sizing: border-box; margin: 0; }
 html, body, #app { height: 100%; }
 body {
   font: 400 13px/1.45 Calibri, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-  background: #fff; color: #222;
+  background: var(--canvas); color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
 #app { display: flex; flex-direction: column; }
@@ -25,64 +25,75 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 @media (min-width: 768px) {
   .layout.chat .listcol { display: flex; }
   .layout:not(.chat) .detailcol { display: block; }
-  .listcol { flex: 0 0 300px; border-right: 2px solid #b0b0b0; }
+  .listcol { flex: 0 0 300px; border-right: 2px solid var(--hairline); }
   .chat-back { display: none; }
 }
 
 /* Excel 크롬: 제목줄 / 리본 / 시트 탭 / 상태줄 */
-.tbar { background: #217346; color: #fff; font-size: 12px; display: flex; gap: 8px; padding: max(4px, env(safe-area-inset-top)) 10px 4px; white-space: nowrap; }
+.tbar { background: var(--black); color: var(--on-primary); font-size: 12px; display: flex; gap: 8px; padding: max(4px, env(safe-area-inset-top)) 10px 4px; white-space: nowrap; }
 .tbar .grow { overflow: hidden; text-overflow: ellipsis; }
-.ribbon { display: flex; background: #f3f3f3; border-bottom: 1px solid #d4d4d4; padding: 2px 4px 0; font-size: 12px; overflow-x: auto; }
-.ribbon span { padding: 4px 9px; color: #444; white-space: nowrap; }
-.ribbon .on { background: #fff; color: #107c41; font-weight: 600; border: 1px solid #d4d4d4; border-bottom: 0; }
-.sheets { display: flex; align-items: stretch; background: #f3f3f3; border-top: 1px solid #d4d4d4; font-size: 12px; }
-.sheets button { padding: 5px 12px; color: #444; border-right: 1px solid #d4d4d4; }
-.sheets .on { background: #fff; color: #107c41; font-weight: 600; box-shadow: inset 0 -2px #107c41; }
-.sheets span { padding: 5px 10px; color: #666; }
-.sbar { display: flex; justify-content: space-between; background: #f3f3f3; border-top: 1px solid #d4d4d4; color: #555; font-size: 11px; padding: 2px 10px calc(2px + env(safe-area-inset-bottom)); font-variant-numeric: tabular-nums; }
+.ribbon { display: flex; background: var(--parchment); border-bottom: 1px solid var(--hairline); padding: 2px 4px 0; font-size: 12px; overflow-x: auto; }
+.ribbon span { padding: 4px 9px; color: var(--ink-secondary); white-space: nowrap; }
+.ribbon .on { background: var(--canvas); color: var(--primary); font-weight: 600; border: 1px solid var(--hairline); border-bottom: 0; }
+.sheets { display: flex; align-items: stretch; background: var(--parchment); border-top: 1px solid var(--hairline); font-size: 12px; }
+.sheets button { padding: 5px 12px; color: var(--ink-secondary); border-right: 1px solid var(--hairline); }
+.sheets .on { background: var(--canvas); color: var(--primary); font-weight: 600; box-shadow: inset 0 -2px var(--primary); }
+.sheets span { padding: 5px 10px; color: var(--ink-muted); }
+.sbar { display: flex; justify-content: space-between; background: var(--parchment); border-top: 1px solid var(--hairline); color: var(--ink-muted); font-size: 11px; padding: 2px 10px calc(2px + env(safe-area-inset-bottom)); font-variant-numeric: tabular-nums; }
 
 /* 시트 격자 기준값 — 열 폭 / 행 높이 / 행번호 거터 / 목록 이름·시간 열 / 본문 최대 폭 */
 :root {
+  --primary: #0066cc;
+  --primary-focus: #0071e3;
+  --ink: #1d1d1f;
+  --ink-secondary: #333333;
+  --ink-muted: #7a7a7a;
+  --hairline: #e0e0e0;
+  --canvas: #ffffff;
+  --parchment: #f5f5f7;
+  --pearl: #fafafc;
+  --on-primary: #ffffff;
+  --black: #000000;
   --cw: 64px;   /* Excel 기본 열 폭 */
   --rh: 20px;   /* Excel 기본 행 높이 = 빈 시트 눈금 pitch */
   --g: 28px;    /* 행 번호 거터 */
   --nw: 84px;   /* 목록 컬럼의 이름/시간 열 */
   --mw: calc(var(--g) + 9 * var(--cw));  /* =604px. 거터 + 9열 = 본문 최대 폭 */
   /* 열 경계 세로선 — 거터 다음부터 --cw 간격(27+64k). 거터 구간 잔상은 거터 셀이 덮는다 */
-  --vline: repeating-linear-gradient(90deg, #0000 0 calc(var(--cw) - 1px), #d4d4d4 calc(var(--cw) - 1px) var(--cw)) var(--g) 0;
+  --vline: repeating-linear-gradient(90deg, #0000 0 calc(var(--cw) - 1px), var(--hairline) calc(var(--cw) - 1px) var(--cw)) var(--g) 0;
   /* 빈 시트 = 거터 + 세로선 + 가로선. 첫 레이어가 맨 위에 그려진다 */
-  --sheet: linear-gradient(90deg, #f3f3f3 calc(var(--g) - 1px), #d4d4d4 calc(var(--g) - 1px) var(--g), #0000 var(--g)),
+  --sheet: linear-gradient(90deg, var(--parchment) calc(var(--g) - 1px), var(--hairline) calc(var(--g) - 1px) var(--g), #0000 var(--g)),
     var(--vline),
-    repeating-linear-gradient(#fff 0 calc(var(--rh) - 1px), #d4d4d4 calc(var(--rh) - 1px) var(--rh));
+    repeating-linear-gradient(var(--canvas) 0 calc(var(--rh) - 1px), var(--hairline) calc(var(--rh) - 1px) var(--rh));
 }
 
 /* 그리드 — 행 번호 거터 + A/B/C 열. 행 번호는 CSS 카운터(JS 0바이트) */
 .ch, .gr { display: grid; grid-template-columns: var(--g) var(--nw) 1fr var(--nw); }
 /* 대화·빈 시트 머리글 — 균일 폭. 화면보다 넓은 열은 잘라내고, 라벨 없는 구간도 세로선은 이어진다 */
-.cw { grid-template-columns: var(--g) repeat(20, var(--cw)); overflow: hidden; border-bottom: 1px solid #d4d4d4; background: var(--vline) #f3f3f3; }
-.ch > * { background: #f3f3f3; border: solid #d4d4d4; border-width: 0 1px 1px 0; text-align: center; color: #555; font-size: 11px; padding: 2px 0; }
+.cw { grid-template-columns: var(--g) repeat(20, var(--cw)); overflow: hidden; border-bottom: 1px solid var(--hairline); background: var(--vline) var(--parchment); }
+.ch > * { background: var(--parchment); border: solid var(--hairline); border-width: 0 1px 1px 0; text-align: center; color: var(--ink-muted); font-size: 11px; padding: 2px 0; }
 .grid { counter-reset: row; }
 .gr { counter-increment: row; }
-.gr::before { content: counter(row); background: #f3f3f3; border: solid #d4d4d4; border-width: 0 1px 1px 0; text-align: center; color: #555; font-size: 11px; padding: 3px 0; }
-.gr > * { border: solid #d4d4d4; border-width: 0 1px 1px 0; padding: 3px 6px; min-width: 0; overflow: hidden; }
-.gr.on, .gr:active { background: #e7f1ec; }
-.gh { background: #e8e8e8; border-bottom: 1px solid #d4d4d4; padding: 3px 8px; font-size: 11px; color: #555; }
+.gr::before { content: counter(row); background: var(--parchment); border: solid var(--hairline); border-width: 0 1px 1px 0; text-align: center; color: var(--ink-muted); font-size: 11px; padding: 3px 0; }
+.gr > * { border: solid var(--hairline); border-width: 0 1px 1px 0; padding: 3px 6px; min-width: 0; overflow: hidden; }
+.gr.on, .gr:active { background: var(--parchment); }
+.gh { background: var(--hairline); border-bottom: 1px solid var(--hairline); padding: 3px 8px; font-size: 11px; color: var(--ink-muted); }
 .el { white-space: nowrap; text-overflow: ellipsis; }
-.my { color: #107c41; font-weight: 600; }
+.my { color: var(--primary); font-weight: 600; }
 /* 메시지 행 = 시트 한 행. 보낸/받은 구분은 색이 아니라 셀 위치(왼쪽/오른쪽)뿐이다.
    행마다 번호 거터 + 아래 테두리 + 열 세로선을 직접 그린다 = 콘텐츠와 함께 스크롤되는 그리드 (고정 배경 겹침 없음).
    오른쪽 패딩으로 본문 상자를 '거터 + 정수 열'에 맞춘다 → 셀 오른쪽 변이 항상 세로선과 겹치고,
    넓은 화면에서도 좌우 메시지가 9열(604px) 안에 모인다. 배경·테두리는 패딩 밖까지 그려지므로 격자는 화면 끝까지 이어진다 */
-.mr { display: flex; align-items: baseline; border-bottom: 1px solid #d4d4d4; padding-right: max(6px, 100% - var(--mw)); padding-right: max(6px, 100% - var(--mw), mod(100% - var(--g), var(--cw))); counter-increment: row; background: var(--vline); }
-.mr::before { content: counter(row); order: -2; flex: 0 0 var(--g); align-self: stretch; background: #f3f3f3; border-right: 1px solid #d4d4d4; text-align: center; color: #555; font-size: 9px; padding-top: 2px; }
+.mr { display: flex; align-items: baseline; border-bottom: 1px solid var(--hairline); padding-right: max(6px, 100% - var(--mw)); padding-right: max(6px, 100% - var(--mw), mod(100% - var(--g), var(--cw))); counter-increment: row; background: var(--vline); }
+.mr::before { content: counter(row); order: -2; flex: 0 0 var(--g); align-self: stretch; background: var(--parchment); border-right: 1px solid var(--hairline); text-align: center; color: var(--ink-muted); font-size: 9px; padding-top: 2px; }
 /* 시간 — 셀 오른쪽(내 것은 왼쪽) 빈 열에 놓는다. 자리가 모자라면 셀을 밀어내지 않고 스스로 잘린다 */
 .mr .cc { flex: 0 1 auto; min-width: 0; padding: 0 4px; font-size: 8px; overflow: hidden; white-space: nowrap; }
 .mine .cc { order: -1; margin-left: auto; }
 /* 값이 든 셀 — 폭은 열 단위(--s, JS가 글자 폭으로 어림). 왼쪽 변은 시트 세로선이 대신하고 오른쪽 변만 직접 그린다.
    마지막 한 열은 시간 표시용으로 남긴다. 2px 패딩 + 10px/1.5 → 한 줄 행이 정확히 --rh(20px) */
-.cb { white-space: pre-wrap; word-break: break-word; border-right: 1px solid #d4d4d4; background: #fff; padding: 2px 5px; flex: 0 0 auto; width: calc(var(--s, 8) * var(--cw)); max-width: calc(100% - var(--g) - var(--cw)); font-size: 10px; line-height: 1.5; }
+.cb { white-space: pre-wrap; word-break: break-word; border-right: 1px solid var(--hairline); background: var(--canvas); padding: 2px 5px; flex: 0 0 auto; width: calc(var(--s, 8) * var(--cw)); max-width: calc(100% - var(--g) - var(--cw)); font-size: 10px; line-height: 1.5; }
 .cb.big { font-size: 14px; }
-.cc { color: #666; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.cc { color: var(--ink-muted); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 .un { color: #c00; font-weight: 700; }
 .pend { opacity: .55; }
 /* 빈 시트 배경 — 반복 그라데이션으로 빈 셀 눈금 표현 */
@@ -90,54 +101,54 @@ main { flex: 1; overflow-y: auto; min-height: 0; }
 /* 목록 컬럼 빈 영역 — 세로선을 .gr 열 경계(거터 / 이름 / 오른쪽 시간)에 맞춘다 */
 .listcol main {
   background:
-    linear-gradient(90deg, #f3f3f3 calc(var(--g) - 1px), #d4d4d4 calc(var(--g) - 1px) var(--g), #0000 var(--g) calc(var(--g) + var(--nw) - 1px), #d4d4d4 calc(var(--g) + var(--nw) - 1px) calc(var(--g) + var(--nw)), #0000 calc(var(--g) + var(--nw))),
-    linear-gradient(#d4d4d4, #d4d4d4) right var(--nw) top/1px 100% no-repeat,
-    repeating-linear-gradient(#fff 0 calc(var(--rh) - 1px), #d4d4d4 calc(var(--rh) - 1px) var(--rh));
+    linear-gradient(90deg, var(--parchment) calc(var(--g) - 1px), var(--hairline) calc(var(--g) - 1px) var(--g), #0000 var(--g) calc(var(--g) + var(--nw) - 1px), var(--hairline) calc(var(--g) + var(--nw) - 1px) calc(var(--g) + var(--nw)), #0000 calc(var(--g) + var(--nw))),
+    linear-gradient(var(--hairline), var(--hairline)) right var(--nw) top/1px 100% no-repeat,
+    repeating-linear-gradient(var(--canvas) 0 calc(var(--rh) - 1px), var(--hairline) calc(var(--rh) - 1px) var(--rh));
 }
 
 /* 컨트롤 */
-.btn { background: #107c41; color: #fff; border-radius: 2px; padding: 8px 12px; width: 100%; }
-.btn2 { background: #fff; border: 1px solid #8a8a8a; border-radius: 2px; padding: 2px 8px; font-size: 12px; }
-.in { width: 100%; padding: 7px 9px; border: 1px solid #8a8a8a; border-radius: 2px; background: #fff; outline: none; }
-.in:focus { border-color: #107c41; }
+.btn { background: var(--primary); color: var(--on-primary); border-radius: 2px; padding: 8px 12px; width: 100%; }
+.btn2 { background: var(--canvas); border: 1px solid var(--ink-muted); border-radius: 2px; padding: 2px 8px; font-size: 12px; }
+.in { width: 100%; padding: 7px 9px; border: 1px solid var(--ink-muted); border-radius: 2px; background: var(--canvas); outline: none; }
+.in:focus { border-color: var(--primary-focus); }
 .err { color: #c00; font-size: 12px; }
-.dim { color: #666; font-size: 12px; }
+.dim { color: var(--ink-muted); font-size: 12px; }
 .pad { padding: 8px; }
 .stat { padding: 14px; text-align: center; }
 
 /* 채팅 */
-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid #d4d4d4; background: #f9f9f9; }
-header h1 { font-size: 13px; font-weight: 600; color: #444; flex: 1; }
-.chat-back { font-size: 16px; color: #555; padding: 0 6px; }
+header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--hairline); background: var(--pearl); }
+header h1 { font-size: 13px; font-weight: 600; color: var(--ink-secondary); flex: 1; }
+.chat-back { font-size: 16px; color: var(--ink-muted); padding: 0 6px; }
 .msgs { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; counter-reset: row; }
 /* 마지막 메시지 아래 빈 시트 — in-flow라 콘텐츠와 함께 스크롤된다 */
 .msgs::after { content: ''; flex: 1; background: var(--sheet); }
 /* 이미지 메시지 = 하이퍼링크 셀처럼 */
-.imgbtn { color: #0563c1; text-decoration: underline; font-size: 10px; text-align: left; }
+.imgbtn { color: var(--primary); text-decoration: underline; font-size: 10px; text-align: left; }
 .cb img { max-width: 100%; max-height: 120px; height: auto; display: block; }
 
 /* 입력 바 = 수식 입력줄 */
-.emo { display: flex; gap: 2px; padding: 1px 6px; overflow-x: auto; border-top: 1px solid #d4d4d4; background: #f9f9f9; }
+.emo { display: flex; gap: 2px; padding: 1px 6px; overflow-x: auto; border-top: 1px solid var(--hairline); background: var(--pearl); }
 .emo button { font-size: 14px; padding: 2px 5px; }
-.bar { display: flex; align-items: center; border-top: 1px solid #d4d4d4; background: #fff; padding: 0 0 env(safe-area-inset-bottom); }
-.ref { flex: 0 0 46px; text-align: center; border-right: 1px solid #d4d4d4; font-size: 12px; color: #444; align-self: stretch; padding: 6px 0; }
-.fx { font: italic 700 13px Georgia, serif; color: #666; padding: 0 8px; }
+.bar { display: flex; align-items: center; border-top: 1px solid var(--hairline); background: var(--canvas); padding: 0 0 env(safe-area-inset-bottom); }
+.ref { flex: 0 0 46px; text-align: center; border-right: 1px solid var(--hairline); font-size: 12px; color: var(--ink-secondary); align-self: stretch; padding: 6px 0; }
+.fx { font: italic 700 13px Georgia, serif; color: var(--ink-muted); padding: 0 8px; }
 .bar textarea { flex: 1; resize: none; border: 0; outline: none; padding: 6px 4px; max-height: 90px; background: none; }
-.send { color: #107c41; font-weight: 700; font-size: 15px; padding: 0 10px; }
+.send { color: var(--primary); font-weight: 700; font-size: 15px; padding: 0 10px; }
 .bar .btn2 { margin-right: 6px; }
 
 /* 인증 */
 .auth { margin: auto; width: 100%; max-width: 300px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
-.auth h1 { text-align: center; color: #107c41; font-size: 24px; font-weight: 600; }
-.auth p { text-align: center; font-size: 12px; color: #666; }
-.auth a { color: #107c41; font-weight: 600; text-decoration: none; }
+.auth h1 { text-align: center; color: var(--primary); font-size: 24px; font-weight: 600; }
+.auth p { text-align: center; font-size: 12px; color: var(--ink-muted); }
+.auth a { color: var(--primary); font-weight: 600; text-decoration: none; }
 .auth .err { text-align: center; }
 
 /* 오버레이 (이미지 원본 / 사진 시트 / 웹캠) */
 .ov { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .ov img { max-width: 95vw; max-height: 75vh; }
-.ov video { max-width: 95vw; max-height: 70vh; background: #000; }
-.ov a { color: #222; background: #f3f3f3; padding: 7px 12px; border-radius: 2px; font-size: 12px; text-decoration: none; font-variant-numeric: tabular-nums; }
-.sheet { background: #fff; border-radius: 4px; padding: 14px; display: flex; flex-direction: column; gap: 8px; width: 240px; max-width: 80vw; }
+.ov video { max-width: 95vw; max-height: 70vh; background: var(--black); }
+.ov a { color: var(--ink); background: var(--parchment); padding: 7px 12px; border-radius: 2px; font-size: 12px; text-decoration: none; font-variant-numeric: tabular-nums; }
+.sheet { background: var(--canvas); border-radius: 4px; padding: 14px; display: flex; flex-direction: column; gap: 8px; width: 240px; max-width: 80vw; }
 
 .use { font-variant-numeric: tabular-nums; }

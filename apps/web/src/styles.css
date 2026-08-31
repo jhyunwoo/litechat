@@ -1,8 +1,8 @@
 /**
- * 전역 스타일 — Tailwind CSS 4 + 따뜻한 litechat 브랜드 토큰
+ * 전역 스타일 — Tailwind CSS 4 + DESIGN.md 브랜드 토큰
  *
  * 핵심 규칙:
- *  - 인터랙티브 텍스트는 대비가 높은 코코아, 브랜드 포인트는 클레이/피치
+ *  - 모든 인터랙션은 Action Blue 하나로 통일하고 다크 위 링크만 Sky Blue를 쓴다.
  *  - 본문 17px / weight 400 / 1.47 / 네거티브 트래킹, 디스플레이는 600 ("Apple tight")
  *  - 버튼은 pill(9999px), 인풋도 pill(검색 인풋 문법), 카드는 12px 라운드
  *  - 그라디언트/그림자 금지 — 표면 색 전환(화이트 ↔ 블랙 타일)이 구획을 만든다
@@ -11,26 +11,26 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-primary: #3b2823;
-  --color-primary-deep: #211a19;
-  --color-primary-press: #211a19;
-  --color-primary-soft: #e8785d;
-  --color-primary-subdued: #f4c5b7;
-  --color-brand-dark: #211a19;
-  --color-brand-peach: #f4c5b7;
-  --color-ink: #3b2823;
-  --color-ink-secondary: #5b433c;
-  --color-ink-mute: #75645e;
-  --color-canvas-soft: #fff8f0;
-  --color-cream: #fff8f0;
-  --color-hairline: #e9dcd3;
-  --color-hairline-input: #d8c7bd;
+  --color-primary: #0066cc;
+  --color-primary-focus: #0071e3;
+  --color-primary-on-dark: #2997ff;
+  --color-primary-deep: #1d1d1f;
+  --color-primary-press: #0066cc;
+  --color-primary-soft: #0066cc;
+  --color-primary-subdued: #d2d2d7;
+  --color-brand-dark: #272729;
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #333333;
+  --color-ink-mute: #7a7a7a;
+  --color-canvas-soft: #f5f5f7;
+  --color-hairline: #e0e0e0;
+  --color-hairline-input: #e0e0e0;
   /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
   --color-ruby: #d64545;
 
-  /* 채팅 말풍선 — 내 것은 잉크 블랙, 상대는 파치먼트 */
-  --color-bubble-me: #3b2823;
-  --color-bubble-peer: #fff8f0;
+  /* 채팅 말풍선 — 내 것은 Action Blue, 상대는 Parchment */
+  --color-bubble-me: #0066cc;
+  --color-bubble-peer: #f5f5f7;
 }
 
 html,
@@ -40,7 +40,7 @@ body,
 }
 
 body {
-  background: #fffdf9;
+  background: #ffffff;
   /* 시스템 폰트 스택 (SF Pro 대체) — 웹폰트 다운로드 없이 브랜드 리듬 유지 */
   font-family:
     'SF Pro Display',
@@ -84,7 +84,7 @@ body {
 
 /* frosted 스티키 바 — 파치먼트 80% + blur (서브내브/탭바/채팅 헤더) */
 .frosted {
-  background: rgb(255 255 255 / 0.8);
+  background: rgb(245 245 247 / 0.8);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
 }

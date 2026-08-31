@@ -26,7 +26,7 @@ export function Glass({ style, children }: Props) {
 
 const useStyles = makeStyles(({ scheme, colors }) => ({
   fallback: {
-    backgroundColor: scheme === 'dark' ? 'rgba(18,22,36,0.92)' : 'rgba(255,255,255,0.92)',
+    backgroundColor: scheme === 'dark' ? 'rgba(39,39,41,0.92)' : 'rgba(245,245,247,0.92)',
     borderColor: colors.hairline,
   },
 }));

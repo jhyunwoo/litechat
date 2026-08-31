@@ -1,7 +1,7 @@
 /**
  * 로그인 / 회원가입 화면 (웹 AuthPage 포팅 — 한 화면에서 모드 전환)
  *
- * 상단은 따뜻한 나이트 히어로 밴드(심벌 + 워드마크) — 웹 AuthPage와 같은 문법.
+ * 상단은 니어블랙 히어로 밴드(심벌 + 워드마크) — 웹 AuthPage와 같은 문법.
  * 밴드 색은 스킴과 무관한 브랜드 표면이라 팔레트가 아닌 상수로 둔다.
  */
 import { useState } from 'react';
@@ -24,10 +24,10 @@ import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 import { WEB_URL } from '@/lib/env';
 
-/* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md 나이트 + 크림) */
-const HERO_BG = '#211A19';
-const HERO_INK = '#FFF8F0';
-const HERO_INK_MUTE = 'rgba(255, 248, 240, 0.72)';
+/* 브랜드 히어로 타일 — 라이트/다크 공통 (DESIGN.md dark tile + on-dark) */
+const HERO_BG = '#272729';
+const HERO_INK = '#FFFFFF';
+const HERO_INK_MUTE = 'rgba(255, 255, 255, 0.72)';
 
 export default function SignIn() {
   const styles = useStyles();
@@ -67,7 +67,7 @@ export default function SignIn() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.screen}>
-      {/* 브랜드 히어로 — 나이트 타일 (표면 색 전환이 곧 구획) */}
+      {/* 브랜드 히어로 — 니어블랙 타일 (표면 색 전환이 곧 구획) */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
         <Image
           source={require('../../assets/images/brand-symbol-on-dark.png')}
@@ -261,7 +261,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
   switchLink: {
     /* 모노크롬에선 색만으로 링크가 안 드러나서 웨이트+밑줄로 신호를 준다 */
     fontSize: 14,
-    color: colors.primary,
+    color: colors.link,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
@@ -271,5 +271,5 @@ const useStyles = makeStyles(({ colors, type }) => ({
     marginTop: spacing.xl,
   },
   privacyLink: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
-  privacyLinkText: { ...type.caption, color: colors.primary, textDecorationLine: 'underline' },
+  privacyLinkText: { ...type.caption, color: colors.link, textDecorationLine: 'underline' },
 }));

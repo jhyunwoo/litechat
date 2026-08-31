@@ -32,8 +32,7 @@ function Tab({ to, label }: { to: string; label: string }) {
       to={to}
       className={({ isActive }) =>
         `whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${
-          // primary가 흰색이므로 활성 탭 텍스트는 검정 (white-on-white 방지)
-          isActive ? 'bg-primary text-black' : 'text-ink-mute hover:text-white'
+          isActive ? 'bg-primary text-white' : 'text-ink-mute hover:text-white'
         }`
       }
     >
@@ -78,7 +77,7 @@ function Shell() {
     >
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 py-2.5 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
         <div className="flex items-center justify-between gap-4 lg:contents">
-          <div className="flex items-center gap-2 text-primary">
+          <div className="flex items-center gap-2 text-primary-on-dark">
             <BrandMark className="h-6 w-6" />
             <h1 className="display text-base text-ink lg:text-lg">litechat 대시보드</h1>
           </div>

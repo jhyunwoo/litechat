@@ -121,7 +121,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     borderBottomWidth: 1,
     borderBottomColor: colors.hairline,
   },
-  back: { width: 40, fontSize: 32, lineHeight: 36, color: colors.primary },
+  back: { width: 40, fontSize: 32, lineHeight: 36, color: colors.link },
   title: { ...type.headingMd },
   content: { padding: spacing.xl, maxWidth: 560, width: '100%', alignSelf: 'center' },
   heading: { ...type.headingLg },

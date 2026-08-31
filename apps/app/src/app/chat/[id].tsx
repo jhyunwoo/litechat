@@ -141,11 +141,11 @@ const useStyles = makeStyles(({ colors }) => ({
   backArrow: {
     fontSize: 30,
     lineHeight: 32,
-    color: colors.primary,
+    color: colors.link,
   },
   headerText: { flex: 1, minWidth: 0 },
   menu: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  menuText: { color: colors.primary, fontSize: 18, letterSpacing: 1 },
+  menuText: { color: colors.link, fontSize: 18, letterSpacing: 1 },
   peerName: {
     fontSize: 16,
     fontWeight: '400',
