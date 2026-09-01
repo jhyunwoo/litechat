@@ -165,20 +165,22 @@ function ChatRoomContent({ convId }: { convId: number }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* 헤더 */}
-      <header className="frosted pt-safe flex items-center gap-2 border-b border-hairline px-2 py-2">
-        <button
-          onClick={() => navigate('/')}
-          aria-label="뒤로"
-          className="rounded-full p-2 text-primary active:bg-canvas-soft md:hidden"
-        >
-          <Icon name="back" className="size-6" />
-        </button>
-        <div className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
-          {conversation?.peer.nickname.charAt(0) ?? '?'}
-        </div>
-        <div>
-          <p className="leading-tight font-normal">{conversation?.peer.nickname ?? '대화'}</p>
-          <p className="text-xs leading-tight text-ink-mute">@{conversation?.peer.username}</p>
+      <header className="frosted pt-safe border-b border-hairline">
+        <div className="flex items-center gap-2 px-2 py-2">
+          <button
+            onClick={() => navigate('/')}
+            aria-label="뒤로"
+            className="rounded-full p-2 text-primary active:bg-canvas-soft md:hidden"
+          >
+            <Icon name="back" className="size-6" />
+          </button>
+          <div className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
+            {conversation?.peer.nickname.charAt(0) ?? '?'}
+          </div>
+          <div>
+            <p className="leading-tight font-normal">{conversation?.peer.nickname ?? '대화'}</p>
+            <p className="text-xs leading-tight text-ink-mute">@{conversation?.peer.username}</p>
+          </div>
         </div>
       </header>
 
