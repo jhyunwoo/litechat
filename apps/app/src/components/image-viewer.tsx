@@ -110,12 +110,14 @@ const useStyles = makeStyles(({ colors }) => ({
   action: {
     borderRadius: rounded.pill,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    minHeight: 40,
+    paddingHorizontal: 22,
+    minHeight: 44,
     justifyContent: 'center',
   },
-  actionPressed: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  actionPressed: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    transform: [{ scale: 0.95 }],
+  },
   actionText: {
     color: colors.onPrimary,
     fontSize: 14,

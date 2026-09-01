@@ -2,6 +2,7 @@
  * 채팅 탭 — 대화 목록 (마지막 메시지 미리보기 + 안읽음 배지)
  */
 import type { WireMessage } from '@litechat/types';
+import { motion } from 'motion/react';
 import { Link, useMatch } from 'react-router';
 import { useConversations } from '../data';
 import { formatTime } from '../lib/format';
@@ -28,7 +29,12 @@ export default function ChatsTab() {
       {isPending ? (
         <p className="py-16 text-center text-sm text-ink-mute">불러오는 중…</p>
       ) : conversations?.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-20 text-ink-mute">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28 }}
+          className="flex flex-col items-center gap-3 py-20 text-ink-mute"
+        >
           <div className="flex size-16 items-center justify-center rounded-full bg-canvas-soft text-primary-subdued">
             <Icon name="chat" className="size-8" />
           </div>
@@ -37,7 +43,7 @@ export default function ChatsTab() {
             <br />
             친구 탭에서 친구를 추가하고 대화를 시작해 보세요!
           </p>
-        </div>
+        </motion.div>
       ) : (
         <ul>
           {conversations?.map((conv) => (
@@ -64,9 +70,15 @@ export default function ChatsTab() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm text-ink-mute">{preview(conv.last)}</p>
                     {conv.unread > 0 && (
-                      <span className="min-w-5 shrink-0 rounded-full bg-ink px-1.5 text-center tnum text-xs leading-5 font-normal text-white">
+                      <motion.span
+                        key={conv.unread}
+                        initial={{ scale: 0.6 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 600, damping: 22, mass: 0.5 }}
+                        className="tnum min-w-5 shrink-0 rounded-full bg-ink px-1.5 text-center text-xs leading-5 font-normal text-white"
+                      >
                         {conv.unread > 99 ? '99+' : conv.unread}
-                      </span>
+                      </motion.span>
                     )}
                   </div>
                 </div>

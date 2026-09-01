@@ -1,6 +1,7 @@
 /**
  * 프로필 탭 — 내 정보 + 알림 토글 + 로그아웃
  */
+import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth';
@@ -80,14 +81,14 @@ export default function ProfileTab() {
               aria-checked={pushOn}
               disabled={!supported || pushBusy}
               onClick={() => void togglePush()}
-              className={`h-7 w-12 rounded-full p-0.5 transition-colors disabled:opacity-40 ${
+              className={`h-7 w-12 shrink-0 rounded-full p-0.5 transition-colors disabled:opacity-40 ${
                 pushOn ? 'bg-primary' : 'bg-hairline-input'
               }`}
             >
-              <span
-                className={`block size-6 rounded-full bg-white shadow transition-transform ${
-                  pushOn ? 'translate-x-5' : ''
-                }`}
+              <motion.span
+                animate={{ x: pushOn ? 20 : 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
+                className="block size-6 rounded-full bg-white"
               />
             </button>
           </div>
@@ -128,7 +129,7 @@ export default function ProfileTab() {
           onClick={() => {
             void logout().then(() => navigate('/login', { replace: true }));
           }}
-          className="w-full px-4 py-3 text-left font-medium text-ruby active:bg-canvas-soft"
+          className="w-full px-4 py-3 text-left font-semibold text-ruby active:bg-canvas-soft"
         >
           로그아웃
         </button>

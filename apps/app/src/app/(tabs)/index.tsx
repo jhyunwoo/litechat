@@ -7,7 +7,7 @@
 import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   Alert,
@@ -17,7 +17,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated, {
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar } from '@/components/avatar';
@@ -37,6 +44,38 @@ function preview(last: WireMessage | null): string {
   if (!last) return '대화를 시작해 보세요';
   if (last.k === 'i') return '📷 사진';
   return last.x;
+}
+
+/**
+ * 안읽음 배지 — 수가 늘어날 때만 톡 튀어오른다.
+ * FlashList가 셀을 재활용해 다른 대화로 바뀐 경우에는 애니메이션하지 않는다.
+ */
+function UnreadBadge({ convId, count }: { convId: number; count: number }) {
+  const styles = useStyles();
+  const pop = useSharedValue(1);
+  const previous = useRef({ convId, count });
+
+  useEffect(() => {
+    const sameConversation = previous.current.convId === convId;
+    const grew = count > previous.current.count;
+    previous.current = { convId, count };
+    if (sameConversation && grew) {
+      pop.set(
+        withSequence(
+          withTiming(1.25, { duration: 110 }),
+          withSpring(1, { stiffness: 600, damping: 18, mass: 0.5 }),
+        ),
+      );
+    }
+  }, [convId, count, pop]);
+
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+
+  return (
+    <Animated.View style={[styles.unreadBadge, style]}>
+      <Text style={styles.unreadText}>{count > 99 ? '99+' : count}</Text>
+    </Animated.View>
+  );
 }
 
 function ConversationRow({
@@ -70,11 +109,7 @@ function ConversationRow({
           <Text style={styles.preview} numberOfLines={1}>
             {preview(conv.last)}
           </Text>
-          {conv.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{conv.unread > 99 ? '99+' : conv.unread}</Text>
-            </View>
-          )}
+          {conv.unread > 0 && <UnreadBadge convId={conv.id} count={conv.unread} />}
         </View>
       </View>
     </Pressable>
@@ -328,14 +363,14 @@ const useStyles = makeStyles(({ colors, type }) => ({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    // 모노크롬 잉크 배지 — onPrimary 텍스트와 짝
-    backgroundColor: colors.primary,
+    // 모노크롬 잉크 배지 — onChip 텍스트와 짝 (Action Blue는 인터랙티브 전용)
+    backgroundColor: colors.chip,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
   unreadText: {
-    color: colors.onPrimary,
+    color: colors.onChip,
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },

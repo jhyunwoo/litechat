@@ -64,6 +64,25 @@ body {
   touch-action: manipulation;
 }
 
+/* 포커스 링 — DESIGN.md: 2px solid {colors.primary-focus} (키보드 이동에만 노출) */
+:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+/* OS의 '동작 줄이기'를 켠 사용자에게는 전환/애니메이션을 사실상 없앤다.
+   (motion 컴포넌트는 main.tsx의 MotionConfig reducedMotion="user"가 담당) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* 숫자 셀(시간, 카운트, 용량)용 tabular figures — DESIGN.md의 tnum 시그니처 */
 .tnum {
   font-feature-settings: 'ss01', 'tnum';

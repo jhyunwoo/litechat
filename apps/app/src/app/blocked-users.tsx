@@ -60,7 +60,7 @@ export default function BlockedUsersScreen() {
             <Pressable
               onPress={() => void unblock(item)}
               accessibilityRole="button"
-              style={styles.unblock}
+              style={({ pressed }) => [styles.unblock, pressed && styles.unblockPressed]}
             >
               <Text style={styles.unblockLabel}>차단 해제</Text>
             </Pressable>
@@ -97,6 +97,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
   nickname: { color: colors.ink, fontSize: 15 },
   username: { color: colors.inkMute, fontSize: 12 },
   unblock: { minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center' },
+  unblockPressed: { opacity: 0.5, transform: [{ scale: 0.95 }] },
   unblockLabel: { color: colors.link, textDecorationLine: 'underline' },
   hint: { color: colors.inkMute, textAlign: 'center', marginTop: spacing.xl },
   error: { color: colors.ruby, textAlign: 'center', marginTop: spacing.xl },

@@ -3,10 +3,11 @@
  */
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { makeStyles } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 
+// prettier-ignore
 const EMOJIS = [
   '😀', '😂', '🤣', '😊', '😍', '🥰', '😘', '😎',
   '🤔', '😅', '😭', '😢', '😡', '🥺', '😴', '🤗',
@@ -23,7 +24,11 @@ interface Props {
 export function EmojiPicker({ onPick }: Props) {
   const styles = useStyles();
   return (
-    <Animated.View entering={FadeInDown.duration(180)} style={styles.grid}>
+    <Animated.View
+      entering={FadeInDown.duration(180)}
+      exiting={FadeOutDown.duration(140)}
+      style={styles.grid}
+    >
       {EMOJIS.map((emoji) => (
         <Pressable
           key={emoji}
@@ -57,7 +62,8 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   cellPressed: {
     backgroundColor: colors.canvasSoft,
-    transform: [{ scale: 0.9 }],
+    // DESIGN.md의 시스템 공통 눌림 스케일
+    transform: [{ scale: 0.95 }],
   },
   emoji: {
     fontSize: 24,

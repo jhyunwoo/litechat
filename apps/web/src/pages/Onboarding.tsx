@@ -39,13 +39,16 @@ function ShareGlyph({ className = '' }: { className?: string }) {
 function AddToHomeGlyph({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" stroke="currentColor" strokeWidth="1.8" />
-      <path
-        d="M12 8.5v7M8.5 12h7"
+      <rect
+        x="3.5"
+        y="3.5"
+        width="17"
+        height="17"
+        rx="4.5"
         stroke="currentColor"
         strokeWidth="1.8"
-        strokeLinecap="round"
       />
+      <path d="M12 8.5v7M8.5 12h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -124,7 +127,7 @@ export default function Onboarding() {
       <button
         onClick={() => navigate('/profile')}
         aria-label="닫기"
-        className="pt-safe absolute top-2 right-4 z-10 flex size-9 items-center justify-center rounded-full text-ink-mute active:bg-canvas-soft"
+        className="pt-safe absolute top-2 right-4 z-10 flex size-11 items-center justify-center rounded-full text-ink-mute transition active:scale-95 active:bg-canvas-soft"
       >
         <Icon name="close" className="size-5" />
       </button>
@@ -152,7 +155,7 @@ export default function Onboarding() {
                 n={1}
                 title={
                   <>
-                    Safari 하단의 <span className="font-medium text-primary">공유</span> 버튼을
+                    Safari 하단의 <span className="font-semibold text-primary">공유</span> 버튼을
                     누르세요
                   </>
                 }
@@ -163,7 +166,7 @@ export default function Onboarding() {
                 n={2}
                 title={
                   <>
-                    <span className="font-medium text-primary">홈 화면에 추가</span>를 선택하세요
+                    <span className="font-semibold text-primary">홈 화면에 추가</span>를 선택하세요
                   </>
                 }
                 desc="목록을 아래로 내리면 있어요"
@@ -173,7 +176,7 @@ export default function Onboarding() {
                 n={3}
                 title={
                   <>
-                    홈 화면의 <span className="font-medium">litechat</span> 아이콘으로 다시 여세요
+                    홈 화면의 <span className="font-semibold">litechat</span> 아이콘으로 다시 여세요
                   </>
                 }
                 desc="그다음 이 안내가 알림 켜기 버튼으로 바뀌어요"
@@ -181,8 +184,8 @@ export default function Onboarding() {
             </ol>
 
             <div className="mt-4 rounded-xl bg-canvas-soft px-4 py-3 text-sm text-ink-secondary">
-              iOS는 홈 화면에 추가한 뒤에만 알림을 보낼 수 있어요. Safari에서 열어야 &lsquo;홈 화면에
-              추가&rsquo;가 보입니다.
+              iOS는 홈 화면에 추가한 뒤에만 알림을 보낼 수 있어요. Safari에서 열어야 &lsquo;홈
+              화면에 추가&rsquo;가 보입니다.
             </div>
 
             <button
@@ -207,9 +210,7 @@ export default function Onboarding() {
                 n={ios ? 3 : 1}
                 title="알림 켜기"
                 desc={
-                  result === 'done'
-                    ? '알림이 켜졌어요'
-                    : '아래 버튼을 누르고 권한을 허용해 주세요'
+                  result === 'done' ? '알림이 켜졌어요' : '아래 버튼을 누르고 권한을 허용해 주세요'
                 }
                 done={result === 'done'}
               />

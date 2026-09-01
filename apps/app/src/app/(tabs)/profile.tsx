@@ -4,8 +4,19 @@
  * 네이티브 앱이므로 iOS PWA 온보딩은 필요 없다 — 토글이 곧바로
  * 권한 요청 → Expo 토큰 등록으로 이어진다.
  */
-import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  Linking,
+  type LayoutChangeEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
@@ -21,6 +32,73 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'light', label: '라이트' },
   { value: 'dark', label: '다크' },
 ];
+
+/** 선택 필이 미끄러지는 스프링 — iOS 세그먼트 컨트롤 감각 */
+const SEGMENT_SPRING = { stiffness: 420, damping: 34, mass: 0.7 } as const;
+
+/** 화면 테마 세그먼트 — 선택된 칸으로 Action Blue 필이 미끄러진다 */
+function ThemeSegments({
+  value,
+  onChange,
+}: {
+  value: ThemePreference;
+  onChange: (next: ThemePreference) => void;
+}) {
+  const styles = useStyles();
+  // 각 칸의 실제 위치/폭을 측정해 그 위로 필을 옮긴다 (라벨 길이가 언어마다 다르다).
+  const [frames, setFrames] = useState<{ x: number; width: number }[]>([]);
+  const x = useSharedValue(0);
+  const width = useSharedValue(0);
+
+  const index = THEME_OPTIONS.findIndex((option) => option.value === value);
+  const frame = frames[index];
+
+  useEffect(() => {
+    if (!frame) return;
+    // 첫 측정에는 애니메이션 없이 자리를 잡고, 이후 전환만 스프링으로 움직인다.
+    if (width.value === 0) {
+      x.set(frame.x);
+      width.set(frame.width);
+      return;
+    }
+    x.set(withSpring(frame.x, SEGMENT_SPRING));
+    width.set(withSpring(frame.width, SEGMENT_SPRING));
+  }, [frame, x, width]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }],
+    width: width.value,
+  }));
+
+  const onSegmentLayout = useCallback((event: LayoutChangeEvent, position: number) => {
+    const { x: left, width: size } = event.nativeEvent.layout;
+    setFrames((previous) => {
+      const next = [...previous];
+      next[position] = { x: left, width: size };
+      return next;
+    });
+  }, []);
+
+  return (
+    <View style={styles.segments}>
+      {frames.length > 0 && <Animated.View style={[styles.segmentPill, pillStyle]} />}
+      {THEME_OPTIONS.map((option, position) => (
+        <Pressable
+          key={option.value}
+          onPress={() => onChange(option.value)}
+          onLayout={(event) => onSegmentLayout(event, position)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === option.value }}
+          style={styles.segment}
+        >
+          <Text style={[styles.segmentLabel, value === option.value && styles.segmentLabelOn]}>
+            {option.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
 
 export default function ProfileTab() {
   const styles = useStyles();
@@ -145,21 +223,7 @@ export default function ProfileTab() {
             <View style={styles.cardRowText}>
               <Text style={styles.rowTitle}>화면 테마</Text>
             </View>
-            <View style={styles.segments}>
-              {THEME_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setPref(option.value)}
-                  style={[styles.segment, pref === option.value && styles.segmentOn]}
-                >
-                  <Text
-                    style={[styles.segmentLabel, pref === option.value && styles.segmentLabelOn]}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <ThemeSegments value={pref} onChange={setPref} />
           </View>
 
           <View style={styles.divider} />
@@ -247,7 +311,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
   },
   logout: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.ruby,
   },
   chevron: { fontSize: 20, color: colors.inkMute },
@@ -257,13 +321,18 @@ const useStyles = makeStyles(({ colors, type }) => ({
     borderRadius: rounded.pill,
     padding: 2,
   },
+  /** 선택 표시 — 칸 위를 미끄러지는 Action Blue 필 */
+  segmentPill: {
+    position: 'absolute',
+    top: 2,
+    bottom: 2,
+    borderRadius: rounded.pill,
+    backgroundColor: colors.primary,
+  },
   segment: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
     borderRadius: rounded.pill,
-  },
-  segmentOn: {
-    backgroundColor: colors.primary,
   },
   segmentLabel: {
     fontSize: 13,
@@ -271,7 +340,8 @@ const useStyles = makeStyles(({ colors, type }) => ({
   },
   segmentLabelOn: {
     color: colors.onPrimary,
-    fontWeight: '500',
+    // 웨이트 사다리는 300/400/600/700 — 500은 시스템에 없다
+    fontWeight: '600',
   },
   footer: {
     textAlign: 'center',

@@ -5,9 +5,11 @@
  * - 낙관적 전송 + ack 확정, 읽음 표시("읽음"), 이미지/이모지 전송
  * - Enter 전송 / Shift+Enter 줄바꿈 / Esc 뒤로가기
  * - 화면이 보이는 동안 새 메시지가 오면 자동으로 읽음 처리
+ * - 입력 바의 사진/이모지/입력창/전송은 모두 44px 높이로 맞춘다 (DESIGN.md 터치 타깃)
  */
 import type { WireMessage } from '@litechat/types';
 import { useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -170,7 +172,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
           <button
             onClick={() => navigate('/')}
             aria-label="뒤로"
-            className="rounded-full p-2 text-primary active:bg-canvas-soft md:hidden"
+            className="flex size-11 items-center justify-center rounded-full text-primary transition active:scale-95 active:bg-canvas-soft md:hidden"
           >
             <Icon name="back" className="size-6" />
           </button>
@@ -218,24 +220,39 @@ function ChatRoomContent({ convId }: { convId: number }) {
           </div>
         </div>
 
-        {awayFromBottom && (
-          <button
-            type="button"
-            onClick={scrollToLatest}
-            aria-label="최신 메시지로 이동"
-            title="최신 메시지로 이동"
-            className="absolute right-4 bottom-4 z-10 flex size-11 items-center justify-center rounded-full border border-hairline bg-white text-xl text-ink shadow-lg transition hover:bg-canvas-soft active:scale-95"
-          >
-            <span aria-hidden>↓</span>
-          </button>
-        )}
+        <AnimatePresence>
+          {awayFromBottom && (
+            <motion.button
+              type="button"
+              onClick={scrollToLatest}
+              aria-label="최신 메시지로 이동"
+              title="최신 메시지로 이동"
+              initial={{ opacity: 0, y: 12, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 480, damping: 30, mass: 0.6 }}
+              whileTap={{ scale: 0.95 }}
+              className="frosted absolute right-4 bottom-4 z-10 flex size-11 items-center justify-center rounded-full border border-hairline text-xl text-ink"
+            >
+              <span aria-hidden>↓</span>
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
-      {error && (
-        <p className="px-4 py-1 text-center text-xs text-ruby" onClick={() => setError('')}>
-          {error}
-        </p>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden px-4 py-1 text-center text-xs text-ruby"
+            onClick={() => setError('')}
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       {/* 입력 바 */}
       <div className="pb-safe border-t border-hairline bg-white">
@@ -246,44 +263,57 @@ function ChatRoomContent({ convId }: { convId: number }) {
               onClick={() => setShowCamMenu((v) => !v)}
               disabled={uploading}
               aria-label="사진 보내기"
-              className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft disabled:opacity-40"
+              className="flex size-11 items-center justify-center rounded-full text-ink-mute transition hover:text-ink-secondary active:scale-95 active:bg-canvas-soft disabled:opacity-40"
             >
               <Icon name={uploading ? 'spinner' : 'camera'} className="size-6" />
             </button>
-            {showCamMenu && (
-              <>
-                {/* 바깥 클릭으로 닫기 */}
-                <div className="fixed inset-0 z-10" onClick={() => setShowCamMenu(false)} />
-                <div className="absolute bottom-full left-0 z-20 mb-2 w-36 overflow-hidden rounded-xl border border-hairline bg-white shadow-lg">
-                  <button
-                    onClick={() => {
-                      setShowCamMenu(false);
-                      fileRef.current?.click();
-                    }}
-                    className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
+            <AnimatePresence>
+              {showCamMenu && (
+                <>
+                  {/* 바깥 클릭으로 닫기 */}
+                  <div className="fixed inset-0 z-10" onClick={() => setShowCamMenu(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                    transition={{ duration: 0.16, ease: [0.32, 0.72, 0, 1] }}
+                    style={{ originX: 0, originY: 1 }}
+                    className="absolute bottom-full left-0 z-20 mb-2 w-36 overflow-hidden rounded-xl border border-hairline bg-white"
                   >
-                    파일 선택
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowCamMenu(false);
-                      setShowWebcam(true);
-                    }}
-                    className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
-                  >
-                    웹캠 촬영
-                  </button>
-                </div>
-              </>
-            )}
+                    <button
+                      onClick={() => {
+                        setShowCamMenu(false);
+                        fileRef.current?.click();
+                      }}
+                      className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
+                    >
+                      파일 선택
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCamMenu(false);
+                        setShowWebcam(true);
+                      }}
+                      className="block w-full px-4 py-2.5 text-left text-sm hover:bg-canvas-soft"
+                    >
+                      웹캠 촬영
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
           <button
             onClick={() => setShowEmoji((v) => !v)}
             aria-label="이모지"
-            className="rounded-full p-2 text-ink-mute transition-colors hover:text-ink-secondary active:bg-canvas-soft"
+            aria-expanded={showEmoji}
+            className={`flex size-11 items-center justify-center rounded-full transition active:scale-95 active:bg-canvas-soft ${
+              showEmoji ? 'text-primary' : 'text-ink-mute hover:text-ink-secondary'
+            }`}
           >
             <Icon name="smile" className="size-6" />
           </button>
+          {/* 입력창 — 한 줄일 때 정확히 44px(11 + 22 + 11)로 좌우 컨트롤과 높이를 맞춘다 */}
           <textarea
             ref={inputRef}
             value={draft}
@@ -291,27 +321,44 @@ function ChatRoomContent({ convId }: { convId: number }) {
             onKeyDown={onKeyDown}
             placeholder="메시지 보내기"
             rows={1}
-            className="max-h-28 flex-1 resize-none rounded-2xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:ring-2 focus:ring-primary-focus"
+            className="max-h-28 min-h-11 flex-1 resize-none rounded-[22px] bg-canvas-soft px-4 py-[11px] text-[16px] leading-[22px]"
           />
-          <button
+          <motion.button
             onClick={() => void submit()}
             disabled={!draft.trim()}
             aria-label="전송"
-            className="rounded-full bg-primary p-2.5 text-white transition active:scale-90 disabled:opacity-30"
+            initial={false}
+            // 높이 정렬이 흐트러지지 않도록 크기는 항상 1 — 활성화되는 순간에만 살짝 튀어오른다
+            animate={draft.trim() ? 'ready' : 'idle'}
+            variants={{
+              idle: { scale: 1, opacity: 0.35 },
+              ready: { scale: [1, 1.12, 1], opacity: 1 },
+            }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+            whileTap={{ scale: 0.95 }}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-white"
           >
             <Icon name="send" className="size-5" />
-          </button>
+          </motion.button>
         </div>
-        {showEmoji && (
-          <div className="mx-auto w-full max-w-3xl">
-            <EmojiPicker
-              onPick={(emoji) => {
-                setDraft((d) => d + emoji);
-                inputRef.current?.focus();
-              }}
-            />
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {showEmoji && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+              className="mx-auto w-full max-w-3xl overflow-hidden"
+            >
+              <EmojiPicker
+                onPick={(emoji) => {
+                  setDraft((d) => d + emoji);
+                  inputRef.current?.focus();
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <ImageViewer message={viewing} onClose={() => setViewing(null)} />

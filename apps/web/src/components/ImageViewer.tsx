@@ -55,13 +55,13 @@ export function ImageViewer({ message, onClose }: Props) {
             <a
               href={`/img/${image.id}/thumb`}
               download={`litechat-${image.id}.webp`}
-              className="tnum rounded-full bg-white/15 px-4 py-2 text-sm text-white backdrop-blur"
+              className="tnum flex min-h-11 items-center rounded-full bg-white/15 px-5 text-sm text-white backdrop-blur transition active:scale-95"
             >
               저화질 저장 ({formatBytes(image.tb)})
             </a>
             <a
               href={`/img/${image.id}/orig`}
-              className="tnum rounded-full bg-white/15 px-4 py-2 text-sm text-white backdrop-blur"
+              className="tnum flex min-h-11 items-center rounded-full bg-white/15 px-5 text-sm text-white backdrop-blur transition active:scale-95"
             >
               원본 저장 ({formatBytes(image.ob)})
             </a>

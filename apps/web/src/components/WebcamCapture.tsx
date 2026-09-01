@@ -98,7 +98,7 @@ export function WebcamCapture({ open, onCapture, onClose }: Props) {
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="rounded-full bg-white/15 px-5 py-2.5 text-sm text-white backdrop-blur"
+                className="min-h-11 rounded-full bg-white/15 px-5 text-sm text-white backdrop-blur transition active:scale-95"
               >
                 취소
               </button>
@@ -106,7 +106,7 @@ export function WebcamCapture({ open, onCapture, onClose }: Props) {
                 <button
                   onClick={capture}
                   aria-label="촬영"
-                  className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-ink active:scale-95"
+                  className="flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-ink transition active:scale-95"
                 >
                   <Icon name="camera" className="size-5" />
                   촬영

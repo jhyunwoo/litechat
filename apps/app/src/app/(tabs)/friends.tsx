@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { useFriendRequests, useFriends } from '@/data/data';
@@ -32,6 +32,7 @@ function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number)
       return (
         <Pressable
           onPress={() => onAdd(user.id)}
+          accessibilityRole="button"
           style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
         >
           <Text style={styles.pillLabel}>친구 추가</Text>
@@ -128,14 +129,18 @@ export default function FriendsTab() {
             {searchResults?.length === 0 && (
               <Text style={styles.sectionHint}>‘{debounced}’ 사용자를 찾지 못했어요.</Text>
             )}
-            {searchResults?.map((user) => (
-              <View key={user.id} style={styles.personRow}>
+            {searchResults?.map((user, index) => (
+              <Animated.View
+                key={user.id}
+                entering={FadeIn.duration(200).delay(Math.min(index, 6) * 30)}
+                style={styles.personRow}
+              >
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{user.nickname}</Text>
                   <Text style={styles.personUsername}>@{user.username}</Text>
                 </View>
                 <RelationAction user={user} onAdd={(id) => addFriend.mutate(id)} />
-              </View>
+              </Animated.View>
             ))}
           </Animated.View>
         )}
@@ -145,7 +150,13 @@ export default function FriendsTab() {
           <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
             <Text style={styles.sectionTitle}>받은 요청</Text>
             {requests.incoming.map((request) => (
-              <View key={request.id} style={styles.personRow}>
+              <Animated.View
+                key={request.id}
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(160)}
+                layout={LinearTransition.duration(220)}
+                style={styles.personRow}
+              >
                 <View style={styles.personInfo}>
                   <Text style={styles.personName}>{request.user.nickname}</Text>
                   <Text style={styles.personUsername}>@{request.user.username}</Text>
@@ -153,18 +164,21 @@ export default function FriendsTab() {
                 <View style={styles.actions}>
                   <Pressable
                     onPress={() => respond.mutate({ id: request.id, accept: true })}
+                    accessibilityRole="button"
                     style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
                   >
                     <Text style={styles.pillLabel}>수락</Text>
                   </Pressable>
+                  {/* button-secondary-pill — 두 번째 CTA는 고스트 필 (테두리만) */}
                   <Pressable
                     onPress={() => respond.mutate({ id: request.id, accept: false })}
+                    accessibilityRole="button"
                     style={({ pressed }) => [styles.pillGhost, pressed && styles.pillGhostPressed]}
                   >
                     <Text style={styles.pillGhostLabel}>거절</Text>
                   </Pressable>
                 </View>
-              </View>
+              </Animated.View>
             ))}
           </Animated.View>
         )}
@@ -175,23 +189,28 @@ export default function FriendsTab() {
           {friends?.length === 0 && (
             <Text style={styles.sectionHint}>위 검색창에서 아이디로 친구를 찾아보세요.</Text>
           )}
-          {friends?.map(({ user, c }) => (
-            <Pressable
+          {friends?.map(({ user, c }, index) => (
+            <Animated.View
               key={user.id}
-              onPress={() => router.push(`/chat/${c}`)}
-              style={({ pressed }) => [
-                styles.friendRow,
-                pressed && { backgroundColor: colors.canvasSoft },
-              ]}
+              entering={FadeIn.duration(220).delay(Math.min(index, 8) * 30)}
+              layout={LinearTransition.duration(220)}
             >
-              <Avatar nickname={user.nickname} size={40} variant="dark" />
-              <View style={styles.personInfo}>
-                <Text style={styles.personName} numberOfLines={1}>
-                  {user.nickname}
-                </Text>
-                <Text style={styles.personUsername}>@{user.username}</Text>
-              </View>
-            </Pressable>
+              <Pressable
+                onPress={() => router.push(`/chat/${c}`)}
+                style={({ pressed }) => [
+                  styles.friendRow,
+                  pressed && { backgroundColor: colors.canvasSoft },
+                ]}
+              >
+                <Avatar nickname={user.nickname} size={40} variant="dark" />
+                <View style={styles.personInfo}>
+                  <Text style={styles.personName} numberOfLines={1}>
+                    {user.nickname}
+                  </Text>
+                  <Text style={styles.personUsername}>@{user.username}</Text>
+                </View>
+              </Pressable>
+            </Animated.View>
           ))}
         </View>
       </ScrollView>
@@ -216,12 +235,15 @@ const useStyles = makeStyles(({ colors, type }) => ({
   },
   search: {
     backgroundColor: colors.canvasSoft,
-    borderRadius: rounded.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
+    // DESIGN.md search-input — 검색창도 CTA와 같은 pill 문법, 높이 44
+    borderRadius: rounded.pill,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 11,
     fontSize: 16,
+    lineHeight: 22,
+    includeFontPadding: false,
     color: colors.ink,
-    minHeight: 40,
+    minHeight: 44,
   },
   notice: {
     paddingHorizontal: spacing.lg,
@@ -240,7 +262,8 @@ const useStyles = makeStyles(({ colors, type }) => ({
     paddingTop: spacing.md,
     paddingBottom: spacing.xs,
     fontSize: 12,
-    fontWeight: '500',
+    // 웨이트 사다리는 300/400/600/700 — 500은 시스템에 없다 (caption-strong = 600)
+    fontWeight: '600',
     color: colors.inkMute,
   },
   sectionHint: {
@@ -288,29 +311,31 @@ const useStyles = makeStyles(({ colors, type }) => ({
   pillButton: {
     backgroundColor: colors.primary,
     borderRadius: rounded.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    minHeight: 32,
+    // button-primary — 11 x 22 패딩, 최소 터치 타깃 44
+    paddingHorizontal: 22,
+    minHeight: 44,
     justifyContent: 'center',
   },
-  pillPressed: { backgroundColor: colors.primaryPress },
+  pillPressed: { backgroundColor: colors.primaryPress, transform: [{ scale: 0.95 }] },
   pillLabel: {
     color: colors.onPrimary,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '400',
   },
+  /** button-secondary-pill — 투명 배경 + 인터랙티브 블루 테두리의 고스트 필
+      (다크 타일 위에서는 link가 Sky Blue라 Action Blue처럼 묻히지 않는다) */
   pillGhost: {
-    backgroundColor: colors.hairline,
+    borderWidth: 1,
+    borderColor: colors.link,
     borderRadius: rounded.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    minHeight: 32,
+    paddingHorizontal: 22,
+    minHeight: 44,
     justifyContent: 'center',
   },
-  pillGhostPressed: { opacity: 0.7 },
+  pillGhostPressed: { backgroundColor: colors.canvasSoft, transform: [{ scale: 0.95 }] },
   pillGhostLabel: {
-    color: colors.inkSecondary,
-    fontSize: 13,
+    color: colors.link,
+    fontSize: 14,
     fontWeight: '400',
   },
 }));

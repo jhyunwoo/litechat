@@ -3,6 +3,7 @@
  */
 import type { PublicUser } from '@litechat/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -25,7 +26,7 @@ function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number)
       return (
         <button
           onClick={() => onAdd(user.id)}
-          className="rounded-full bg-primary px-3 py-1 text-xs font-normal text-white active:scale-95"
+          className="min-h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-normal text-white transition active:scale-95"
         >
           친구 추가
         </button>
@@ -104,69 +105,113 @@ export default function FriendsTab() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="아이디로 검색 (Ctrl+K)"
-            className="w-full rounded-xl bg-canvas-soft px-4 py-2.5 text-[16px] outline-none focus:bg-canvas-soft focus:ring-2 focus:ring-primary-focus"
+            className="h-11 w-full rounded-full bg-canvas-soft px-5 text-[16px]"
             autoCapitalize="none"
           />
         </div>
       </header>
 
-      {notice && (
-        <p className="px-4 py-2 text-center text-sm text-primary" onClick={() => setNotice('')}>
-          {notice}
-        </p>
-      )}
+      <AnimatePresence>
+        {notice && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden px-4 py-2 text-center text-sm text-primary"
+            onClick={() => setNotice('')}
+          >
+            {notice}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       {/* 검색 결과 */}
-      {debounced && (
-        <section className="border-b border-hairline pb-2">
-          <h2 className="px-4 pt-2 pb-1 text-xs font-medium text-ink-mute">검색 결과</h2>
-          {searchResults?.length === 0 && (
-            <p className="px-4 py-3 text-sm text-ink-mute">‘{debounced}’ 사용자를 찾지 못했어요.</p>
-          )}
-          {searchResults?.map((user) => (
-            <div key={user.id} className="flex items-center justify-between px-4 py-2">
-              <div>
-                <p className="font-normal">{user.nickname}</p>
-                <p className="text-xs text-ink-mute">@{user.username}</p>
-              </div>
-              <RelationAction user={user} onAdd={(id) => addFriend.mutate(id)} />
-            </div>
-          ))}
-        </section>
-      )}
+      <AnimatePresence initial={false}>
+        {debounced && (
+          <motion.section
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+            className="overflow-hidden border-b border-hairline pb-2"
+          >
+            <h2 className="px-4 pt-2 pb-1 text-xs font-semibold text-ink-mute">검색 결과</h2>
+            {searchResults?.length === 0 && (
+              <p className="px-4 py-3 text-sm text-ink-mute">
+                ‘{debounced}’ 사용자를 찾지 못했어요.
+              </p>
+            )}
+            {searchResults?.map((user, index) => (
+              <motion.div
+                key={user.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(index, 6) * 0.03, duration: 0.2 }}
+                className="flex items-center justify-between gap-3 px-4 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-normal">{user.nickname}</p>
+                  <p className="truncate text-xs text-ink-mute">@{user.username}</p>
+                </div>
+                <RelationAction user={user} onAdd={(id) => addFriend.mutate(id)} />
+              </motion.div>
+            ))}
+          </motion.section>
+        )}
+      </AnimatePresence>
 
-      {/* 받은 친구 요청 */}
-      {requests && requests.incoming.length > 0 && (
-        <section className="border-b border-hairline pb-2">
-          <h2 className="px-4 pt-2 pb-1 text-xs font-medium text-ink-mute">받은 요청</h2>
-          {requests.incoming.map((request) => (
-            <div key={request.id} className="flex items-center justify-between px-4 py-2">
-              <div>
-                <p className="font-normal">{request.user.nickname}</p>
-                <p className="text-xs text-ink-mute">@{request.user.username}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => respond.mutate({ id: request.id, accept: true })}
-                  className="rounded-full bg-primary px-3 py-1 text-xs font-normal text-white active:scale-95"
+      {/* 받은 친구 요청 — 수락/거절하면 행이 접히며 사라진다 */}
+      <AnimatePresence initial={false}>
+        {requests && requests.incoming.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden border-b border-hairline pb-2"
+          >
+            <h2 className="px-4 pt-2 pb-1 text-xs font-semibold text-ink-mute">받은 요청</h2>
+            <AnimatePresence initial={false}>
+              {requests.incoming.map((request) => (
+                <motion.div
+                  key={request.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0, transition: { duration: 0.18 } }}
+                  transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                  className="overflow-hidden"
                 >
-                  수락
-                </button>
-                <button
-                  onClick={() => respond.mutate({ id: request.id, accept: false })}
-                  className="rounded-full bg-hairline px-3 py-1 text-xs font-normal text-ink-secondary active:scale-95"
-                >
-                  거절
-                </button>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
+                  <div className="flex items-center justify-between gap-3 px-4 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-normal">{request.user.nickname}</p>
+                      <p className="truncate text-xs text-ink-mute">@{request.user.username}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => respond.mutate({ id: request.id, accept: true })}
+                        className="min-h-11 rounded-full bg-primary px-5 text-sm font-normal text-white transition active:scale-95"
+                      >
+                        수락
+                      </button>
+                      {/* button-secondary-pill — 두 번째 CTA는 고스트 필 */}
+                      <button
+                        onClick={() => respond.mutate({ id: request.id, accept: false })}
+                        className="min-h-11 rounded-full border border-primary px-5 text-sm font-normal text-primary transition active:scale-95 active:bg-canvas-soft"
+                      >
+                        거절
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.section>
+        )}
+      </AnimatePresence>
 
       {/* 친구 목록 */}
       <section>
-        <h2 className="px-4 pt-3 pb-1 text-xs font-medium text-ink-mute">
+        <h2 className="px-4 pt-3 pb-1 text-xs font-semibold text-ink-mute">
           친구 {friends?.length ?? 0}
         </h2>
         {friends?.length === 0 && (
@@ -174,20 +219,26 @@ export default function FriendsTab() {
             위 검색창에서 아이디로 친구를 찾아보세요.
           </p>
         )}
-        {friends?.map(({ user, c }) => (
-          <Link
+        {friends?.map(({ user, c }, index) => (
+          <motion.div
             key={user.id}
-            to={`/chat/${c}`}
-            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-canvas-soft active:bg-canvas-soft"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(index, 8) * 0.03, duration: 0.22 }}
           >
-            <div className="flex size-10 items-center justify-center rounded-full bg-ink font-semibold text-white">
-              {user.nickname.charAt(0)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-normal">{user.nickname}</p>
-              <p className="text-xs text-ink-mute">@{user.username}</p>
-            </div>
-          </Link>
+            <Link
+              to={`/chat/${c}`}
+              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-canvas-soft active:bg-canvas-soft"
+            >
+              <div className="flex size-10 items-center justify-center rounded-full bg-ink font-semibold text-white">
+                {user.nickname.charAt(0)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-normal">{user.nickname}</p>
+                <p className="text-xs text-ink-mute">@{user.username}</p>
+              </div>
+            </Link>
+          </motion.div>
         ))}
       </section>
     </div>

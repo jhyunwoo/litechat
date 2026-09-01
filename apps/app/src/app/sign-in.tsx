@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Image } from 'expo-image';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/data/auth';
 import { errorMessage } from '@/lib/api';
@@ -85,7 +85,7 @@ export default function SignIn() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.form}>
+        <Animated.View style={styles.form} layout={LinearTransition.duration(200)}>
           <TextInput
             style={styles.input}
             placeholder="아이디 (영문 소문자/숫자/_)"
@@ -98,7 +98,7 @@ export default function SignIn() {
             maxLength={20}
           />
           {isRegister && (
-            <Animated.View entering={FadeIn.duration(180)}>
+            <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
               <TextInput
                 style={styles.input}
                 placeholder="닉네임"
@@ -143,9 +143,9 @@ export default function SignIn() {
               <Text style={styles.ctaLabel}>{isRegister ? '가입하기' : '로그인'}</Text>
             )}
           </Pressable>
-        </View>
+        </Animated.View>
 
-        <View style={styles.switchRow}>
+        <Animated.View style={styles.switchRow} layout={LinearTransition.duration(200)}>
           <Text style={styles.switchHint}>
             {isRegister ? '이미 계정이 있나요? ' : '처음이신가요? '}
           </Text>
@@ -158,7 +158,7 @@ export default function SignIn() {
           >
             <Text style={styles.switchLink}>{isRegister ? '로그인' : '가입하기'}</Text>
           </Pressable>
-        </View>
+        </Animated.View>
 
         <Text style={styles.notice}>
           서비스 개선과 보안을 위해 접속 IP·기기 정보 등을 수집해요.
@@ -223,10 +223,13 @@ const useStyles = makeStyles(({ colors, type }) => ({
     backgroundColor: colors.canvas,
     borderWidth: 1,
     borderColor: colors.hairlineInput,
-    borderRadius: rounded.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    // 인풋도 pill — DESIGN.md search-input 문법 (웹 AuthPage와 동일)
+    borderRadius: rounded.pill,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 11,
     fontSize: 16,
+    lineHeight: 22,
+    includeFontPadding: false,
     color: colors.ink,
     minHeight: 44,
   },
@@ -244,7 +247,7 @@ const useStyles = makeStyles(({ colors, type }) => ({
     minHeight: 48,
     justifyContent: 'center',
   },
-  ctaPressed: { backgroundColor: colors.primaryPress },
+  ctaPressed: { backgroundColor: colors.primaryPress, transform: [{ scale: 0.95 }] },
   ctaBusy: { opacity: 0.6 },
   ctaLabel: {
     ...type.buttonMd,

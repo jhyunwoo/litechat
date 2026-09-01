@@ -3,6 +3,7 @@
  * 왼쪽(모바일은 상단)은 니어블랙 타일에 브랜드 심벌 + 워드마크,
  * 오른쪽은 흰 캔버스의 폼 패널이다.
  */
+import { AnimatePresence, motion } from 'motion/react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -40,7 +41,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   // 인풋도 pill — 검색 인풋과 같은 문법 (16px은 iOS 자동 줌 방지)
   const inputClass =
-    'w-full rounded-full border border-hairline-input bg-white px-5 py-2.5 text-[16px] outline-none focus:border-primary-focus transition-colors';
+    'h-11 w-full rounded-full border border-hairline-input bg-white px-5 text-[16px] transition-colors';
 
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
@@ -59,7 +60,12 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
       {/* 폼 패널 — 화이트 캔버스, 세로 중앙 정렬 */}
       <div className="relative flex flex-1 flex-col justify-center px-6">
-        <div className="pb-safe relative mx-auto w-full max-w-sm py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+          className="pb-safe relative mx-auto w-full max-w-sm py-10"
+        >
           <h2 className="display mb-8 text-center text-2xl text-ink">
             {isRegister ? '회원가입' : '로그인'}
           </h2>
@@ -77,16 +83,26 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               maxLength={20}
               pattern="[a-z0-9_]{3,20}"
             />
-            {isRegister && (
-              <input
-                className={inputClass}
-                placeholder="닉네임"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                required
-                maxLength={20}
-              />
-            )}
+            <AnimatePresence initial={false}>
+              {isRegister && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+                  className="overflow-hidden"
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="닉네임"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    required
+                    maxLength={20}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <input
               className={inputClass}
               type="password"
@@ -99,17 +115,25 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               maxLength={72}
             />
 
-            {error && (
-              <p className="text-center text-sm text-ruby" role="alert">
-                {error}
-              </p>
-            )}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center text-sm text-ruby"
+                  role="alert"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
             {/* button-primary pill — 밴드당 하나뿐인 Action Blue CTA */}
             <button
               type="submit"
               disabled={busy}
-              className="mt-2 rounded-full bg-primary py-3 text-white transition active:scale-95 active:bg-primary-press disabled:opacity-50"
+              className="mt-2 min-h-11 rounded-full bg-primary py-3 text-white transition active:scale-95 active:bg-primary-press disabled:opacity-50"
             >
               {busy ? '잠시만요…' : isRegister ? '가입하기' : '로그인'}
             </button>
@@ -144,7 +168,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               개인정보처리방침
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

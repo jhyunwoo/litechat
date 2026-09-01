@@ -2,14 +2,23 @@
  * 입력 바 — 사진/이모지/텍스트 전송 (글래스 표면 위)
  *
  * - 자동으로 자라는 입력창 (최대 5줄 정도)
- * - 전송 버튼: 인디고 필, 눌림 스케일 + 햅틱
+ * - 사진/이모지/입력창/전송은 모두 CONTROL_SIZE(44pt)로 높이를 맞춘다 —
+ *   DESIGN.md의 최소 터치 타깃(44x44)이자 search-input 높이 규칙
+ * - 전송 버튼: Action Blue 필, 입력이 생기면 스프링으로 커지며 또렷해진다
  * - 사진: 앨범에서 선택 → /api/images 업로드 → 이미지 메시지 전송
  */
 import type { MessageKind } from '@litechat/types';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { authHeaders, unwrap } from '@/lib/api';
 import { API_URL } from '@/lib/env';
 import { isEmojiOnly } from '@/lib/format';
@@ -17,6 +26,15 @@ import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 import { EmojiPicker } from './emoji-picker';
 import { Glass } from './glass';
+
+/** 입력 바의 모든 컨트롤이 공유하는 높이 — DESIGN.md 최소 터치 타깃 44x44 */
+const CONTROL_SIZE = 44;
+/** 한 줄일 때 입력창이 정확히 CONTROL_SIZE가 되도록 맞춘 값 (44 = 11 + 22 + 11) */
+const INPUT_LINE_HEIGHT = 22;
+const INPUT_PADDING_V = (CONTROL_SIZE - INPUT_LINE_HEIGHT) / 2;
+
+/** 전송 버튼이 살아나는 팝 — 크기는 항상 CONTROL_SIZE라 정렬은 흔들리지 않는다 */
+const SEND_POP_SPRING = { stiffness: 500, damping: 18, mass: 0.5 } as const;
 
 interface Props {
   onSend: (kind: MessageKind, content: string) => Promise<void>;
@@ -85,6 +103,22 @@ export function Composer({ onSend, onError }: Props) {
 
   const canSend = draft.trim().length > 0;
 
+  // 보낼 내용이 생기는 순간 전송 버튼이 또렷해지며 한 번 톡 튀어오른다.
+  const sendOpacity = useSharedValue(0.35);
+  const sendScale = useSharedValue(1);
+  useEffect(() => {
+    sendOpacity.set(withTiming(canSend ? 1 : 0.35, { duration: 160 }));
+    if (canSend) {
+      sendScale.set(
+        withSequence(withTiming(1.12, { duration: 110 }), withSpring(1, SEND_POP_SPRING)),
+      );
+    }
+  }, [canSend, sendOpacity, sendScale]);
+  const sendStyle = useAnimatedStyle(() => ({
+    opacity: sendOpacity.value,
+    transform: [{ scale: sendScale.value }],
+  }));
+
   return (
     <Glass style={styles.surface}>
       <View style={styles.bar}>
@@ -122,19 +156,18 @@ export function Composer({ onSend, onError }: Props) {
           onFocus={() => setShowEmoji(false)}
         />
 
-        {/* 전송 — 인디고 필 (화면당 하나뿐인 채워진 CTA), 눌림 스케일 */}
-        <Pressable
-          onPress={() => void submit()}
-          disabled={!canSend}
-          accessibilityLabel="전송"
-          style={({ pressed }) => [
-            styles.sendButton,
-            !canSend && styles.sendDisabled,
-            pressed && styles.sendPressed,
-          ]}
-        >
-          <Text style={styles.sendArrow}>↑</Text>
-        </Pressable>
+        {/* 전송 — Action Blue 필 (화면당 하나뿐인 채워진 CTA), 눌림 스케일 */}
+        <Animated.View style={sendStyle}>
+          <Pressable
+            onPress={() => void submit()}
+            disabled={!canSend}
+            accessibilityLabel="전송"
+            accessibilityState={{ disabled: !canSend }}
+            style={({ pressed }) => [styles.sendButton, pressed && styles.sendPressed]}
+          >
+            <Text style={styles.sendArrow}>↑</Text>
+          </Pressable>
+        </Animated.View>
       </View>
 
       {showEmoji && <EmojiPicker onPick={(emoji) => setDraft((d) => d + emoji)} />}
@@ -154,39 +187,44 @@ const useStyles = makeStyles(({ colors }) => ({
     padding: spacing.sm,
   },
   iconButton: {
-    padding: spacing.sm,
+    width: CONTROL_SIZE,
+    height: CONTROL_SIZE,
     borderRadius: rounded.pill,
-    minWidth: 48,
-    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconPressed: { backgroundColor: colors.canvasSoft },
-  icon: { fontSize: 20 },
+  iconPressed: { backgroundColor: colors.canvasSoft, transform: [{ scale: 0.95 }] },
+  icon: { fontSize: 20, lineHeight: 24 },
   input: {
     flex: 1,
     maxHeight: 110,
-    minHeight: 40,
+    // 한 줄일 때 정확히 CONTROL_SIZE — 전송 버튼/아이콘과 같은 높이로 맞춘다.
+    minHeight: CONTROL_SIZE,
     backgroundColor: colors.canvasSoft,
-    borderRadius: 20,
+    // 한 줄에서는 완전한 필, 여러 줄로 자라면 라운드 사각형이 된다.
+    borderRadius: CONTROL_SIZE / 2,
     paddingHorizontal: spacing.lg,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: INPUT_PADDING_V,
+    paddingBottom: INPUT_PADDING_V,
     fontSize: 16,
+    lineHeight: INPUT_LINE_HEIGHT,
+    // 안드로이드의 기본 폰트 패딩이 높이를 44에서 밀어내지 않도록 끈다.
+    includeFontPadding: false,
+    textAlignVertical: 'center',
     color: colors.ink,
   },
   sendButton: {
-    width: 48,
-    height: 48,
+    width: CONTROL_SIZE,
+    height: CONTROL_SIZE,
     borderRadius: rounded.pill,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendDisabled: { opacity: 0.3 },
   sendPressed: {
     backgroundColor: colors.primaryPress,
-    transform: [{ scale: 0.88 }],
+    // DESIGN.md의 시스템 공통 눌림 마이크로 인터랙션
+    transform: [{ scale: 0.95 }],
   },
   sendArrow: {
     color: colors.onPrimary,

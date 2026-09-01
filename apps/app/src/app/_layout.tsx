@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { AuthProvider, useAuth } from '@/data/auth';
 import { AppErrorBoundary } from '@/components/app-error-boundary';
 import { useRealtimeSync } from '@/data/data';
@@ -120,6 +121,8 @@ function Root() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* 접근성 '동작 줄이기'를 켠 기기에서는 모든 애니메이션을 끈다 */}
+      <ReducedMotionConfig mode={ReduceMotion.System} />
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
           <AppErrorBoundary>

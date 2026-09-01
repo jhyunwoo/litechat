@@ -19,7 +19,13 @@ import {
   useKeyboardHandler,
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
 import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
@@ -176,21 +182,23 @@ function ChatRoomViewContent({ convId, meId }: Props) {
         )}
 
         {awayFromBottom && (
-          <Pressable
-            onPress={scrollToEnd}
-            accessibilityRole="button"
-            accessibilityLabel="최신 메시지로 이동"
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.latestButton,
-              { bottom: composerLayoutHeight + spacing.md },
-              pressed && styles.latestButtonPressed,
-            ]}
+          <Animated.View
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+            style={[styles.latestAnchor, { bottom: composerLayoutHeight + spacing.md }]}
           >
-            <Text style={styles.latestButtonText} aria-hidden>
-              ↓
-            </Text>
-          </Pressable>
+            <Pressable
+              onPress={scrollToEnd}
+              accessibilityRole="button"
+              accessibilityLabel="최신 메시지로 이동"
+              hitSlop={8}
+              style={({ pressed }) => [styles.latestButton, pressed && styles.latestButtonPressed]}
+            >
+              <Text style={styles.latestButtonText} aria-hidden>
+                ↓
+              </Text>
+            </Pressable>
+          </Animated.View>
         )}
       </View>
 
@@ -215,7 +223,7 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   );
 }
 
-const useStyles = makeStyles(({ colors, shadowPanel }) => ({
+const useStyles = makeStyles(({ colors }) => ({
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
@@ -231,23 +239,25 @@ const useStyles = makeStyles(({ colors, shadowPanel }) => ({
     left: 0,
     zIndex: 1,
   },
-  latestButton: {
+  latestAnchor: {
     position: 'absolute',
     right: spacing.lg,
     zIndex: 2,
+  },
+  latestButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    // 크롬에는 그림자를 쓰지 않는다 — 표면 색 + 헤어라인으로만 떠오르게 한다 (DESIGN.md)
     borderWidth: 1,
     borderColor: colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.canvas,
-    ...shadowPanel,
   },
   latestButtonPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.96 }],
+    backgroundColor: colors.canvasSoft,
+    transform: [{ scale: 0.95 }],
   },
   latestButtonText: {
     fontSize: 21,

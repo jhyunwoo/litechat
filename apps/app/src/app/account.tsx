@@ -97,7 +97,11 @@ export default function AccountScreen() {
           disabled={busy || password.length < 8}
           accessibilityRole="button"
           accessibilityLabel="계정 영구 삭제"
-          style={[styles.deleteButton, (busy || password.length < 8) && styles.disabled]}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            (busy || password.length < 8) && styles.disabled,
+            pressed && styles.deletePressed,
+          ]}
         >
           {busy ? (
             <ActivityIndicator color="#fff" />
@@ -131,8 +135,9 @@ const useStyles = makeStyles(({ colors, type }) => ({
     minHeight: 48,
     borderWidth: 1,
     borderColor: colors.hairlineInput,
-    borderRadius: rounded.sm,
-    paddingHorizontal: spacing.md,
+    // 인풋도 pill — DESIGN.md search-input 문법 (로그인 화면과 동일)
+    borderRadius: rounded.pill,
+    paddingHorizontal: spacing.xl,
     fontSize: 16,
     color: colors.ink,
   },
@@ -146,5 +151,6 @@ const useStyles = makeStyles(({ colors, type }) => ({
     justifyContent: 'center',
   },
   disabled: { opacity: 0.45 },
+  deletePressed: { transform: [{ scale: 0.95 }] },
   deleteLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
 }));

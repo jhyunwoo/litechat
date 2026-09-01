@@ -6,6 +6,7 @@
  *
  * 단축키: Alt+1 채팅 / Alt+2 친구 / Alt+3 프로필 / Ctrl(Cmd)+K 검색 포커스
  */
+import { motion } from 'motion/react';
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router';
 import { useConversations, useFriendRequests, useRealtimeSync } from '../data';
@@ -24,9 +25,15 @@ const IOS_ONBOARD_SEEN = 'lc:ios-onboard-seen';
 function Badge({ count }: { count: number }) {
   if (!count) return null;
   return (
-    <span className="tnum min-w-4 rounded-full bg-ink px-1 text-center text-[10px] leading-4 font-normal text-white">
+    <motion.span
+      key={count}
+      initial={{ scale: 0.6 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 600, damping: 22, mass: 0.5 }}
+      className="tnum min-w-4 rounded-full bg-ink px-1 text-center text-[10px] leading-4 font-normal text-white"
+    >
       {count > 99 ? '99+' : count}
-    </span>
+    </motion.span>
   );
 }
 
@@ -51,6 +58,13 @@ function Tab({
         active ? 'font-semibold text-primary' : 'text-ink-mute hover:text-ink-secondary'
       }`}
     >
+      {active && (
+        <motion.span
+          layoutId="tab-underline"
+          transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.8 }}
+          className="absolute inset-x-[30%] top-0 h-0.5 rounded-full bg-primary"
+        />
+      )}
       <Icon name={icon} className="size-6" />
       <span>{label}</span>
       {badge ? (
@@ -79,11 +93,18 @@ function RailItem({
   return (
     <Link
       to={to}
-      className={`relative flex w-full flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] transition-colors ${
+      className={`relative isolate flex w-full flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] transition-colors ${
         // 활성 = 잉크 블랙 필 — 파치먼트 레일 위의 유일한 강조
-        active ? 'bg-ink text-white' : 'text-ink-mute hover:bg-white/70 hover:text-ink-secondary'
+        active ? 'text-white' : 'text-ink-mute hover:bg-white/70 hover:text-ink-secondary'
       }`}
     >
+      {active && (
+        <motion.span
+          layoutId="rail-pill"
+          transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.8 }}
+          className="absolute inset-0 -z-10 rounded-xl bg-ink"
+        />
+      )}
       <Icon name={icon} className="size-7" />
       <span>{label}</span>
       {badge ? (

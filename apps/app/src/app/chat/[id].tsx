@@ -108,7 +108,7 @@ export default function ChatRoomScreen() {
           accessibilityRole="button"
           accessibilityLabel="대화 안전 옵션"
           hitSlop={8}
-          style={styles.menu}
+          style={({ pressed }) => [styles.menu, pressed && styles.menuPressed]}
         >
           <Text style={styles.menuText}>•••</Text>
         </Pressable>
@@ -145,6 +145,7 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   headerText: { flex: 1, minWidth: 0 },
   menu: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  menuPressed: { opacity: 0.5, transform: [{ scale: 0.95 }] },
   menuText: { color: colors.link, fontSize: 18, letterSpacing: 1 },
   peerName: {
     fontSize: 16,

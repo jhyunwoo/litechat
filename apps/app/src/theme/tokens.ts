@@ -31,6 +31,10 @@ export const lightColors = {
   canvasCream: '#FAFAFC',
   hairline: '#E0E0E0',
   hairlineInput: '#E0E0E0',
+  /* 아바타/안읽음 배지처럼 '누를 수 없는' 모노크롬 칩 표면 —
+     Action Blue는 인터랙티브 요소 전용이라 여기에는 쓰지 않는다 (웹과 동일한 잉크 칩) */
+  chip: '#1D1D1F',
+  onChip: '#FFFFFF',
   /* 에러/파괴적 동작 전용 기능색 — 모노크롬 시스템의 유일한 유채색 */
   ruby: '#d64545',
   /* 이전 API 호환용 키 — 두 번째 브랜드 액센트를 만들지 않고 primary와 동일하게 둔다. */
@@ -60,6 +64,9 @@ export const darkColors: Palette = {
   canvasCream: '#252527',
   hairline: '#333333',
   hairlineInput: '#7A7A7A',
+  /* 다크 캔버스(#272729) 위에서 한 단계 밝은 칩 — 표면 색 차이로만 떠오르게 한다 */
+  chip: '#3A3A3C',
+  onChip: '#FFFFFF',
   ruby: '#ff6b6b',
   magenta: '#2997FF',
   shadowBlue: '#000000',
