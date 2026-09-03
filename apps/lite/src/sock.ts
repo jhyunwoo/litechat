@@ -1,5 +1,8 @@
 /**
  * WebSocket 클라이언트 (Lite) — 자동 재연결 + 송수신 바이트 계측
+ *
+ * 재연결 대기에는 지터를 섞는다(백오프의 50~100%). 재배포로 모든 클라이언트가 동시에
+ * 끊겼을 때 같은 시각에 몰려 재연결하는 것을 막는다.
  */
 import type { ClientFrame, ServerFrame } from '@litechat/types';
 import { addBytes } from './net';
@@ -79,7 +82,7 @@ function connect(): void {
   ws.onclose = () => {
     clearInterval(pingTimer);
     if (!running) return;
-    setTimeout(connect, delay);
+    setTimeout(connect, delay / 2 + Math.random() * (delay / 2));
     delay = Math.min(delay * 2, 8000);
   };
 }
