@@ -4,7 +4,13 @@
  * 해시 라우팅: #login #signup #chats #friends #profile #c/:id
  * 모든 화면은 #app에 직접 렌더링한다. 주석은 빌드 시 제거되므로 크기 부담이 없다.
  */
-import type { ConversationSummary, PublicUser, ServerFrame, WireMessage } from '@litechat/types';
+import type {
+  ConversationSummary,
+  PublicUser,
+  ServerFrame,
+  WireMessage,
+  WireQuote,
+} from '@litechat/types';
 import { errMsg, fmtBytes, onBytesChange, req, resetBytes, totalBytes } from './net';
 import { onFrame, onReconnect, send, startSocket, stopSocket } from './sock';
 
@@ -18,6 +24,10 @@ const msgs = new Map<number, Msg[]>();
 const hasMore = new Map<number, boolean>();
 /** 대화별 작성 중 초안 — 재렌더가 textarea를 갈아치워도 입력을 보존한다 */
 const drafts = new Map<number, string>();
+/** 대화별 인용 원본 캐시 — /messages 응답의 refs (본문이 잘려 있어 msgs와 섞지 않는다) */
+const quotes = new Map<number, Map<number, WireQuote>>();
+/** 대화별 답장 대상 메시지 ID */
+const replyTo = new Map<number, number>();
 let friends: { user: PublicUser; c: number }[] = [];
 let requests: { incoming: { id: number; user: PublicUser }[]; outgoing: { id: number; user: PublicUser }[] } = {
   incoming: [],
@@ -70,6 +80,25 @@ function cellCols(text: string): number {
   return Math.min(8, Math.ceil((units * 5 + 16) / 64));
 }
 
+/** refs를 인용 캐시에 병합한다 */
+function cacheQuotes(convId: number, refs?: WireQuote[]): void {
+  if (!refs?.length) return;
+  let map = quotes.get(convId);
+  if (!map) quotes.set(convId, (map = new Map()));
+  for (const q of refs) map.set(q.id, q);
+}
+/** 인용 원본 해석: 로드된 메시지 → refs 캐시 (못 찾으면 null) */
+function quoteOf(convId: number, id: number): { s: number; k: WireMessage['k']; x: string } | null {
+  return (msgs.get(convId) ?? []).find((m) => m.id === id) ?? quotes.get(convId)?.get(id) ?? null;
+}
+/** 인용문 한 줄 — 이미지는 본문이 ID라 '사진'으로 바꾼다 */
+const quoteText = (k: WireMessage['k'], x: string) => (k === 'i' ? '사진' : x);
+/** 허용 방향 이동량 (반대 방향이거나 세로가 뚜렷하면 0) — apps/app/src/lib/gesture.ts와 같은 규칙 */
+const swipeAlong = (dx: number, dy: number, mine: boolean) => {
+  const a = mine ? -dx : dx;
+  return a > 0 && a > Math.abs(dy) * 1.5 ? Math.min(a, 72) : 0;
+};
+
 /* ---------- 데이터 로딩 ---------- */
 async function loadConvs(): Promise<void> {
   convs = (await req<{ conversations: ConversationSummary[] }>('/api/chat')).conversations;
@@ -82,7 +111,10 @@ async function loadFriends(): Promise<void> {
 }
 async function loadMsgs(convId: number, after?: number): Promise<void> {
   const query = after ? `?after=${after}` : '?limit=30';
-  const { messages } = await req<{ messages: Msg[] }>(`/api/chat/${convId}/messages${query}`);
+  const { messages, refs } = await req<{ messages: Msg[]; refs?: WireQuote[] }>(
+    `/api/chat/${convId}/messages${query}`,
+  );
+  cacheQuotes(convId, refs);
   const existing = msgs.get(convId) ?? [];
   if (after) {
     msgs.set(convId, [...existing, ...messages]);
@@ -513,6 +545,47 @@ function chatView(convId: number): HTMLElement {
 
   const msgList = h('div', { class: 'msgs' });
 
+  // 답장 스와이프 — 행마다 리스너를 달지 않고 컨테이너 하나에 위임한다 (코드/리스너 수 최소).
+  let swRow: HTMLElement | null = null;
+  let swId = 0;
+  let swMine = false;
+  let swX = 0;
+  let swY = 0;
+  msgList.addEventListener(
+    'touchstart',
+    (e) => {
+      const row = (e.target as HTMLElement).closest('.mr') as HTMLElement | null;
+      swId = Number(row?.dataset.id ?? 0);
+      if (!row || swId <= 0) return;
+      swRow = row;
+      swMine = row.classList.contains('mine');
+      swX = (e as TouchEvent).touches[0]!.clientX;
+      swY = (e as TouchEvent).touches[0]!.clientY;
+    },
+    { passive: true },
+  );
+  msgList.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!swRow) return;
+      const t = (e as TouchEvent).touches[0]!;
+      const d = swipeAlong(t.clientX - swX, t.clientY - swY, swMine);
+      swRow.style.transform = d ? `translateX(${swMine ? -d : d}px)` : '';
+    },
+    { passive: true },
+  );
+  msgList.addEventListener('touchend', (e) => {
+    if (!swRow) return;
+    const t = (e as TouchEvent).changedTouches[0]!;
+    const ready = swipeAlong(t.clientX - swX, t.clientY - swY, swMine) >= 56;
+    swRow.style.transform = '';
+    swRow = null;
+    if (ready) {
+      replyTo.set(convId, swId);
+      render();
+    }
+  });
+
   // 과거 메시지 버튼 — 자동 로드 대신 명시적 버튼 (예상치 못한 데이터 사용 방지)
   if (hasMore.get(convId)) {
     msgList.append(
@@ -524,9 +597,10 @@ function chatView(convId: number): HTMLElement {
           onclick: async (e: Event) => {
             const oldest = list.find((m) => m.id > 0);
             if (!oldest) return;
-            const { messages } = await req<{ messages: Msg[] }>(
+            const { messages, refs } = await req<{ messages: Msg[]; refs?: WireQuote[] }>(
               `/api/chat/${convId}/messages?before=${oldest.id}&limit=30`,
             );
+            cacheQuotes(convId, refs);
             msgs.set(convId, [...messages, ...list]);
             if (messages.length < 30) hasMore.set(convId, false);
             render();
@@ -569,19 +643,43 @@ function chatView(convId: number): HTMLElement {
       );
     }
 
+    // 인용문 — 원본을 못 찾으면 플레이스홀더를 보여준다
+    const quoted = message.r !== undefined ? quoteOf(convId, message.r) : null;
+
     // 상대는 왼쪽 / 내 것은 오른쪽 — 색 구분 없이 셀 위치로만 나뉜다. 셀 폭은 열 단위로 맞춘다
     msgList.append(
       h(
         'div',
-        { class: `mr${mine ? ' mine' : ''}${message._i ? ' pend' : ''}` },
+        { class: `mr${mine ? ' mine' : ''}${message._i ? ' pend' : ''}`, 'data-id': message.id },
         h(
           'span',
           {
             class: `cb${message.k === 'e' || isEmojiOnly(message.x) ? ' big' : ''}`,
             style: `--s:${cellCols(typeof body === 'string' ? body : (body.textContent ?? ''))}`,
           },
+          message.r !== undefined
+            ? h(
+                'button',
+                { class: 'qt', onclick: () => void jumpTo(convId, message.r!) },
+                `↩ ${quoted ? quoteText(quoted.k, quoted.x) : '메시지'}`,
+              )
+            : null,
           body,
         ),
+        message.id > 0
+          ? h(
+              'button',
+              {
+                class: 'rp',
+                title: '답장',
+                onclick: () => {
+                  replyTo.set(convId, message.id);
+                  render();
+                },
+              },
+              '↩',
+            )
+          : null,
         h(
           'span',
           { class: 'cc' },
@@ -619,22 +717,48 @@ function chatView(convId: number): HTMLElement {
   input.value = drafts.get(convId) ?? '';
   const sendBtn = h('button', { class: 'send', onclick: () => submit() }, '✓');
 
+  // 답장 바 — 답장 대상이 정해져 있을 때만 입력 바 위에 한 줄
+  const replyId = replyTo.get(convId);
+  const replySource = replyId !== undefined ? quoteOf(convId, replyId) : null;
+  const replyBar =
+    replyId === undefined
+      ? null
+      : h(
+          'div',
+          { class: 'rb' },
+          h('span', {}, `↩ ${replySource ? quoteText(replySource.k, replySource.x) : '메시지'}`),
+          h(
+            'button',
+            {
+              class: 'btn2',
+              onclick: () => {
+                replyTo.delete(convId);
+                render();
+              },
+            },
+            '✕',
+          ),
+        );
+
   function submit(): void {
     const text = input.value.trim();
     if (!text || !me) return;
     input.value = '';
     drafts.delete(convId);
     const tempKey = `t${Date.now()}`;
+    const r = replyTo.get(convId);
     const optimistic: Msg = {
       id: -Date.now(), c: convId, s: me.id,
       k: isEmojiOnly(text) ? 'e' : 't', x: text,
       ts: Math.floor(Date.now() / 1000), _i: tempKey,
+      ...(r !== undefined ? { r } : {}),
     };
+    replyTo.delete(convId);
     (msgs.get(convId) ?? []).push(optimistic);
     if (conv) conv.last = optimistic;
-    if (!send({ t: 'm', c: convId, k: optimistic.k, x: text, i: tempKey })) {
+    if (!send({ t: 'm', c: convId, k: optimistic.k, x: text, i: tempKey, ...(r !== undefined ? { r } : {}) })) {
       // WS가 끊겨 있으면 REST로 보낸다.
-      void req<{ message: Msg }>(`/api/chat/${convId}/messages`, 'POST', { k: optimistic.k, x: text })
+      void req<{ message: Msg }>(`/api/chat/${convId}/messages`, 'POST', { k: optimistic.k, x: text, ...(r !== undefined ? { r } : {}) })
         .then(({ message }) => {
           optimistic.id = message.id;
           optimistic.ts = message.ts;
@@ -753,6 +877,7 @@ function chatView(convId: number): HTMLElement {
         h('button', { onclick: () => { input.value += emoji; drafts.set(convId, input.value); input.focus(); } }, emoji),
       ),
     ),
+    replyBar,
     h(
       'div',
       { class: 'bar' },
@@ -778,6 +903,32 @@ function chatView(convId: number): HTMLElement {
 }
 
 /** 이미지 원본 오버레이 */
+/** 인용 원본으로 이동 — 로드 범위에 없으면 과거를 최대 10페이지까지 되짚는다 */
+async function jumpTo(convId: number, id: number): Promise<void> {
+  for (let page = 0; page <= 10; page += 1) {
+    const row = document.querySelector(`.mr[data-id="${id}"]`) as HTMLElement | null;
+    if (row) {
+      row.scrollIntoView({ block: 'center' });
+      row.classList.add('hl');
+      setTimeout(() => row.classList.remove('hl'), 1200);
+      return;
+    }
+    if (page === 10 || !hasMore.get(convId)) break;
+    const list = msgs.get(convId) ?? [];
+    const oldest = list.find((m) => m.id > 0);
+    if (!oldest) break;
+    const { messages, refs } = await req<{ messages: Msg[]; refs?: WireQuote[] }>(
+      `/api/chat/${convId}/messages?before=${oldest.id}&limit=30`,
+    );
+    cacheQuotes(convId, refs);
+    if (messages.length === 0) break;
+    msgs.set(convId, [...messages, ...list]);
+    if (messages.length < 30) hasMore.set(convId, false);
+    render();
+  }
+  showError('원본 메시지를 찾을 수 없습니다');
+}
+
 function showImageOverlay(image: NonNullable<WireMessage['im']>): void {
   const overlay = h(
     'div',
