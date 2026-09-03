@@ -1,7 +1,7 @@
 /**
  * 프로필 탭 — 내 정보 + 알림 토글 + 로그아웃
  */
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth';
@@ -85,7 +85,7 @@ export default function ProfileTab() {
                 pushOn ? 'bg-primary' : 'bg-hairline-input'
               }`}
             >
-              <motion.span
+              <m.span
                 animate={{ x: pushOn ? 20 : 0 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
                 className="block size-6 rounded-full bg-white"

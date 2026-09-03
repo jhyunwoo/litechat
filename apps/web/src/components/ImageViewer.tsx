@@ -2,7 +2,7 @@
  * 이미지 뷰어 — 탭하면 전체 화면으로 확대, 저화질/원본 다운로드 제공
  */
 import type { WireMessage } from '@litechat/types';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect } from 'react';
 import { formatBytes } from '../lib/format';
 
@@ -30,14 +30,14 @@ export function ImageViewer({ message, onClose }: Props) {
   return (
     <AnimatePresence>
       {message && image && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex flex-col bg-black/90"
           onClick={onClose}
         >
-          <motion.img
+          <m.img
             initial={{ scale: 0.85 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.85 }}
@@ -66,7 +66,7 @@ export function ImageViewer({ message, onClose }: Props) {
               원본 저장 ({formatBytes(image.ob)})
             </a>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

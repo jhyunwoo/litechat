@@ -9,7 +9,7 @@
  */
 import type { WireMessage } from '@litechat/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -63,10 +63,17 @@ function ChatRoomContent({ convId }: { convId: number }) {
   }, [lastId]);
 
   // 화면에 보이는 마지막 메시지를 읽음 처리한다 (문서가 보일 때만).
+  // 배열을 복사·역순 정렬하지 않고 뒤에서부터 찾는다 — 메시지가 도착할 때마다
+  // 실행되는 경로라, 히스토리가 길수록 복사 비용이 그대로 프레임 예산을 깎는다.
   useEffect(() => {
     if (!messages || document.visibilityState !== 'visible') return;
-    const lastIncoming = [...messages].reverse().find((m) => m.s !== me?.id && m.id > 0);
-    if (lastIncoming) markRead(queryClient, convId, lastIncoming.id);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]!;
+      if (message.s !== me?.id && message.id > 0) {
+        markRead(queryClient, convId, message.id);
+        break;
+      }
+    }
   }, [lastId, convId, me?.id, messages, queryClient]);
 
   // Esc → 목록으로
@@ -222,7 +229,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
 
         <AnimatePresence>
           {awayFromBottom && (
-            <motion.button
+            <m.button
               type="button"
               onClick={scrollToLatest}
               aria-label="최신 메시지로 이동"
@@ -235,14 +242,14 @@ function ChatRoomContent({ convId }: { convId: number }) {
               className="frosted absolute right-4 bottom-4 z-10 flex size-11 items-center justify-center rounded-full border border-hairline text-xl text-ink"
             >
               <span aria-hidden>↓</span>
-            </motion.button>
+            </m.button>
           )}
         </AnimatePresence>
       </div>
 
       <AnimatePresence>
         {error && (
-          <motion.p
+          <m.p
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -250,7 +257,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
             onClick={() => setError('')}
           >
             {error}
-          </motion.p>
+          </m.p>
         )}
       </AnimatePresence>
 
@@ -272,7 +279,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
                 <>
                   {/* 바깥 클릭으로 닫기 */}
                   <div className="fixed inset-0 z-10" onClick={() => setShowCamMenu(false)} />
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0, y: 6, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.96 }}
@@ -298,7 +305,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
                     >
                       웹캠 촬영
                     </button>
-                  </motion.div>
+                  </m.div>
                 </>
               )}
             </AnimatePresence>
@@ -323,7 +330,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
             rows={1}
             className="max-h-28 min-h-11 flex-1 resize-none rounded-[22px] bg-canvas-soft px-4 py-[11px] text-[16px] leading-[22px]"
           />
-          <motion.button
+          <m.button
             onClick={() => void submit()}
             disabled={!draft.trim()}
             aria-label="전송"
@@ -339,11 +346,11 @@ function ChatRoomContent({ convId }: { convId: number }) {
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-white"
           >
             <Icon name="send" className="size-5" />
-          </motion.button>
+          </m.button>
         </div>
         <AnimatePresence initial={false}>
           {showEmoji && (
-            <motion.div
+            <m.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -356,7 +363,7 @@ function ChatRoomContent({ convId }: { convId: number }) {
                   inputRef.current?.focus();
                 }}
               />
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

@@ -241,16 +241,69 @@ export function useRealtimeSync(): void {
     if (!me) return;
     const offFrame = socket.onFrame((frame) => handleFrame(queryClient, me.id, frame));
     const offReconnect = socket.onReconnect(() => {
-      // 끊긴 동안의 변경을 통째로 따라잡는다 (메시지는 각 화면이 after=로 처리).
+      // 끊긴 동안의 변경을 따라잡는다. 목록류는 통째로 다시 받고(작다),
+      // 메시지는 증분(after=)으로만 받는다.
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['requests'] });
-      void queryClient.invalidateQueries({ queryKey: ['messages'] });
+      void catchUpMessages(queryClient);
     });
     return () => {
       offFrame();
       offReconnect();
     };
   }, [me?.id, queryClient]);
+}
+
+/**
+ * 재연결 catch-up — 열려 있는 대화방의 밀린 메시지만 증분으로 가져온다.
+ *
+ * 이전에는 ['messages']를 invalidate해 활성 쿼리를 통째로 다시 받았다. 끊김이 잦은
+ * 모바일 회선에서는 재연결마다 최근 30개(≈5 KB)를 다시 내려받는 셈이고, 사용자가
+ * 위로 스크롤해 불러 둔 과거 페이지도 함께 버려졌다.
+ * `after=<마지막 id>`로 바꾸면 보통은 빈 배열(수십 바이트)만 오가고, 이미 불러 둔
+ * 히스토리와 스크롤 위치도 그대로 유지된다.
+ */
+async function catchUpMessages(queryClient: QueryClient): Promise<void> {
+  const active = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: ['messages'], type: 'active' });
+
+  await Promise.all(
+    active.map(async (query) => {
+      const convId = query.queryKey[1];
+      if (typeof convId !== 'number') return;
+      const cached = queryClient.getQueryData<WireMessage[]>(['messages', convId]);
+      // 서버가 확정한(양수 id) 마지막 메시지가 없으면 평소대로 다시 조회한다.
+      let lastId = 0;
+      for (let i = (cached?.length ?? 0) - 1; i >= 0; i--) {
+        const id = cached![i]!.id;
+        if (id > 0) {
+          lastId = id;
+          break;
+        }
+      }
+      if (lastId === 0) {
+        await queryClient.invalidateQueries({ queryKey: ['messages', convId] });
+        return;
+      }
+      try {
+        const res = await api.api.chat[':id'].messages.$get({
+          param: { id: String(convId) },
+          query: { after: String(lastId) },
+        });
+        const { messages } = await unwrap<{ messages: WireMessage[] }>(res);
+        if (messages.length === 0) return;
+        queryClient.setQueryData<WireMessage[]>(['messages', convId], (old) => {
+          if (!old) return messages;
+          const seen = new Set(old.map((message) => message.id));
+          const fresh = messages.filter((message) => !seen.has(message.id));
+          return fresh.length > 0 ? [...old, ...fresh] : old;
+        });
+      } catch {
+        // 따라잡기에 실패하면 다음 재연결에서 다시 시도한다 — 화면을 막지 않는다.
+      }
+    }),
+  );
 }
 
 /** 과거 메시지 페이지 로드 (위로 스크롤 시) — 더 없으면 false 반환 */

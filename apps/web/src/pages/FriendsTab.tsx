@@ -3,7 +3,7 @@
  */
 import type { PublicUser } from '@litechat/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -113,7 +113,7 @@ export default function FriendsTab() {
 
       <AnimatePresence>
         {notice && (
-          <motion.p
+          <m.p
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -121,14 +121,14 @@ export default function FriendsTab() {
             onClick={() => setNotice('')}
           >
             {notice}
-          </motion.p>
+          </m.p>
         )}
       </AnimatePresence>
 
       {/* 검색 결과 */}
       <AnimatePresence initial={false}>
         {debounced && (
-          <motion.section
+          <m.section
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -142,7 +142,7 @@ export default function FriendsTab() {
               </p>
             )}
             {searchResults?.map((user, index) => (
-              <motion.div
+              <m.div
                 key={user.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -154,16 +154,16 @@ export default function FriendsTab() {
                   <p className="truncate text-xs text-ink-mute">@{user.username}</p>
                 </div>
                 <RelationAction user={user} onAdd={(id) => addFriend.mutate(id)} />
-              </motion.div>
+              </m.div>
             ))}
-          </motion.section>
+          </m.section>
         )}
       </AnimatePresence>
 
       {/* 받은 친구 요청 — 수락/거절하면 행이 접히며 사라진다 */}
       <AnimatePresence initial={false}>
         {requests && requests.incoming.length > 0 && (
-          <motion.section
+          <m.section
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, height: 0 }}
@@ -172,7 +172,7 @@ export default function FriendsTab() {
             <h2 className="px-4 pt-2 pb-1 text-xs font-semibold text-ink-mute">받은 요청</h2>
             <AnimatePresence initial={false}>
               {requests.incoming.map((request) => (
-                <motion.div
+                <m.div
                   key={request.id}
                   layout
                   initial={{ opacity: 0, height: 0 }}
@@ -202,10 +202,10 @@ export default function FriendsTab() {
                       </button>
                     </div>
                   </div>
-                </motion.div>
+                </m.div>
               ))}
             </AnimatePresence>
-          </motion.section>
+          </m.section>
         )}
       </AnimatePresence>
 
@@ -220,7 +220,7 @@ export default function FriendsTab() {
           </p>
         )}
         {friends?.map(({ user, c }, index) => (
-          <motion.div
+          <m.div
             key={user.id}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -238,7 +238,7 @@ export default function FriendsTab() {
                 <p className="text-xs text-ink-mute">@{user.username}</p>
               </div>
             </Link>
-          </motion.div>
+          </m.div>
         ))}
       </section>
     </div>

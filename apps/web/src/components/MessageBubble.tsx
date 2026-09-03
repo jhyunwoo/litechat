@@ -7,7 +7,7 @@
  * - 이미지: 저화질 webp 표시, 탭하면 뷰어 열기
  */
 import type { WireMessage } from '@litechat/types';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { memo } from 'react';
 import { formatTime, isEmojiOnly } from '../lib/format';
 
@@ -34,7 +34,7 @@ export const MessageBubble = memo(function MessageBubble({
   const emojiOnly = message.k === 'e' || (message.k === 't' && isEmojiOnly(message.x));
 
   return (
-    <motion.div
+    <m.div
       // 아래에서 살짝 튀어오르는 스프링 등장 (iMessage 느낌)
       initial={{ opacity: 0, y: 14, scale: 0.9 }}
       animate={{ opacity: pending ? 0.6 : 1, y: 0, scale: 1 }}
@@ -77,6 +77,6 @@ export const MessageBubble = memo(function MessageBubble({
           </span>
         )}
       </div>
-    </motion.div>
+    </m.div>
   );
 });

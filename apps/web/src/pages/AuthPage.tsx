@@ -3,7 +3,7 @@
  * 왼쪽(모바일은 상단)은 니어블랙 타일에 브랜드 심벌 + 워드마크,
  * 오른쪽은 흰 캔버스의 폼 패널이다.
  */
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
@@ -60,7 +60,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
       {/* 폼 패널 — 화이트 캔버스, 세로 중앙 정렬 */}
       <div className="relative flex flex-1 flex-col justify-center px-6">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
@@ -85,7 +85,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             />
             <AnimatePresence initial={false}>
               {isRegister && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
@@ -100,7 +100,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                     required
                     maxLength={20}
                   />
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
             <input
@@ -117,7 +117,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
             <AnimatePresence>
               {error && (
-                <motion.p
+                <m.p
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
@@ -125,7 +125,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   role="alert"
                 >
                   {error}
-                </motion.p>
+                </m.p>
               )}
             </AnimatePresence>
 
@@ -168,7 +168,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               개인정보처리방침
             </Link>
           </p>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

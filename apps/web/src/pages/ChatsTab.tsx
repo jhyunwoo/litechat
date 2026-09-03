@@ -2,7 +2,7 @@
  * 채팅 탭 — 대화 목록 (마지막 메시지 미리보기 + 안읽음 배지)
  */
 import type { WireMessage } from '@litechat/types';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { Link, useMatch } from 'react-router';
 import { useConversations } from '../data';
 import { formatTime } from '../lib/format';
@@ -29,7 +29,7 @@ export default function ChatsTab() {
       {isPending ? (
         <p className="py-16 text-center text-sm text-ink-mute">불러오는 중…</p>
       ) : conversations?.length === 0 ? (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28 }}
@@ -43,7 +43,7 @@ export default function ChatsTab() {
             <br />
             친구 탭에서 친구를 추가하고 대화를 시작해 보세요!
           </p>
-        </motion.div>
+        </m.div>
       ) : (
         <ul>
           {conversations?.map((conv) => (
@@ -70,7 +70,7 @@ export default function ChatsTab() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm text-ink-mute">{preview(conv.last)}</p>
                     {conv.unread > 0 && (
-                      <motion.span
+                      <m.span
                         key={conv.unread}
                         initial={{ scale: 0.6 }}
                         animate={{ scale: 1 }}
@@ -78,7 +78,7 @@ export default function ChatsTab() {
                         className="tnum min-w-5 shrink-0 rounded-full bg-ink px-1.5 text-center text-xs leading-5 font-normal text-white"
                       >
                         {conv.unread > 99 ? '99+' : conv.unread}
-                      </motion.span>
+                      </m.span>
                     )}
                   </div>
                 </div>

@@ -5,7 +5,7 @@
  * 서버가 sharp로 webp 변환하므로 클라이언트는 포맷을 신경 쓰지 않아도 된다.
  * 닫히거나 언마운트될 때 카메라 트랙을 반드시 정지한다(카메라 표시등 꺼짐).
  */
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 
@@ -76,7 +76,7 @@ export function WebcamCapture({ open, onCapture, onClose }: Props) {
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -114,7 +114,7 @@ export function WebcamCapture({ open, onCapture, onClose }: Props) {
               )}
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );
