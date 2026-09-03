@@ -73,13 +73,23 @@ async function sendEvent(path: string): Promise<void> {
 /**
  * 루트 레이아웃에서 한 번 마운트 — 콜드 스타트 시, 포그라운드 복귀 시,
  * 화면(경로) 전환마다 세션/이벤트를 기록한다.
+ *
+ * @param ready 초기 세션 확인이 끝났는지. 콜드 스타트의 세션 기록은 이때까지 미룬다 —
+ *   SecureStore 읽기·기기 정보 조회·네트워크 POST 모두 첫 화면에 필요 없는 작업이라,
+ *   느린 회선에서 인증/실시간 연결과 경쟁시킬 이유가 없다. 지연돼도 기록은 정확하다
+ *   (sessionId는 30분 유휴 기준으로 정해지므로 수백 ms 차이는 영향이 없다).
  */
-export function useAppAnalytics(): void {
+export function useAppAnalytics(ready: boolean): void {
   const pathname = usePathname();
   const lastPath = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!ready) return;
     enqueueAnalytics(sendSession);
+  }, [ready]);
+
+  // 포그라운드 복귀는 시작 경로가 아니므로 즉시 기록한다.
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') enqueueAnalytics(sendSession);
     });
@@ -87,10 +97,10 @@ export function useAppAnalytics(): void {
   }, []);
 
   useEffect(() => {
-    if (lastPath.current === pathname) return;
+    if (!ready || lastPath.current === pathname) return;
     lastPath.current = pathname;
     enqueueAnalytics(() => sendEvent(pathname));
-  }, [pathname]);
+  }, [ready, pathname]);
 }
 
 /** 계정 삭제 시 기기에 남은 장기 분석 상관관계 키를 제거한다. */

@@ -44,10 +44,11 @@ function Root() {
   useNotificationDeepLink(ready);
   // 알림 수신 ACK — 프로세스가 살아있는 동안 도착한 알림은 서버에 수신 시각을 기록한다
   useNotificationReceivedAck();
-  // OTA 업데이트 — 포그라운드 복귀 시 백그라운드 다운로드, 다음 실행에 적용
-  useOTAUpdates();
-  // 사용자 분석 — 콜드 스타트/포그라운드 복귀/화면 전환마다 접속 정보를 기록한다
-  useAppAnalytics();
+  // OTA 업데이트 — 포그라운드 복귀 시 백그라운드 다운로드, 다음 실행에 적용.
+  // 콜드 스타트 확인은 ready 이후로 미뤄 인증/실시간 연결과 대역폭을 다투지 않게 한다.
+  useOTAUpdates(ready);
+  // 사용자 분석 — 콜드 스타트/포그라운드 복귀/화면 전환마다 접속 정보를 기록한다 (ready 이후)
+  useAppAnalytics(ready);
 
   // 앱 백그라운드/활성 전환에 맞춰 소켓을 닫고/재연결한다.
   useEffect(() => bindAppState(), []);

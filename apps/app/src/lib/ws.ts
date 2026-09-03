@@ -1,7 +1,7 @@
 /**
  * WebSocket 클라이언트 — apps/web/src/ws.ts의 네이티브 포팅
  *
- * - 지수 백오프 재연결 (0.5s → 8s 상한)
+ * - 지수 백오프 재연결 (0.5s → 8s 상한, 지터 포함)
  * - 25초 간격 앱 레벨 핑으로 유휴 연결 유지
  * - 재연결 성공 시 'reconnect' 이벤트 → 화면들이 REST로 밀린 데이터를 따라잡는다
  *
@@ -17,6 +17,18 @@ import { wsUrl } from './env';
 import { getToken } from './session';
 
 type Listener = (frame: ServerFrame) => void;
+
+/**
+ * 재연결 대기 시간 — 지수 백오프에 지터를 섞는다.
+ *
+ * 지터가 없으면 재배포처럼 모든 클라이언트가 동시에 끊긴 상황에서 전부 같은 시각에
+ * 재연결을 시도해(썬더링 허드) 막 뜬 컨테이너를 때린다. 실제 대기는 계산된 백오프의
+ * 50~100% 구간에서 무작위로 고른다 — 복구 속도는 유지하면서 시도 시각만 흩뜨린다.
+ */
+function jittered(delay: number): number {
+  return delay / 2 + Math.random() * (delay / 2);
+}
+
 
 /** RN WebSocket 생성자 — 세 번째 인자로 헤더를 받는다 (테스트에서 주입 가능) */
 export type WebSocketFactory = (url: string, headers: Record<string, string>) => WebSocket;
@@ -130,8 +142,8 @@ export class ChatSocket {
       this.clearPing();
       // 로그아웃(stop) 또는 백그라운드(pause)로 인한 종료면 재연결하지 않는다.
       if (!this.shouldRun || this.paused) return;
-      // 지수 백오프 재연결
-      this.retryTimer = setTimeout(() => this.connect(), this.retryDelay);
+      // 지수 백오프 + 지터 재연결
+      this.retryTimer = setTimeout(() => this.connect(), jittered(this.retryDelay));
       this.retryDelay = Math.min(this.retryDelay * 2, 8000);
     };
   }

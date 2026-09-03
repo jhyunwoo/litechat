@@ -104,11 +104,18 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   );
 
   // 화면에 보이는 마지막 수신 메시지를 읽음 처리한다.
+  // 배열 복사·역순 정렬 대신 뒤에서부터 찾는다 — 메시지 도착마다 실행되는 경로라
+  // 히스토리가 길수록 복사 비용이 JS 스레드 프레임 예산을 그대로 깎는다.
   const lastId = messages?.at(-1)?.id;
   useEffect(() => {
     if (!messages || !focused.current) return;
-    const lastIncoming = [...messages].reverse().find((m) => m.s !== meId && m.id > 0);
-    if (lastIncoming) markRead(queryClient, convId, lastIncoming.id);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]!;
+      if (message.s !== meId && message.id > 0) {
+        markRead(queryClient, convId, message.id);
+        break;
+      }
+    }
   }, [lastId, convId, meId, messages, queryClient]);
 
   const onSend = useCallback(

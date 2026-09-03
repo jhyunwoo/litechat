@@ -74,32 +74,39 @@ describe('ChatSocket', () => {
     socket.stop();
   });
 
-  test('끊기면 지수 백오프로 재연결한다 (0.5s → 8s 상한)', () => {
+  test('끊기면 지수 백오프 + 지터로 재연결한다 (상한 8s)', () => {
+    // 재배포처럼 모든 클라이언트가 동시에 끊긴 상황에서 같은 시각에 몰려 재연결하지
+    // 않도록, 실제 대기는 계산된 백오프의 50~100% 구간에서 무작위로 고른다.
+    // 따라서 정확한 시각이 아니라 "구간 안에 들어오는가"를 검증한다.
     const socket = new ChatSocket(factory);
     socket.start();
     expect(FakeWebSocket.instances).toHaveLength(1);
 
-    // 1차 종료 → 500ms 후 재연결
-    lastSocket().close();
-    jest.advanceTimersByTime(499);
-    expect(FakeWebSocket.instances).toHaveLength(1);
-    jest.advanceTimersByTime(1);
-    expect(FakeWebSocket.instances).toHaveLength(2);
-
-    // 2차 종료 → 1000ms
-    lastSocket().close();
-    jest.advanceTimersByTime(1000);
-    expect(FakeWebSocket.instances).toHaveLength(3);
-
-    // 여러 번 실패해도 8초를 넘지 않는다.
-    for (let i = 0; i < 10; i += 1) {
+    /** 소켓을 끊고, 재연결이 실제로 일어난 시각(ms)을 1ms 단위로 되돌려 준다 */
+    const reconnectDelay = (cap: number): number => {
+      const before = FakeWebSocket.instances.length;
       lastSocket().close();
-      jest.advanceTimersByTime(8000);
+      for (let elapsed = 1; elapsed <= cap; elapsed += 1) {
+        jest.advanceTimersByTime(1);
+        if (FakeWebSocket.instances.length > before) return elapsed;
+      }
+      return Number.POSITIVE_INFINITY;
+    };
+
+    // 1차: 백오프 500ms → 실제 대기는 [250, 500)
+    const first = reconnectDelay(1000);
+    expect(first).toBeGreaterThanOrEqual(250);
+    expect(first).toBeLessThan(500);
+
+    // 2차: 백오프 1000ms → [500, 1000)
+    const second = reconnectDelay(2000);
+    expect(second).toBeGreaterThanOrEqual(500);
+    expect(second).toBeLessThan(1000);
+
+    // 여러 번 실패해도 상한(8초)을 넘지 않는다 — 지터를 감안해도 8000ms 안에 반드시 재연결한다.
+    for (let i = 0; i < 10; i += 1) {
+      expect(reconnectDelay(8000)).toBeLessThanOrEqual(8000);
     }
-    const before = FakeWebSocket.instances.length;
-    lastSocket().close();
-    jest.advanceTimersByTime(8000);
-    expect(FakeWebSocket.instances.length).toBe(before + 1);
     socket.stop();
   });
 

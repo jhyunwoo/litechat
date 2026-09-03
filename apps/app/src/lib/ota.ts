@@ -31,10 +31,23 @@ export async function fetchUpdateInBackground(): Promise<void> {
   }
 }
 
-/** 루트 레이아웃에서 한 번 마운트 — 시작 시 + 포그라운드 복귀 시 체크 */
-export function useOTAUpdates(): void {
+/**
+ * 루트 레이아웃에서 한 번 마운트 — 시작 시 + 포그라운드 복귀 시 체크.
+ *
+ * @param ready 초기 세션 확인이 끝났는지. 콜드 스타트의 업데이트 확인은 이때까지
+ *   미룬다 — 확인/다운로드는 번들 전체를 받을 수도 있는 작업이라, 시작 직후에 돌면
+ *   같은 회선에서 진짜 급한 요청(/api/auth/me, WebSocket 연결)과 대역폭을 다툰다.
+ *   미뤄도 되는 이유는 OTA가 어차피 **다음 실행**에 적용되기 때문이다.
+ *   (useNotificationDeepLink와 같은 ready 게이팅 패턴)
+ */
+export function useOTAUpdates(ready: boolean): void {
   useEffect(() => {
+    if (!ready) return;
     void fetchUpdateInBackground();
+  }, [ready]);
+
+  // 포그라운드 복귀는 시작 경로가 아니므로 그대로 즉시 확인한다.
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void fetchUpdateInBackground();
     });

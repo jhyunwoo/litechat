@@ -96,7 +96,13 @@ export const MessageBubble = memo(function MessageBubble({
             <Image
               source={{ uri: imageUrl(message.im.id, 'thumb'), headers: authHeaders() }}
               style={[styles.image, imageSize()]}
-              cachePolicy="disk"
+              // memory-disk: 썸네일은 불변이라 디스크 캐시로 재다운로드는 이미 막고 있었지만,
+              // 메모리 캐시가 없으면 위아래로 스크롤할 때마다 디스크에서 다시 읽고 **다시 디코딩**한다.
+              // 셀을 재활용하는 리스트에서 이 디코딩이 스크롤 프레임을 갉아먹는다.
+              // 640px 썸네일이라 항목당 메모리 비용은 작다.
+              cachePolicy="memory-disk"
+              // 재활용된 셀이 이전 메시지의 사진을 잠깐 보여주지 않게 한다.
+              recyclingKey={message.im.id}
               transition={150}
               accessibilityLabel="사진"
             />
