@@ -79,6 +79,57 @@ describe('POST /api/chat/:id/messages', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  test('답장을 보내면 r이 저장되고 상대 프레임에도 실린다', async () => {
+    const target = await sendMessage(alice, '원본 메시지');
+    const bobSocket = fakeSocket(deps, bob.user.id);
+
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: bob.cookie,
+      body: { k: 't', x: '답장이야', r: target.id },
+    });
+    expect(res.status).toBe(201);
+    const { message } = (await res.json()) as { message: { r?: number } };
+    expect(message.r).toBe(target.id);
+    expect(bobSocket.frames).toContainEqual(
+      expect.objectContaining({ t: 'm', x: '답장이야', r: target.id }),
+    );
+  });
+
+  test('존재하지 않는 메시지를 인용하면 400', async () => {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { k: 't', x: '유령 답장', r: 999_999 },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // 다른 대화의 메시지를 인용하면 그 본문이 refs를 타고 새어 나간다 — 반드시 막아야 한다.
+  test('다른 대화의 메시지를 인용하면 400', async () => {
+    const carol = await signup(app, 'carol2', 'Carol');
+    const requested = await jsonRequest(app, '/api/friends/requests', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { userId: carol.user.id },
+    });
+    const { id: friendshipId } = (await requested.json()) as { id: number };
+    const accepted = await jsonRequest(app, `/api/friends/requests/${friendshipId}/respond`, {
+      method: 'POST',
+      cookie: carol.cookie,
+      body: { accept: true },
+    });
+    const otherConv = ((await accepted.json()) as { conversationId: number }).conversationId;
+    const secret = await sendMessage(alice, '비밀', otherConv);
+
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { k: 't', x: '몰래 인용', r: secret.id },
+    });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('GET /api/chat/:id/messages', () => {

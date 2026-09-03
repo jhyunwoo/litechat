@@ -63,6 +63,8 @@ export class ChatService {
     content: string,
     /** WS 전송 시 본인 소켓 (팬아웃에서 제외하고 ack만 받게 한다) */
     excludeSocket?: WSContext,
+    /** 답장 대상 메시지 ID (선택) */
+    replyToId?: number,
   ): WireMessage {
     const [, peerId] = this.requireMembership(meId, conversationId);
 
@@ -77,7 +79,15 @@ export class ChatService {
       if (!image || image.owner_id !== meId) throw errors.badRequest('INVALID_IMAGE');
     }
 
-    const message = this.messages.insert(conversationId, meId, kind, trimmed);
+    // 답장 대상은 반드시 같은 대화 안의 메시지여야 한다.
+    // 다른 대화의 ID를 인용하면 그 본문이 getMessages의 refs를 타고 새어 나가므로
+    // 저장 전에 여기서 막는다.
+    if (replyToId !== undefined) {
+      const target = this.messages.findWire(replyToId);
+      if (!target || target.c !== conversationId) throw errors.badRequest('INVALID_REPLY');
+    }
+
+    const message = this.messages.insert(conversationId, meId, kind, trimmed, replyToId);
 
     // 실시간 팬아웃: 상대방의 모든 기기 + 내 다른 기기.
     // 같은 프레임이므로 직렬화는 한 번만 한다 (전송마다 stringify 2회 → 1회).

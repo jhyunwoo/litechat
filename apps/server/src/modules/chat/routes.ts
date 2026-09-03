@@ -41,8 +41,8 @@ export function chatRoutes(deps: AppDeps, service: ChatService) {
         zValidator('json', sendMessageSchema),
         (c) => {
           const { id } = c.req.valid('param');
-          const { k, x } = c.req.valid('json');
-          const message = service.sendMessage(c.var.userId, id, k, x);
+          const { k, x, r } = c.req.valid('json');
+          const message = service.sendMessage(c.var.userId, id, k, x, undefined, r);
           return c.json({ message }, 201);
         },
       )

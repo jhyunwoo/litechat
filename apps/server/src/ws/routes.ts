@@ -34,7 +34,7 @@ export function wsRoutes(deps: AppDeps, chat: ChatService) {
             switch (frame.t) {
               case 'm': {
                 // 메시지 전송 → 본인에게는 ack, 상대에게는 m 프레임
-                const message = chat.sendMessage(userId, frame.c, frame.k, frame.x, ws);
+                const message = chat.sendMessage(userId, frame.c, frame.k, frame.x, ws, frame.r);
                 ws.send(
                   JSON.stringify({
                     t: 'a',
