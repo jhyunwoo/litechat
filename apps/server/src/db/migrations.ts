@@ -243,4 +243,27 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX ix_content_reports_status ON content_reports (status, created_at);
   CREATE INDEX ix_content_reports_reported ON content_reports (reported_user_id, created_at);
   `,
+
+  // v8 → v9: 실측으로 확인된 전체 테이블 스캔 3건을 없애는 인덱스
+  //
+  // EXPLAIN QUERY PLAN 근거 (사용자 400 / 대화 4,800 / 메시지 60,500 시드):
+  //   images.canAccess   → SCAN messages  (p50 16.3 ms, p99 291 ms) — 이미지 썸네일을
+  //                        **받는 쪽**이 볼 때마다 messages 전체를 훑었다. 비용이 전체
+  //                        메시지 수에 비례해 영원히 증가하는 유일한 경로라 가장 시급했다.
+  //   friends.listFriends / listOutgoing → SCAN friendships (친구 탭 로드마다)
+  //   listConversations  → SCAN conversations (채팅 탭 로드마다)
+  `
+  -- 이미지 메시지 조회용 부분 인덱스. kind='i' 행만 담아 인덱스를 작게 유지하고,
+  -- conversation_id를 함께 넣어 접근 제어 쿼리가 메시지 본체를 읽지 않게 한다(커버링).
+  CREATE INDEX ix_messages_image_content
+    ON messages (content, conversation_id) WHERE kind = 'i';
+
+  -- friendships는 addressee 방향만 인덱스가 있었다. requester 방향을 추가하면
+  -- (requester_id = ? OR addressee_id = ?) 를 MULTI-INDEX OR로 처리할 수 있다.
+  CREATE INDEX ix_friendships_requester ON friendships (requester_id, status);
+
+  -- conversations의 UNIQUE(user_a, user_b)는 user_a 방향만 커버한다. user_b 방향을
+  -- 추가해 대화 목록 조회가 전체 스캔 대신 두 인덱스 탐색으로 끝나게 한다.
+  CREATE INDEX ix_conversations_user_b ON conversations (user_b);
+  `,
 ];

@@ -15,6 +15,13 @@ export interface KVStore {
   del(key: string): Promise<void>;
   /** 만료 시간 갱신 (슬라이딩 세션용) */
   expire(key: string, ttlSeconds: number): Promise<void>;
+  /**
+   * 조회와 동시에 만료를 연장한다 (슬라이딩 세션 조회 전용).
+   *
+   * 인증이 필요한 **모든 요청**이 세션을 조회하고 만료를 미룬다. get+expire를 따로
+   * 부르면 요청마다 Redis 왕복이 2회 발생하는데, GETEX 한 번이면 원자적으로 끝난다.
+   */
+  getAndRefresh(key: string, ttlSeconds: number): Promise<string | null>;
   /** 고정 시간창 카운터를 원자적으로 증가시키고 현재 값/남은 TTL을 반환 */
   increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }>;
   /** 접두사 아래에서 값이 일치하는 키를 모두 삭제 (계정 전체 세션 파기용) */
@@ -54,6 +61,12 @@ export class MemoryKV implements KVStore {
   async expire(key: string, ttlSeconds: number): Promise<void> {
     const entry = this.store.get(key);
     if (entry) entry.expiresAt = this.now() + ttlSeconds * 1000;
+  }
+
+  async getAndRefresh(key: string, ttlSeconds: number): Promise<string | null> {
+    const value = await this.get(key);
+    if (value !== null) await this.expire(key, ttlSeconds);
+    return value;
   }
 
   async increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }> {

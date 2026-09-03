@@ -38,6 +38,14 @@ export class RedisKV implements KVStore {
     await this.redis.expire(key, ttlSeconds);
   }
 
+  /**
+   * GETEX — 조회와 TTL 갱신을 왕복 1회로 처리한다 (Redis 6.2+, 운영은 redis:7-alpine).
+   * 인증된 모든 요청이 지나는 경로라 왕복 2회 → 1회가 그대로 요청당 지연으로 돌아온다.
+   */
+  async getAndRefresh(key: string, ttlSeconds: number): Promise<string | null> {
+    return this.redis.getex(key, 'EX', ttlSeconds);
+  }
+
   async increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }> {
     const result = (await this.redis.eval(
       `local count = redis.call('INCR', KEYS[1])

@@ -26,11 +26,10 @@ export async function createSession(deps: AppDeps, userId: number): Promise<stri
 
 /** 토큰으로 userId를 조회하고 만료를 연장한다. 무효 토큰이면 null. */
 export async function getSessionUserId(deps: AppDeps, token: string): Promise<number | null> {
-  const value = await deps.kv.get(PREFIX + token);
-  if (value === null) return null;
-  // 슬라이딩 만료 — 사용 중인 세션은 계속 살아 있게 한다.
-  await deps.kv.expire(PREFIX + token, deps.config.sessionTtlSeconds);
-  return Number(value);
+  // 슬라이딩 만료 — 사용 중인 세션은 계속 살아 있게 한다. 조회와 연장을 한 번의
+  // GETEX로 처리해 인증 요청마다의 Redis 왕복을 2회에서 1회로 줄인다.
+  const value = await deps.kv.getAndRefresh(PREFIX + token, deps.config.sessionTtlSeconds);
+  return value === null ? null : Number(value);
 }
 
 /** 세션 파기 (로그아웃) */
