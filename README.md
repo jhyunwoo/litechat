@@ -25,8 +25,12 @@
   클릭 시 원본/저화질 다운로드. Lite는 탭해야 로드한다.
 - **타입 안전성 (Hono Stack)**: 서버의 `AppType`을 `hc<AppType>`로 소비. API 문서는
   `/docs` (OpenAPI 명세는 `/openapi.json`) 에서 자동 생성된다.
-- **Lite 크기 예산**: 빌드가 초기 전송량(brotli)을 측정해 10KB를 넘으면 실패한다.
-  Lite는 사용한 데이터를 화면에 실시간 표시한다 (Resource Timing + WS 프레임 계측).
+- **크기 예산**: 세 프론트엔드 모두 빌드가 초기 전송량(brotli)을 측정해 예산을 넘으면 실패한다
+  (Lite 10 KB / Full Chat 128 KB / 대시보드 78 KB). Lite는 사용한 데이터를 화면에 실시간
+  표시한다 (Resource Timing + WS 프레임 계측).
+- **사전 압축**: 세 프론트엔드의 산출물은 빌드 시점에 brotli(품질 11)/gzip으로 압축돼
+  `.br`/`.gz`로 함께 배포되고, 서버가 `Accept-Encoding`에 맞춰 그대로 전송한다. 요청마다의
+  압축 CPU가 0이라 2 OCPU 호스트에 유리하다 → [성능](#성능) 참고.
 - **헬스체크**: `GET /api/health` — 컨테이너/오케스트레이터의 상태 확인용.
 
 ### 기술 스택
@@ -62,6 +66,98 @@ bun run check-types  # turbo run check-types
 bun run lint         # turbo run lint
 bun run format       # prettier --write
 ```
+
+## 성능
+
+성능에 영향이 큰 설계 결정과, 그것을 다시 측정하는 방법.
+
+### 정적 자산 전송
+
+빌드가 `dist/**`의 텍스트 자산을 brotli(품질 11)와 gzip으로 미리 압축해
+`<file>.br` / `<file>.gz`로 함께 내보낸다(`packages/build-tools`). 서버(`apps/server/src/static.ts`)는
+요청의 `Accept-Encoding`을 보고 압축본이 있으면 그대로 흘려보낸다.
+
+- 압축본을 **먼저** stat 한다. `.br`은 실제 파일 옆에만 생성되므로 그 존재가 원본의 존재를 증명한다
+  → 자산 요청 하나에 파일시스템 조회 1회.
+- 해시가 붙은 `/assets/*`는 `immutable` 1년 캐시. 그 외(HTML)는 `no-cache` + 약한 `ETag`로
+  재검증한다(변경 없으면 304).
+- `Vary: Accept-Encoding`은 압축 여부와 무관하게 항상 붙인다.
+
+Traefik 압축 미들웨어(`docker-compose.yml`)는 **API JSON 응답**만 담당한다. 정적 자산은 이미
+`Content-Encoding`이 붙어 있어 건드리지 않고, webp/png/jpeg는 `excludedContentTypes`로 제외한다.
+
+### 크기 예산 (회귀 방지)
+
+각 앱의 빌드가 "초기 전송량(brotli)"—HTML + 진입 청크 + 정적으로 import되는 청크 + CSS—을 재고
+예산을 넘으면 **빌드를 실패시킨다**. 지연 로드 청크는 포함하지 않는다.
+
+| 앱 | 예산 | 설정 위치 |
+|---|---|---|
+| Lite | 10 KB | `apps/lite/build.ts` |
+| Full Chat | 128 KB | `apps/web/vite.config.ts` |
+| 대시보드 | 78 KB | `apps/dashboard/vite.config.ts` |
+
+예산을 올릴 때는 무엇이 늘었고 왜 받아들이는지 커밋 메시지에 남길 것.
+
+### SQLite
+
+`apps/server/src/db/database.ts`가 열 때마다 적용하는 PRAGMA와 그 근거는 파일 주석에 상세히 적어 두었다.
+요약하면 WAL + `synchronous=NORMAL` + 16 MiB 페이지 캐시 + 256 MB mmap이다.
+
+`synchronous=NORMAL`은 **의도적인 내구성 절충**이다: 프로세스 크래시/재배포에서는 아무것도 잃지 않고,
+호스트 전원 손실에서만 마지막 체크포인트 이후 트랜잭션을 잃을 수 있다. 그 창을 시간으로 묶기 위해
+60초마다 PASSIVE 체크포인트를 돈다. 이 절충을 되돌리려면 `applyPragmas`에서 해당 줄만 지우면 된다
+(메시지 저장 지연이 0.024 ms → 1.8 ms로 돌아간다).
+
+인덱스는 실측한 쿼리 플랜을 근거로만 추가한다. 새 쿼리를 넣을 때는 `EXPLAIN QUERY PLAN`으로
+전체 스캔이 없는지 확인할 것 — 특히 메시지 수에 비례해 커지는 경로를 조심한다.
+
+### WebSocket
+
+- 같은 프레임을 여러 수신자에게 보낼 때 직렬화는 한 번만 한다(`WsHub.sendPayload`).
+- 소켓당 미전송 버퍼가 1 MiB를 넘으면 연결을 끊는다. 느린 클라이언트가 서버 메모리를 잠식하지 못하게
+  하기 위함이고, 클라이언트는 재연결 후 `?after=`로 밀린 메시지를 따라잡는다.
+- 클라이언트 재연결 백오프에는 **지터**가 있다(계산값의 50~100%). 재배포로 모든 클라이언트가 동시에
+  끊겨도 새 컨테이너에 한꺼번에 몰리지 않는다.
+- 재연결 catch-up은 열린 대화방의 `?after=<마지막 id>` 증분만 받는다 — 전체 페이지를 다시 받지 않는다.
+
+### 우아한 종료
+
+SIGTERM을 받으면 새 연결을 막고 진행 중인 요청을 끝낸 뒤, WebSocket을 명시적으로 닫고
+WAL을 TRUNCATE 체크포인트한 다음 종료한다(최대 10초). compose의 `stop_grace_period: 20s`가 이를 받쳐 준다.
+
+### Docker 이미지
+
+빌드용 의존성과 런타임 의존성을 다른 스테이지에서 설치한다. 런타임 이미지에는 서버 실행에 필요한
+50개 패키지만 들어간다(vite/tailwind/typescript 등 빌드 전용 도구 제외). 프론트엔드 빌드 스테이지는
+`apps/server` 소스를 복사하지 않으므로, 서버만 고쳤을 때 프론트엔드 빌드 레이어가 캐시된 채로 남는다.
+
+`init-data-perms`는 완료 표식(`/app/data/.perms-ok`)을 남기고 이후 배포에서는 건너뛴다. 표식이 없으면
+전체 `chown -R`이 한 번 돈다. 강제로 다시 돌리려면:
+
+```sh
+docker run --rm -v litechat-data:/d busybox rm -f /d/.perms-ok
+```
+
+### 성능 측정 방법
+
+```sh
+# 1) 일회용 벤치 DB 생성 (운영 데이터와 절대 섞지 말 것 — DB_PATH를 임시 경로로)
+DB_PATH=/tmp/bench.db bun apps/server/scripts/seed-bench.ts
+
+# 2) 시드 DB로 프로덕션 모드 서버 기동 (:3100)
+cp /tmp/bench.db /tmp/run.db
+SCR=/tmp sh apps/server/scripts/bench-server.sh
+
+# 3) 쿼리 플랜 확인 — 뜨거운 경로에 SCAN이 없어야 한다
+#    (bun repl 또는 스크립트에서 EXPLAIN QUERY PLAN 실행)
+
+# 4) 번들 크기: 빌드 출력이 초기 전송량과 예산을 항상 함께 보고한다
+bun run build
+```
+
+e2e는 `PLAYWRIGHT_CHROMIUM_PATH`로 브라우저 경로를 지정할 수 있다(설치된 리비전이 다를 때).
+
 
 ## 테스트
 
