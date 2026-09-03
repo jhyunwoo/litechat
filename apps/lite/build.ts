@@ -51,13 +51,20 @@ if (!bundle.success) {
 const js = await bundle.outputs[0]!.text();
 const jsName = `assets/a.${hashOf(js)}.js`;
 
-// 2) CSS 최소화 (간단한 공백/주석 제거로 충분)
-const rawCss = await Bun.file(join(SRC, 'style.css')).text();
-const css = rawCss
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/\s+/g, ' ')
-  .replace(/ ?([{}:;,>]) ?/g, '$1')
-  .trim();
+// 2) CSS 최소화 — Bun의 CSS 파서/미니파이어를 쓴다.
+// 이전에는 정규식으로 공백을 지웠는데, 셀렉터의 `>`나 url(data:...)의 `:` 같은
+// 문맥을 구분하지 못해 언젠가 조용히 CSS를 망가뜨릴 수 있는 방식이었다.
+// 실제 파서는 규칙 병합·중복 제거까지 해서 결과도 더 작다 (brotli 1821 → 1781 B).
+const cssBundle = await Bun.build({
+  entrypoints: [join(SRC, 'style.css')],
+  target: 'browser',
+  minify: true,
+});
+if (!cssBundle.success) {
+  console.error(...cssBundle.logs);
+  process.exit(1);
+}
+const css = await cssBundle.outputs[0]!.text();
 const cssName = `assets/a.${hashOf(css)}.css`;
 
 // 3) HTML에 해시된 파일명 주입

@@ -1,0 +1,17 @@
+{
+  "name": "@litechat/build-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.5",
+    "typescript": "5.9.2",
+    "vite": "^6.3.5"
+  }
+}
