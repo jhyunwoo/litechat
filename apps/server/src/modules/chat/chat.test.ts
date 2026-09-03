@@ -384,3 +384,57 @@ describe('MessagesRepo — 답장', () => {
     expect(new MessagesRepo(deps.db).listQuotes(conversationId, [])).toEqual([]);
   });
 });
+
+describe('GET /api/chat/:id/messages — refs', () => {
+  /** 메시지 목록을 { messages, refs } 형태로 받는다 */
+  async function fetchMessages(query: string) {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages${query}`, {
+      cookie: alice.cookie,
+    });
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      messages: { id: number; r?: number }[];
+      refs?: { id: number; x: string }[];
+    };
+  }
+
+  /** REST로 답장을 보낸다 */
+  async function sendReply(text: string, replyTo: number) {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: bob.cookie,
+      body: { k: 't', x: text, r: replyTo },
+    });
+    expect(res.status).toBe(201);
+  }
+
+  test('인용 대상이 같은 페이지에 있으면 refs 필드가 아예 없다', async () => {
+    const target = await sendMessage(alice, '원본');
+    await sendReply('답장', target.id);
+
+    const body = await fetchMessages('?limit=30');
+    expect(body.messages).toHaveLength(2);
+    expect(body.refs).toBeUndefined();
+  });
+
+  test('인용 대상이 페이지 밖이면 그것만 refs에 담긴다', async () => {
+    const target = await sendMessage(alice, '아주 오래된 원본');
+    await sendMessage(alice, '사이 메시지');
+    await sendReply('답장', target.id);
+
+    // 마지막 1개만 받으면 원본은 페이지 밖이다.
+    const body = await fetchMessages('?limit=1');
+    expect(body.messages).toHaveLength(1);
+    expect(body.refs).toEqual([expect.objectContaining({ id: target.id, x: '아주 오래된 원본' })]);
+  });
+
+  test('답장 셋이 같은 원본을 가리켜도 refs는 하나만 싣는다', async () => {
+    const target = await sendMessage(alice, '인기 있는 원본');
+    for (const text of ['답장1', '답장2', '답장3']) await sendReply(text, target.id);
+
+    const body = await fetchMessages('?limit=3');
+    expect(body.messages).toHaveLength(3);
+    expect(body.refs).toHaveLength(1);
+    expect(body.refs![0]!.id).toBe(target.id);
+  });
+});
