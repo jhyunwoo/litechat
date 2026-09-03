@@ -45,3 +45,6 @@ yarn-error.log*
 /e2e/.data/
 /data/GeoLite2-*
 /apps/server/data/GeoLite2-*
+
+# Playwright 실행 산출물
+e2e/test-results/

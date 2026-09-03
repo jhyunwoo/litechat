@@ -79,6 +79,20 @@ test('전체 여정: 가입 → 친구 추가/수락 → 실시간 채팅 → �
   await expect(bob.getByText(/원본 저장/)).toBeVisible();
   await bob.keyboard.press('Escape');
 
+  // ── 답장: bob이 alice의 첫 메시지에 답장하면 인용문이 양쪽에 보인다
+  const firstMessage = bob.locator('[data-message-id]').filter({ hasText: '안녕 바비!' }).first();
+  await firstMessage.hover();
+  await firstMessage.getByRole('button', { name: '이 메시지에 답장' }).click();
+  await expect(bob.getByText('앨리스에게 답장')).toBeVisible();
+  await bob.getByPlaceholder('메시지 보내기').fill('답장이야!');
+  await bob.getByPlaceholder('메시지 보내기').press('Enter');
+  // 전송에 성공하면 답장 바가 스스로 사라진다
+  await expect(bob.getByText('앨리스에게 답장')).toHaveCount(0);
+  await expect(alice.getByRole('main').getByText('답장이야!')).toBeVisible();
+  // 인용문은 보낸 쪽과 받은 쪽 모두에 보인다 (버튼 이름에 원본 미리보기가 들어간다)
+  await expect(bob.getByRole('button', { name: /안녕 바비!/ }).first()).toBeVisible();
+  await expect(alice.getByRole('button', { name: /안녕 바비!/ }).first()).toBeVisible();
+
   // ── 긴 대화의 과거 페이지네이션: 연속 스크롤에도 중복 없이 한 번씩만 표시
   const conversationUrl = new URL(alice.url());
   const conversationId = conversationUrl.pathname.split('/').at(-1)!;
@@ -185,4 +199,60 @@ test('공개 출시 페이지와 웹 계정 삭제 검증', async ({ page }) => 
   await page.getByRole('button', { name: '로그인' }).click();
   await expect(page.getByRole('alert')).toHaveText('아이디 또는 비밀번호가 올바르지 않아요.');
   expect(consoleErrors).toEqual([]);
+});
+
+test('답장: 원본이 로드 범위 밖이어도 인용문이 보이고 눌러서 원본으로 이동한다', async ({
+  browser,
+}) => {
+  const aliceName = uniqueName('ra');
+  const bobName = uniqueName('rb');
+  const aliceContext = await browser.newContext({ baseURL: BASE });
+  const bobContext = await browser.newContext({ baseURL: BASE });
+  const alice = await aliceContext.newPage();
+  const bob = await bobContext.newPage();
+
+  await register(alice, aliceName, '레이');
+  await register(bob, bobName, '루비');
+
+  await alice.getByRole('link', { name: /친구/ }).click();
+  await alice.getByPlaceholder('아이디로 검색 (Ctrl+K)').fill(bobName);
+  await alice.getByRole('button', { name: '친구 추가' }).click();
+  await bob.getByRole('link', { name: /친구/ }).click();
+  await bob.getByRole('button', { name: '수락' }).click();
+  await expect(bob.getByRole('link', { name: /레이/ })).toBeVisible();
+
+  // 원본을 보내고 그 id를 확보한다.
+  await alice.getByRole('link', { name: /루비/ }).click();
+  const conversationId = new URL(alice.url()).pathname.split('/').at(-1)!;
+  const created = await alice.request.post(`${BASE}/api/chat/${conversationId}/messages`, {
+    data: { k: 't', x: '아주 오래된 원본' },
+  });
+  const originalId = ((await created.json()) as { message: { id: number } }).message.id;
+
+  // 원본을 최근 30개 창 밖으로 밀어낸 뒤, 가장 최근 메시지로 답장을 만든다.
+  for (let index = 1; index <= 40; index += 1) {
+    await alice.request.post(`${BASE}/api/chat/${conversationId}/messages`, {
+      data: { k: 't', x: `채우기-${index}` },
+    });
+  }
+  const replied = await bob.request.post(`${BASE}/api/chat/${conversationId}/messages`, {
+    data: { k: 't', x: '오래된 것에 답장', r: originalId },
+  });
+  expect(replied.status()).toBe(201);
+
+  // 방을 열면 최근 30개만 로드된다 → 원본 말풍선은 없지만 인용문은 refs로 그려진다.
+  await alice.reload();
+  await expect(alice.getByRole('main').getByText('오래된 것에 답장')).toBeVisible();
+  await expect(alice.locator(`[data-message-id="${originalId}"]`)).toHaveCount(0);
+  const quote = alice.getByRole('button', { name: /아주 오래된 원본/ }).first();
+  await expect(quote).toBeVisible();
+
+  // 인용문을 누르면 과거를 되짚어 불러온 뒤 원본으로 스크롤한다.
+  await quote.click();
+  await expect(alice.locator(`[data-message-id="${originalId}"]`)).toBeInViewport({
+    timeout: 20_000,
+  });
+
+  await aliceContext.close();
+  await bobContext.close();
 });
