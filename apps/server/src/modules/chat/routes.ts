@@ -30,8 +30,8 @@ export function chatRoutes(deps: AppDeps, service: ChatService) {
         zValidator('query', messagesQuerySchema),
         (c) => {
           const { id } = c.req.valid('param');
-          const messages = service.getMessages(c.var.userId, id, c.req.valid('query'));
-          return c.json({ messages }, 200);
+          // { messages, refs? } — refs는 이번 페이지 밖을 가리키는 인용 원본만 담는다.
+          return c.json(service.getMessages(c.var.userId, id, c.req.valid('query')), 200);
         },
       )
       // 메시지 전송 (WS 폴백 겸 e2e 검증용)
@@ -41,8 +41,8 @@ export function chatRoutes(deps: AppDeps, service: ChatService) {
         zValidator('json', sendMessageSchema),
         (c) => {
           const { id } = c.req.valid('param');
-          const { k, x } = c.req.valid('json');
-          const message = service.sendMessage(c.var.userId, id, k, x);
+          const { k, x, r } = c.req.valid('json');
+          const message = service.sendMessage(c.var.userId, id, k, x, undefined, r);
           return c.json({ message }, 201);
         },
       )

@@ -21,6 +21,9 @@
 - **SQLite(WAL)** 가 영속 데이터, **Redis** 가 세션 저장을 담당. (`REDIS_URL=memory`로 Redis 없이 개발 가능)
 - **실시간**: 순수 WebSocket + 한 글자 키 JSON 프로토콜(`packages/types/src/protocol.ts`).
   읽음 확인은 워터마크(사용자·대화별 한 행) 방식이라 전송량과 쓰기량이 최소다.
+  답장은 메시지에 `r`(인용 대상 ID) 한 필드만 싣고, 인용문을 그리는 데 필요한데 이번
+  페이지에 없는 원본만 `/messages` 응답의 `refs`에 한 번씩 담아 보낸다 — 인용 본문을
+  메시지마다 중복 전송하지 않는다.
 - **이미지**: 원본 보존 + sharp로 저화질 webp(640px/q40) 생성. 채팅방은 webp 기본,
   클릭 시 원본/저화질 다운로드. Lite는 탭해야 로드한다.
 - **타입 안전성 (Hono Stack)**: 서버의 `AppType`을 `hc<AppType>`로 소비. API 문서는

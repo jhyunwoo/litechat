@@ -266,4 +266,16 @@ export const MIGRATIONS: string[] = [
   -- 추가해 대화 목록 조회가 전체 스캔 대신 두 인덱스 탐색으로 끝나게 한다.
   CREATE INDEX ix_conversations_user_b ON conversations (user_b);
   `,
+
+  // v9 → v10: 답장 — 메시지가 같은 대화 안의 다른 메시지를 인용한다.
+  //
+  // 인덱스를 만들지 않는 이유: 조회는 항상 PK(m.id IN (...))로만 일어나고
+  // "이 메시지에 달린 답장 전부" 같은 역방향 질의가 없다. 실측 근거 없는 인덱스는
+  // 메시지 삽입마다 쓰기 비용만 늘린다 — 이 프로젝트에서 가장 뜨거운 경로다.
+  //
+  // 매달린 참조가 생기지 않는 이유: 계정 삭제는 대화의 메시지를 통째로 지우고
+  // (modules/auth/service.ts), 인용은 언제나 같은 대화 안이므로 대상만 사라지지 않는다.
+  `
+  ALTER TABLE messages ADD COLUMN reply_to_id INTEGER REFERENCES messages(id);
+  `,
 ];

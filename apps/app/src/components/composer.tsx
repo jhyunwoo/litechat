@@ -39,9 +39,12 @@ const SEND_POP_SPRING = { stiffness: 500, damping: 18, mass: 0.5 } as const;
 interface Props {
   onSend: (kind: MessageKind, content: string) => Promise<void>;
   onError: (message: unknown) => void;
+  /** 답장 중이면 인용 미리보기 (보낸이 이름 + 한 줄) */
+  replyPreview?: { name: string; text: string };
+  onCancelReply: () => void;
 }
 
-export function Composer({ onSend, onError }: Props) {
+export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props) {
   const styles = useStyles();
   const { colors } = useTheme();
   const [draft, setDraft] = useState('');
@@ -121,6 +124,25 @@ export function Composer({ onSend, onError }: Props) {
 
   return (
     <Glass style={styles.surface}>
+      {/* 답장 바 — 답장 대상이 정해져 있을 때만 */}
+      {replyPreview && (
+        <View style={styles.replyBar}>
+          <View style={styles.replyText}>
+            <Text style={styles.replyName}>{replyPreview.name}에게 답장</Text>
+            <Text style={styles.replyPreview} numberOfLines={1}>
+              {replyPreview.text}
+            </Text>
+          </View>
+          <Pressable
+            onPress={onCancelReply}
+            accessibilityLabel="답장 취소"
+            style={({ pressed }) => [styles.iconButton, pressed && styles.iconPressed]}
+          >
+            <Text style={styles.icon}>✕</Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.bar}>
         {/* 사진 */}
         <Pressable
@@ -186,6 +208,22 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.sm,
     padding: spacing.sm,
   },
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingTop: spacing.xs,
+  },
+  replyText: {
+    flex: 1,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primarySoft,
+    paddingLeft: spacing.sm,
+  },
+  replyName: { fontSize: 11, fontWeight: '500', color: colors.primarySoft },
+  replyPreview: { fontSize: 12, color: colors.inkMute },
   iconButton: {
     width: CONTROL_SIZE,
     height: CONTROL_SIZE,

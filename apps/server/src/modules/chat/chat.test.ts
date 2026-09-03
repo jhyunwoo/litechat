@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createApp, type AppType } from '../../app';
 import { createTestDeps, type AppDeps } from '../../deps';
 import { fakeSocket, jsonRequest, signup } from '../../test/helpers';
+import { MessagesRepo } from './messages-repo';
 
 let deps: AppDeps;
 let app: AppType;
@@ -75,6 +76,57 @@ describe('POST /api/chat/:id/messages', () => {
       method: 'POST',
       cookie: alice.cookie,
       body: { k: 't', x: '' },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('답장을 보내면 r이 저장되고 상대 프레임에도 실린다', async () => {
+    const target = await sendMessage(alice, '원본 메시지');
+    const bobSocket = fakeSocket(deps, bob.user.id);
+
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: bob.cookie,
+      body: { k: 't', x: '답장이야', r: target.id },
+    });
+    expect(res.status).toBe(201);
+    const { message } = (await res.json()) as { message: { r?: number } };
+    expect(message.r).toBe(target.id);
+    expect(bobSocket.frames).toContainEqual(
+      expect.objectContaining({ t: 'm', x: '답장이야', r: target.id }),
+    );
+  });
+
+  test('존재하지 않는 메시지를 인용하면 400', async () => {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { k: 't', x: '유령 답장', r: 999_999 },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // 다른 대화의 메시지를 인용하면 그 본문이 refs를 타고 새어 나간다 — 반드시 막아야 한다.
+  test('다른 대화의 메시지를 인용하면 400', async () => {
+    const carol = await signup(app, 'carol2', 'Carol');
+    const requested = await jsonRequest(app, '/api/friends/requests', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { userId: carol.user.id },
+    });
+    const { id: friendshipId } = (await requested.json()) as { id: number };
+    const accepted = await jsonRequest(app, `/api/friends/requests/${friendshipId}/respond`, {
+      method: 'POST',
+      cookie: carol.cookie,
+      body: { accept: true },
+    });
+    const otherConv = ((await accepted.json()) as { conversationId: number }).conversationId;
+    const secret = await sendMessage(alice, '비밀', otherConv);
+
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { k: 't', x: '몰래 인용', r: secret.id },
     });
     expect(res.status).toBe(400);
   });
@@ -284,5 +336,105 @@ describe('WebSocket /ws (실서버 통합)', () => {
     } finally {
       server.stop(true);
     }
+  });
+});
+
+describe('MessagesRepo — 답장', () => {
+  test('replyToId를 저장하고 WireMessage에 r로 되돌려준다', () => {
+    const repo = new MessagesRepo(deps.db);
+    const target = repo.insert(conversationId, alice.user.id, 't', '원본');
+    const reply = repo.insert(conversationId, bob.user.id, 't', '답장', target.id);
+
+    expect(target.r).toBeUndefined();
+    expect(reply.r).toBe(target.id);
+    expect(repo.findWire(reply.id)!.r).toBe(target.id);
+  });
+
+  test('listQuotes는 본문을 100자로 자른다', () => {
+    const repo = new MessagesRepo(deps.db);
+    const target = repo.insert(conversationId, alice.user.id, 't', 'ㄱ'.repeat(150));
+
+    const [quote] = repo.listQuotes(conversationId, [target.id]);
+    expect(quote).toEqual({ id: target.id, s: alice.user.id, k: 't', x: 'ㄱ'.repeat(100) });
+  });
+
+  // 보안 경계: 대화 ID를 조건에서 빼면 남의 대화 본문을 ID만으로 긁을 수 있다.
+  test('listQuotes는 다른 대화의 메시지를 절대 반환하지 않는다', async () => {
+    const carol = await signup(app, 'carol', 'Carol');
+    const requested = await jsonRequest(app, '/api/friends/requests', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { userId: carol.user.id },
+    });
+    const { id: friendshipId } = (await requested.json()) as { id: number };
+    const accepted = await jsonRequest(app, `/api/friends/requests/${friendshipId}/respond`, {
+      method: 'POST',
+      cookie: carol.cookie,
+      body: { accept: true },
+    });
+    const otherConv = ((await accepted.json()) as { conversationId: number }).conversationId;
+
+    const repo = new MessagesRepo(deps.db);
+    const secret = repo.insert(otherConv, alice.user.id, 't', '비밀 이야기');
+
+    expect(repo.listQuotes(conversationId, [secret.id])).toEqual([]);
+  });
+
+  test('listQuotes는 빈 배열을 받으면 빈 배열을 준다', () => {
+    expect(new MessagesRepo(deps.db).listQuotes(conversationId, [])).toEqual([]);
+  });
+});
+
+describe('GET /api/chat/:id/messages — refs', () => {
+  /** 메시지 목록을 { messages, refs } 형태로 받는다 */
+  async function fetchMessages(query: string) {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages${query}`, {
+      cookie: alice.cookie,
+    });
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      messages: { id: number; r?: number }[];
+      refs?: { id: number; x: string }[];
+    };
+  }
+
+  /** REST로 답장을 보낸다 */
+  async function sendReply(text: string, replyTo: number) {
+    const res = await jsonRequest(app, `/api/chat/${conversationId}/messages`, {
+      method: 'POST',
+      cookie: bob.cookie,
+      body: { k: 't', x: text, r: replyTo },
+    });
+    expect(res.status).toBe(201);
+  }
+
+  test('인용 대상이 같은 페이지에 있으면 refs 필드가 아예 없다', async () => {
+    const target = await sendMessage(alice, '원본');
+    await sendReply('답장', target.id);
+
+    const body = await fetchMessages('?limit=30');
+    expect(body.messages).toHaveLength(2);
+    expect(body.refs).toBeUndefined();
+  });
+
+  test('인용 대상이 페이지 밖이면 그것만 refs에 담긴다', async () => {
+    const target = await sendMessage(alice, '아주 오래된 원본');
+    await sendMessage(alice, '사이 메시지');
+    await sendReply('답장', target.id);
+
+    // 마지막 1개만 받으면 원본은 페이지 밖이다.
+    const body = await fetchMessages('?limit=1');
+    expect(body.messages).toHaveLength(1);
+    expect(body.refs).toEqual([expect.objectContaining({ id: target.id, x: '아주 오래된 원본' })]);
+  });
+
+  test('답장 셋이 같은 원본을 가리켜도 refs는 하나만 싣는다', async () => {
+    const target = await sendMessage(alice, '인기 있는 원본');
+    for (const text of ['답장1', '답장2', '답장3']) await sendReply(text, target.id);
+
+    const body = await fetchMessages('?limit=3');
+    expect(body.messages).toHaveLength(3);
+    expect(body.refs).toHaveLength(1);
+    expect(body.refs![0]!.id).toBe(target.id);
   });
 });

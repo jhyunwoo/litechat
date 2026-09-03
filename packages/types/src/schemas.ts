@@ -94,6 +94,8 @@ export const sendMessageSchema = z.object({
   k: z.enum(['t', 'i', 'e']),
   /** 내용 — 텍스트/이모지 본문 또는 업로드된 이미지 ID */
   x: z.string().min(1).max(MAX_MESSAGE_LENGTH),
+  /** 답장 대상 메시지 ID (선택) — 같은 대화의 메시지여야 한다 */
+  r: z.number().int().positive().optional(),
 });
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 

@@ -6,7 +6,13 @@
  *   4. 상대방 + 내 다른 기기로 WS 팬아웃
  *   5. 상대가 오프라인이면 오프라인 훅 호출 (푸시 알림 발송)
  */
-import type { ConversationSummary, MessageKind, PublicUser, WireMessage } from '@litechat/types';
+import type {
+  ConversationSummary,
+  MessageKind,
+  PublicUser,
+  WireMessage,
+  WireQuote,
+} from '@litechat/types';
 import { MAX_MESSAGE_LENGTH } from '@litechat/types';
 import type { WSContext } from 'hono/ws';
 import type { AppDeps } from '../../deps';
@@ -63,6 +69,8 @@ export class ChatService {
     content: string,
     /** WS 전송 시 본인 소켓 (팬아웃에서 제외하고 ack만 받게 한다) */
     excludeSocket?: WSContext,
+    /** 답장 대상 메시지 ID (선택) */
+    replyToId?: number,
   ): WireMessage {
     const [, peerId] = this.requireMembership(meId, conversationId);
 
@@ -77,7 +85,15 @@ export class ChatService {
       if (!image || image.owner_id !== meId) throw errors.badRequest('INVALID_IMAGE');
     }
 
-    const message = this.messages.insert(conversationId, meId, kind, trimmed);
+    // 답장 대상은 반드시 같은 대화 안의 메시지여야 한다.
+    // 다른 대화의 ID를 인용하면 그 본문이 getMessages의 refs를 타고 새어 나가므로
+    // 저장 전에 여기서 막는다.
+    if (replyToId !== undefined) {
+      const target = this.messages.findWire(replyToId);
+      if (!target || target.c !== conversationId) throw errors.badRequest('INVALID_REPLY');
+    }
+
+    const message = this.messages.insert(conversationId, meId, kind, trimmed, replyToId);
 
     // 실시간 팬아웃: 상대방의 모든 기기 + 내 다른 기기.
     // 같은 프레임이므로 직렬화는 한 번만 한다 (전송마다 stringify 2회 → 1회).
@@ -97,14 +113,30 @@ export class ChatService {
     return message;
   }
 
-  /** 메시지 목록 조회 */
+  /**
+   * 메시지 목록 조회.
+   *
+   * 답장이 가리키는 원본 중 **이번 페이지에 없는 것만** refs에 실어 보낸다.
+   * 클라이언트가 인용문을 그리려고 따로 요청할 필요가 없고, 답장 여러 개가 같은
+   * 원본을 가리켜도 원본은 한 번만 전송된다. 인용 스냅샷을 메시지마다 동봉하는
+   * 방식과 달리 히스토리를 다시 받을 때 같은 바이트가 반복되지 않는다.
+   * 부족한 것이 없으면 refs 필드 자체를 생략해 빈 배열 바이트도 아낀다.
+   */
   getMessages(
     meId: number,
     conversationId: number,
     options: { after?: number; before?: number; limit: number },
-  ): WireMessage[] {
+  ): { messages: WireMessage[]; refs?: WireQuote[] } {
     this.requireMembership(meId, conversationId);
-    return this.messages.list(conversationId, options);
+    const messages = this.messages.list(conversationId, options);
+
+    const present = new Set(messages.map((message) => message.id));
+    const missing = new Set<number>();
+    for (const message of messages) {
+      if (message.r !== undefined && !present.has(message.r)) missing.add(message.r);
+    }
+    if (missing.size === 0) return { messages };
+    return { messages, refs: this.messages.listQuotes(conversationId, [...missing]) };
   }
 
   /** 읽음 워터마크 전진 + 상대방에게 실시간 알림 */

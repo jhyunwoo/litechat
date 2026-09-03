@@ -114,6 +114,11 @@ header h1 { font-size: 13px; font-weight: 600; color: #444; flex: 1; }
 .msgs::after { content: ''; flex: 1; background: var(--sheet); }
 /* 이미지 메시지 = 하이퍼링크 셀처럼 */
 .imgbtn { color: #0563c1; text-decoration: underline; font-size: 10px; text-align: left; }
+.qt { display: block; width: 100%; text-align: left; font-size: 9px; color: #555; border-left: 2px solid #0563c1; padding-left: 4px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp { flex: 0 0 auto; padding: 0 4px; font-size: 10px; color: #0563c1; }
+.rb { display: flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 10px; border-top: 1px solid #d4d4d4; background: #f3f3f3; }
+.rb span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr.hl { background: #fff6cc; }
 .cb img { max-width: 100%; max-height: 120px; height: auto; display: block; }
 
 /* 입력 바 = 수식 입력줄 */

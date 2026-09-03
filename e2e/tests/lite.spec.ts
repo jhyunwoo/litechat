@@ -99,8 +99,19 @@ test('전체 여정: 가입 → 친구 → 실시간 채팅 → 읽음 → 이�
   await bob.locator('.cb img').click();
   await expect(bob.getByText(/원본 저장/)).toBeVisible();
 
+  // ── 답장: 행의 ↩ 버튼으로 대상을 고르고 보내면 인용문이 양쪽에 보인다
+  await bob.locator('.ov').click(); // 이미지 오버레이 닫기
+  await bob.locator('.mr', { hasText: '라이트에서 안녕!' }).first().locator('.rp').click();
+  await expect(bob.locator('.rb')).toBeVisible();
+  await bob.locator('.bar textarea').fill('라이트 답장!');
+  await bob.locator('.bar textarea').press('Enter');
+  // 전송에 성공하면 답장 바가 사라진다
+  await expect(bob.locator('.rb')).toHaveCount(0);
+  await expect(bob.locator('.qt').first()).toContainText('라이트에서 안녕!');
+  await expect(alice.locator('.msgs').getByText('라이트 답장!')).toBeVisible();
+  await expect(alice.locator('.qt').first()).toContainText('라이트에서 안녕!');
+
   // ── 데이터 카운터가 증가했고 프로필 탭에서 확인 가능 (시트 탭은 채팅 중에도 보인다)
-  await bob.locator('.ov').click(); // 오버레이 닫기
   await bob.getByRole('button', { name: '내정보' }).click();
   await expect(bob.getByText('사용 데이터')).toBeVisible();
 

@@ -1,6 +1,7 @@
 /**
  * 표시용 포맷 유틸리티
  */
+import type { MessageKind } from '@litechat/types';
 
 /** unix epoch 초 → 채팅 시간 표시 (오늘이면 시:분, 아니면 날짜) */
 export function formatTime(ts: number): string {
@@ -33,4 +34,13 @@ export function isEmojiOnly(text: string): boolean {
   const emojiPattern =
     /^(?:\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*){1,3}$/u;
   return emojiPattern.test(trimmed);
+}
+
+/**
+ * 인용문에 표시할 한 줄 텍스트.
+ * 이미지는 본문이 이미지 ID이므로 '사진'으로 바꾼다 — 인용문 하나 때문에 이미지를
+ * 새로 내려받는 일이 없어야 한다.
+ */
+export function quoteText(kind: MessageKind, content: string): string {
+  return kind === 'i' ? '사진' : content;
 }

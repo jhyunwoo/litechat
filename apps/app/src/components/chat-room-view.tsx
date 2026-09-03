@@ -28,13 +28,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
-import { markRead, sendMessage, useConversations, useMessages } from '@/data/data';
+import { loadOlderMessages, markRead, sendMessage, useConversations, useMessages } from '@/data/data';
 import { api, errorMessage, unwrap } from '@/lib/api';
+import { quoteText } from '@/lib/format';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
 import { Composer } from './composer';
 import { ImageViewer } from './image-viewer';
 import { MessageList, type Row } from './message-list';
+
+/** 인용 원본을 찾으러 과거로 되짚을 최대 페이지 수 — 저속 회선에서 왕복이 무한정 늘지 않게 한다 */
+const MAX_JUMP_PAGES = 10;
 
 interface Props {
   convId: number;
@@ -58,6 +62,10 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   const [error, setError] = useState('');
   const [awayFromBottom, setAwayFromBottom] = useState(false);
   const [composerLayoutHeight, setComposerLayoutHeight] = useState(0);
+  /** 지금 답장 중인 메시지 (없으면 null) */
+  const [replyTo, setReplyTo] = useState<WireMessage | null>(null);
+  /** 점프 직후 잠깐 밝힐 메시지 ID */
+  const [highlighted, setHighlighted] = useState<number | null>(null);
   const focused = useRef(false);
   const listRef = useRef<FlashListRef<Row>>(null);
   const composerHeight = useSharedValue(0);
@@ -119,8 +127,45 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   }, [lastId, convId, meId, messages, queryClient]);
 
   const onSend = useCallback(
-    (kind: MessageKind, content: string) => sendMessage(queryClient, meId, convId, kind, content),
-    [queryClient, meId, convId],
+    async (kind: MessageKind, content: string) => {
+      await sendMessage(queryClient, meId, convId, kind, content, replyTo?.id);
+      setReplyTo(null); // 성공했을 때만 해제한다 (실패하면 Composer가 입력을 되돌리고 답장 대상은 유지)
+    },
+    [queryClient, meId, convId, replyTo],
+  );
+
+  /**
+   * 인용 원본으로 이동한다.
+   *
+   * 로드된 범위에 없으면 과거 페이지를 되짚어 불러오되 MAX_JUMP_PAGES에서 멈춘다.
+   * around= 같은 새 엔드포인트를 쓰지 않는 이유는 메시지 배열에 구멍이 생기면
+   * 페이지네이션과 읽음 워터마크 계산이 모두 복잡해지기 때문이다.
+   */
+  const jumpTo = useCallback(
+    async (messageId: number) => {
+      for (let page = 0; page <= MAX_JUMP_PAGES; page += 1) {
+        const loaded = queryClient.getQueryData<WireMessage[]>(['messages', convId]);
+        const index = loaded?.findIndex((message) => message.id === messageId) ?? -1;
+        if (index >= 0) {
+          setHighlighted(messageId);
+          setTimeout(
+            () => setHighlighted((current) => (current === messageId ? null : current)),
+            1200,
+          );
+          listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+          return;
+        }
+        if (page === MAX_JUMP_PAGES) break;
+        try {
+          if (!(await loadOlderMessages(queryClient, convId))) break;
+        } catch (cause) {
+          setError(errorMessage(cause));
+          return;
+        }
+      }
+      setError('원본 메시지를 찾을 수 없습니다');
+    },
+    [queryClient, convId],
   );
   const onLoadError = useCallback((cause: unknown) => setError(errorMessage(cause)), []);
 
@@ -185,6 +230,9 @@ function ChatRoomViewContent({ convId, meId }: Props) {
             composerHeight={composerHeight}
             onAwayFromBottomChange={setAwayFromBottom}
             onLoadError={onLoadError}
+            highlightedId={highlighted}
+            onReply={setReplyTo}
+            onQuotePress={(id) => void jumpTo(id)}
           />
         )}
 
@@ -221,7 +269,19 @@ function ChatRoomViewContent({ convId, meId }: Props) {
         )}
 
         <Animated.View style={composerPad}>
-          <Composer onSend={onSend} onError={(err) => setError(errorMessage(err))} />
+          <Composer
+            onSend={onSend}
+            onError={(err) => setError(errorMessage(err))}
+            replyPreview={
+              replyTo
+                ? {
+                    name: replyTo.s === meId ? '나' : (conversation?.peer.nickname ?? '상대'),
+                    text: quoteText(replyTo.k, replyTo.x),
+                  }
+                : undefined
+            }
+            onCancelReply={() => setReplyTo(null)}
+          />
         </Animated.View>
       </KeyboardStickyView>
 

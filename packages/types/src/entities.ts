@@ -77,6 +77,27 @@ export interface WireMessage {
   ts: number;
   /** k === 'i' 일 때만 포함되는 이미지 메타데이터 */
   im?: WireImage;
+  /** 답장 대상 메시지 ID — 항상 같은 대화 안의 메시지를 가리킨다 (답장이 아니면 없음) */
+  r?: number;
+}
+
+/**
+ * 인용 표시 전용 축약 메시지.
+ *
+ * 본문(x)은 서버가 100자로 잘라 보내므로 **메시지 목록에 병합하면 안 된다**.
+ * WireMessage와 타입을 분리해 그 사고를 컴파일 타임에 막는다.
+ * 닉네임은 싣지 않는다 — 1:1 대화라 s는 나 아니면 상대이고, 클라이언트가 이미
+ * me와 conversation.peer를 갖고 있어 로컬에서 이름을 붙일 수 있다.
+ */
+export interface WireQuote {
+  /** 원본 메시지 ID */
+  id: number;
+  /** 원본을 보낸 사람 user ID */
+  s: number;
+  /** 원본 메시지 종류 */
+  k: MessageKind;
+  /** 원본 본문 (100자로 잘림). k === 'i'면 이미지 ID이므로 표시하지 않는다 */
+  x: string;
 }
 
 /** 채팅 탭에 표시할 대화 요약 */

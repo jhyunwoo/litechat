@@ -26,6 +26,20 @@ describe('release security controls', () => {
     expect(
       parseClientFrame(JSON.stringify({ t: 'm', c: 1, k: 't', x: 'a'.repeat(9000), i: 'tmp' })),
     ).toBeNull();
+
+    // 답장: r은 양의 정수만 허용한다.
+    expect(parseClientFrame('{"t":"m","c":1,"k":"t","x":"hi","i":"tmp","r":5}')).toEqual({
+      t: 'm',
+      c: 1,
+      k: 't',
+      x: 'hi',
+      i: 'tmp',
+      r: 5,
+    });
+    expect(parseClientFrame('{"t":"m","c":1,"k":"t","x":"hi","i":"tmp","r":0}')).toBeNull();
+    expect(parseClientFrame('{"t":"m","c":1,"k":"t","x":"hi","i":"tmp","r":-1}')).toBeNull();
+    expect(parseClientFrame('{"t":"m","c":1,"k":"t","x":"hi","i":"tmp","r":1.5}')).toBeNull();
+    expect(parseClientFrame('{"t":"m","c":1,"k":"t","x":"hi","i":"tmp","r":"5"}')).toBeNull();
   });
 
   /**
