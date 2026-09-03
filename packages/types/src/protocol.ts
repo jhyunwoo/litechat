@@ -44,6 +44,8 @@ export interface ClientSendFrame {
   x: string;
   /** 클라이언트 임시 ID — ack(`a`) 프레임으로 실제 ID와 매칭된다 */
   i: string;
+  /** 답장 대상 메시지 ID (선택) — 같은 대화의 메시지여야 한다 */
+  r?: number;
 }
 
 /** 읽음 워터마크 갱신 — "대화 c를 메시지 m까지 읽었다" */
@@ -69,6 +71,7 @@ const clientFrameSchema = z.discriminatedUnion('t', [
       k: z.enum(['t', 'i', 'e']),
       x: z.string().min(1).max(MAX_MESSAGE_LENGTH),
       i: z.string().min(1).max(100),
+      r: z.number().int().positive().optional(),
     })
     .strict(),
   z
