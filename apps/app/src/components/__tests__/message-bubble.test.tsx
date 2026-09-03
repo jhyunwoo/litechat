@@ -15,7 +15,10 @@ const base = {
   read: false,
   isTail: true,
   animate: false,
+  highlighted: false,
   onImagePress: jest.fn(),
+  onReply: jest.fn(),
+  onQuotePress: jest.fn(),
 };
 
 describe('MessageBubble', () => {
@@ -54,5 +57,29 @@ describe('MessageBubble', () => {
       />,
     );
     expect(screen.getByLabelText('사진')).toBeTruthy();
+  });
+});
+
+describe('MessageBubble — 답장', () => {
+  test('인용문이 있으면 보낸이와 본문을 함께 보여준다', async () => {
+    await render(
+      <MessageBubble
+        {...base}
+        message={message({ r: 7 })}
+        quote={{ id: 7, name: '앨리스', text: '원본입니다' }}
+      />,
+    );
+    expect(screen.getByText('앨리스')).toBeTruthy();
+    expect(screen.getByText('원본입니다')).toBeTruthy();
+  });
+
+  test('인용 원본을 못 찾으면 플레이스홀더를 보여준다', async () => {
+    await render(<MessageBubble {...base} message={message({ r: 7 })} />);
+    expect(screen.getByText('메시지')).toBeTruthy();
+  });
+
+  test('답장이 아니면 인용 영역이 없다', async () => {
+    await render(<MessageBubble {...base} message={message()} />);
+    expect(screen.queryByText('메시지')).toBeNull();
   });
 });

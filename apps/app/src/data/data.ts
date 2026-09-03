@@ -10,7 +10,13 @@
  * 실시간 프레임은 useRealtimeSync가 받아 캐시를 직접 갱신한다.
  * → 추가 REST 호출 없이 화면이 즉시 반영된다 (트래픽 절약 + 저지연).
  */
-import type { ConversationSummary, MessageKind, ServerFrame, WireMessage } from '@litechat/types';
+import type {
+  ConversationSummary,
+  MessageKind,
+  ServerFrame,
+  WireMessage,
+  WireQuote,
+} from '@litechat/types';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api, unwrap } from '@/lib/api';
@@ -22,6 +28,30 @@ const PAGE_SIZE = 30;
 
 /** QueryClient/대화별 과거 페이지 요청 — 같은 커서의 중복 요청을 하나로 합친다. */
 const olderMessageRequests = new WeakMap<QueryClient, Map<number, Promise<boolean>>>();
+
+/**
+ * 대화별 인용 원본 캐시 — /messages 응답의 refs를 모은다.
+ *
+ * 본문이 100자로 잘려 있으므로 ['messages'] 캐시(진짜 메시지 배열)와 절대 섞지 않는다.
+ * 채팅방을 나가도 유지한다 — 재진입 시 같은 원본을 다시 받지 않기 위해서다.
+ */
+const quoteCache = new Map<number, Map<number, WireQuote>>();
+
+/** /messages 응답의 refs를 캐시에 병합한다 */
+export function cacheQuotes(convId: number, refs: WireQuote[] | undefined): void {
+  if (!refs?.length) return;
+  let quotes = quoteCache.get(convId);
+  if (!quotes) {
+    quotes = new Map();
+    quoteCache.set(convId, quotes);
+  }
+  for (const quote of refs) quotes.set(quote.id, quote);
+}
+
+/** 캐시된 인용 원본 조회 (없으면 undefined) */
+export function getQuote(convId: number, id: number): WireQuote | undefined {
+  return quoteCache.get(convId)?.get(id);
+}
 
 /* ------------------------------------------------------------------ */
 /* 조회 훅                                                              */
@@ -45,7 +75,9 @@ export function useMessages(convId: number) {
         param: { id: String(convId) },
         query: { limit: String(PAGE_SIZE) },
       });
-      return (await unwrap<{ messages: WireMessage[] }>(res)).messages;
+      const { messages, refs } = await unwrap<{ messages: WireMessage[]; refs?: WireQuote[] }>(res);
+      cacheQuotes(convId, refs);
+      return messages;
     },
     staleTime: Infinity, // WS가 실시간 갱신하므로 재조회 불필요
   });
@@ -94,6 +126,8 @@ export async function sendMessage(
   convId: number,
   kind: MessageKind,
   content: string,
+  /** 답장 대상 메시지 ID (선택) */
+  replyTo?: number,
 ): Promise<void> {
   const tempKey = `t${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
   const optimistic: WireMessage = {
@@ -103,17 +137,25 @@ export async function sendMessage(
     k: kind,
     x: content,
     ts: Math.floor(Date.now() / 1000),
+    ...(replyTo !== undefined ? { r: replyTo } : {}),
   };
   pendingSends.set(tempKey, convId);
   appendMessage(queryClient, optimistic, tempKey);
 
-  const sentViaWs = socket.send({ t: 'm', c: convId, k: kind, x: content, i: tempKey });
+  const sentViaWs = socket.send({
+    t: 'm',
+    c: convId,
+    k: kind,
+    x: content,
+    i: tempKey,
+    ...(replyTo !== undefined ? { r: replyTo } : {}),
+  });
   if (!sentViaWs) {
     // WS가 끊긴 동안에도 전송은 가능해야 한다 → REST 폴백
     try {
       const res = await api.api.chat[':id'].messages.$post({
         param: { id: String(convId) },
-        json: { k: kind, x: content },
+        json: { k: kind, x: content, ...(replyTo !== undefined ? { r: replyTo } : {}) },
       });
       const { message } = await unwrap<{ message: WireMessage }>(res);
       confirmMessage(queryClient, tempKey, message.id, message.ts, message.im);
@@ -292,7 +334,11 @@ async function catchUpMessages(queryClient: QueryClient): Promise<void> {
           param: { id: String(convId) },
           query: { after: String(lastId) },
         });
-        const { messages } = await unwrap<{ messages: WireMessage[] }>(res);
+        const { messages, refs } = await unwrap<{
+          messages: WireMessage[];
+          refs?: WireQuote[];
+        }>(res);
+        cacheQuotes(convId, refs);
         if (messages.length === 0) return;
         queryClient.setQueryData<WireMessage[]>(['messages', convId], (old) => {
           if (!old) return messages;
@@ -330,7 +376,8 @@ export async function loadOlderMessages(
         param: { id: String(convId) },
         query: { before: String(oldest.id), limit: String(PAGE_SIZE) },
       });
-      const { messages } = await unwrap<{ messages: WireMessage[] }>(res);
+      const { messages, refs } = await unwrap<{ messages: WireMessage[]; refs?: WireQuote[] }>(res);
+      cacheQuotes(convId, refs);
       if (messages.length === 0) return false;
 
       let added = false;

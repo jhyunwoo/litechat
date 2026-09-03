@@ -20,10 +20,11 @@ import {
 } from 'react-native';
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller';
 import type { SharedValue } from 'react-native-reanimated';
-import { loadOlderMessages } from '@/data/data';
+import { getQuote, loadOlderMessages } from '@/data/data';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
-import { MessageBubble } from './message-bubble';
+import { quoteText } from '@/lib/format';
+import { MessageBubble, type QuoteView } from './message-bubble';
 
 /** 렌더 항목 — 파생 플래그를 미리 계산해 말풍선 memo가 잘 듣게 한다 */
 export interface Row {
@@ -33,6 +34,10 @@ export interface Row {
   read: boolean;
   isTail: boolean;
   animate: boolean;
+  /** 이 메시지가 인용하는 원본 (해석 실패 시 undefined) */
+  quote?: QuoteView;
+  /** 점프해 온 직후인지 */
+  highlighted: boolean;
 }
 
 interface Props {
@@ -50,6 +55,10 @@ interface Props {
   onAwayFromBottomChange?: (away: boolean) => void;
   /** 과거 메시지 로드 실패를 채팅방 오류 UI로 전달한다. */
   onLoadError?: (cause: unknown) => void;
+  /** 점프 직후 잠깐 밝힐 메시지 ID */
+  highlightedId: number | null;
+  onReply: (message: WireMessage) => void;
+  onQuotePress: (messageId: number) => void;
 }
 
 export function MessageList({
@@ -63,6 +72,9 @@ export function MessageList({
   composerHeight,
   onAwayFromBottomChange,
   onLoadError,
+  highlightedId,
+  onReply,
+  onQuotePress,
 }: Props) {
   const styles = useStyles();
   const queryClient = useQueryClient();
@@ -73,6 +85,28 @@ export function MessageList({
   const [initialIds] = useState(() => new Set(messages.map((m) => m.id)));
 
   const peerRead = conversation?.peerRead ?? 0;
+
+  const peerNickname = conversation?.peer.nickname;
+
+  /**
+   * 인용 원본 해석: (1) 로드된 메시지 → (2) refs 캐시 → (3) 못 찾으면 undefined(=플레이스홀더)
+   * 말풍선이 memo되어 있으므로 렌더마다 새 객체를 만들지 않도록 여기서 한 번만 만든다.
+   */
+  const quotes = useMemo(() => {
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    const views = new Map<number, QuoteView>();
+    for (const message of messages) {
+      if (message.r === undefined || views.has(message.r)) continue;
+      const source = byId.get(message.r) ?? getQuote(convId, message.r);
+      if (!source) continue;
+      views.set(message.r, {
+        id: message.r,
+        name: source.s === meId ? '나' : (peerNickname ?? '상대'),
+        text: quoteText(source.k, source.x),
+      });
+    }
+    return views;
+  }, [messages, convId, meId, peerNickname]);
 
   // 오름차순 메시지 → 파생 플래그를 포함한 렌더 행
   const rows = useMemo<Row[]>(
@@ -87,9 +121,11 @@ export function MessageList({
           // 같은 사람의 연속 메시지 묶음에서 마지막인지 (꼬리와 시간 표시는 마지막에만)
           isTail: !next || next.s !== message.s || next.ts - message.ts > 60,
           animate: !initialIds.has(message.id),
+          quote: message.r !== undefined ? quotes.get(message.r) : undefined,
+          highlighted: highlightedId === message.id,
         };
       }),
-    [messages, meId, peerRead, initialIds],
+    [messages, meId, peerRead, initialIds, quotes, highlightedId],
   );
 
   /** 위(과거) 끝에 도달 — 이전 페이지 로드 */
@@ -126,11 +162,15 @@ export function MessageList({
         read={item.read}
         isTail={item.isTail}
         animate={item.animate}
+        quote={item.quote}
+        highlighted={item.highlighted}
         onImagePress={onImagePress}
         onLongPress={item.mine ? undefined : onMessageLongPress}
+        onReply={onReply}
+        onQuotePress={onQuotePress}
       />
     ),
-    [onImagePress, onMessageLongPress],
+    [onImagePress, onMessageLongPress, onReply, onQuotePress],
   );
 
   // FlashList의 가상화를 유지하면서 키보드 높이와 스크롤 inset을 UI 스레드에서 동기화한다.
