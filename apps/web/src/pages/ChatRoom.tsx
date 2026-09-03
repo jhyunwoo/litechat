@@ -10,17 +10,27 @@
 import type { WireMessage } from '@litechat/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, m } from 'motion/react';
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { api, errorMessage, unwrap } from '../api';
 import { useAuth } from '../auth';
-import { loadOlderMessages, markRead, sendMessage, useConversations, useMessages } from '../data';
+import {
+  getQuote,
+  loadOlderMessages,
+  markRead,
+  sendMessage,
+  useConversations,
+  useMessages,
+} from '../data';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ImageViewer } from '../components/ImageViewer';
 import { WebcamCapture } from '../components/WebcamCapture';
-import { MessageBubble } from '../components/MessageBubble';
+import { MessageBubble, type QuoteView } from '../components/MessageBubble';
 import { Icon } from '../components/Icon';
-import { isEmojiOnly } from '../lib/format';
+import { isEmojiOnly, quoteText } from '../lib/format';
+
+/** 인용 원본을 찾으러 과거로 되짚을 최대 페이지 수 — 저속 회선에서 왕복이 무한정 늘지 않게 한다 */
+const MAX_JUMP_PAGES = 10;
 
 export default function ChatRoom() {
   const { id } = useParams();
@@ -45,6 +55,10 @@ function ChatRoomContent({ convId }: { convId: number }) {
   const [uploading, setUploading] = useState(false);
   const [showCamMenu, setShowCamMenu] = useState(false);
   const [showWebcam, setShowWebcam] = useState(false);
+  /** 지금 답장 중인 메시지 (없으면 null) */
+  const [replyTo, setReplyTo] = useState<WireMessage | null>(null);
+  /** 점프 직후 잠깐 밝힐 메시지 ID */
+  const [highlighted, setHighlighted] = useState<number | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -56,6 +70,26 @@ function ChatRoomContent({ convId }: { convId: number }) {
 
   // 새 메시지가 오면 (하단에 붙어 있을 때) 자동 스크롤
   const lastId = messages?.at(-1)?.id;
+
+  /**
+   * 인용 원본 해석: ① 로드된 메시지 → ② refs 캐시 → ③ 못 찾으면 맵에 없음(=플레이스홀더)
+   * 말풍선이 memo되어 있으므로 렌더마다 새 객체를 만들지 않도록 여기서 한 번만 만든다.
+   */
+  const quotes = useMemo(() => {
+    const byId = new Map((messages ?? []).map((message) => [message.id, message]));
+    const views = new Map<number, QuoteView>();
+    for (const message of messages ?? []) {
+      if (message.r === undefined || views.has(message.r)) continue;
+      const source = byId.get(message.r) ?? getQuote(convId, message.r);
+      if (!source) continue;
+      views.set(message.r, {
+        id: message.r,
+        name: source.s === me?.id ? '나' : (conversation?.peer.nickname ?? '상대'),
+        text: quoteText(source.k, source.x),
+      });
+    }
+    return views;
+  }, [messages, convId, me?.id, conversation?.peer.nickname]);
   useEffect(() => {
     if (stickToBottom.current) {
       listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -76,14 +110,31 @@ function ChatRoomContent({ convId }: { convId: number }) {
     }
   }, [lastId, convId, me?.id, messages, queryClient]);
 
-  // Esc → 목록으로
+  // Esc → 답장 중이면 답장 취소가 우선, 아니면 목록으로 (한 번 더 누르면 나간다)
+  // Ctrl/Cmd + ↑ → 마지막 메시지에 답장. 입력창이 거의 항상 포커스를 갖고 있어
+  // 단일 문자 단축키는 글자 입력과 구분되지 않으므로 조합키를 쓴다.
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') navigate('/');
+      if (e.key === 'Escape') {
+        if (replyTo) {
+          setReplyTo(null);
+          return;
+        }
+        navigate('/');
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
+        const last = messages?.at(-1);
+        if (last && last.id > 0) {
+          e.preventDefault();
+          setReplyTo(last);
+          inputRef.current?.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate]);
+  }, [navigate, replyTo, messages]);
 
   /** 위로 스크롤 시 과거 메시지 로드 */
   async function onScroll() {
@@ -125,14 +176,63 @@ function ChatRoomContent({ convId }: { convId: number }) {
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }
 
+  /**
+   * 메시지가 DOM에 나타나면 화면 가운데로 스크롤한다.
+   *
+   * 캐시에 메시지가 들어간 시점과 React가 그것을 커밋하는 시점은 다르다. 한 프레임만
+   * 기다리면 querySelector가 아직 null이라 스크롤이 조용히 건너뛰어진다(실측으로 확인).
+   * 나타날 때까지 몇 프레임 되짚는다.
+   */
+  function scrollToMessage(messageId: number, attempts = 20): void {
+    const el = listRef.current?.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if (attempts > 0) requestAnimationFrame(() => scrollToMessage(messageId, attempts - 1));
+  }
+
+  /**
+   * 인용 원본으로 이동한다.
+   *
+   * 로드된 범위에 없으면 과거 페이지를 되짚어 불러오되 MAX_JUMP_PAGES에서 멈춘다.
+   * around= 같은 새 엔드포인트를 쓰지 않는 이유는 메시지 배열에 구멍이 생기면
+   * 페이지네이션과 읽음 워터마크 계산이 모두 복잡해지기 때문이다.
+   */
+  async function jumpTo(messageId: number): Promise<void> {
+    for (let page = 0; page <= MAX_JUMP_PAGES; page += 1) {
+      const loaded = queryClient.getQueryData<WireMessage[]>(['messages', convId]);
+      if (loaded?.some((message) => message.id === messageId)) {
+        stickToBottom.current = false;
+        setHighlighted(messageId);
+        window.setTimeout(
+          () => setHighlighted((current) => (current === messageId ? null : current)),
+          1200,
+        );
+        scrollToMessage(messageId);
+        return;
+      }
+      if (page === MAX_JUMP_PAGES) break;
+      try {
+        if (!(await loadOlderMessages(queryClient, convId))) break;
+      } catch (cause) {
+        setError(errorMessage(cause));
+        return;
+      }
+    }
+    setError('원본 메시지를 찾을 수 없습니다');
+  }
+
   /** 텍스트/이모지 전송 */
   async function submit() {
     const text = draft.trim();
     if (!text || !me) return;
+    const replyId = replyTo?.id;
     setDraft('');
     setShowEmoji(false);
     try {
-      await sendMessage(queryClient, me.id, convId, isEmojiOnly(text) ? 'e' : 't', text);
+      await sendMessage(queryClient, me.id, convId, isEmojiOnly(text) ? 'e' : 't', text, replyId);
+      setReplyTo(null); // 성공했을 때만 해제한다 (실패하면 답장 대상을 유지)
     } catch (err) {
       setError(errorMessage(err));
       setDraft(text); // 실패하면 입력을 복구한다.
@@ -215,7 +315,11 @@ function ChatRoomContent({ convId }: { convId: number }) {
                   pending={message.id < 0}
                   read={mine && (conversation?.peerRead ?? 0) >= message.id && message.id > 0}
                   isTail={isTail}
+                  quote={message.r !== undefined ? quotes.get(message.r) : undefined}
+                  highlighted={highlighted === message.id}
                   onImageClick={setViewing}
+                  onReply={setReplyTo}
+                  onQuoteClick={(id) => void jumpTo(id)}
                 />
               );
             })}
@@ -263,6 +367,37 @@ function ChatRoomContent({ convId }: { convId: number }) {
 
       {/* 입력 바 */}
       <div className="pb-safe border-t border-hairline bg-white">
+        {/* 답장 바 — 답장 대상이 정해져 있을 때만 */}
+        <AnimatePresence>
+          {replyTo && (
+            <m.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mx-auto w-full max-w-3xl overflow-hidden"
+            >
+              <div className="mx-2 mt-2 flex items-center gap-2 rounded-lg border-l-2 border-primary-soft bg-canvas-soft px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-medium text-primary-soft">
+                    {replyTo.s === me?.id ? '나' : (conversation?.peer.nickname ?? '상대')}에게 답장
+                  </p>
+                  <p className="truncate text-xs text-ink-mute">
+                    {quoteText(replyTo.k, replyTo.x)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  aria-label="답장 취소"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-mute hover:bg-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </m.div>
+          )}
+        </AnimatePresence>
+
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2 p-2">
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
           <div className="relative">
