@@ -1,11 +1,36 @@
+# 빌드 컨텍스트에서 제외 — 작을수록 전송/캐시 판정이 빨라진다.
 node_modules
 **/node_modules
 **/dist
 .git
+.github
 .turbo
 **/.turbo
+
+# 네이티브 앱은 서버 이미지에 필요 없다. 매니페스트만 lockfile 검증용으로 남긴다
+# (Dockerfile의 install이 --filter '!app'으로 설치 자체는 건너뛴다).
+apps/app
+!apps/app/package.json
+
+# 테스트/도구 산출물
 e2e/test-results
 e2e/.data
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/coverage
+
+# 런타임 데이터와 로컬 산출물
 data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+# 저장소 문서/자산 — 런타임에 쓰이지 않는다
 *.md
 !packages/**/*.md
+docs
+design
+brand
+store-assets
+security

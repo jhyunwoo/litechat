@@ -59,6 +59,16 @@ services:
       - 'traefik.http.routers.litechat-lc-moveto.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.litechat-lc-moveto.service=litechat-lc-moveto'
       - 'traefik.http.services.litechat-lc-moveto.loadbalancer.server.port=3000'
+      # 압축 미들웨어 — 정적 자산(js/css/html)은 빌드 시점에 이미 brotli/gzip으로
+      # 사전 압축돼 Content-Encoding과 함께 전송되므로 Traefik이 다시 손대지 않는다.
+      # 여기서 얻는 것은 **API JSON 응답** 압축이다(대화 목록/메시지 페이지는 한글이라
+      # 압축률이 높다). 이미 압축된 이미지(webp/png/jpeg)는 excludedContentTypes로 뺀다 —
+      # 재압축은 CPU만 쓰고 크기는 오히려 커진다. 2 OCPU 호스트라 이 구분이 중요하다.
+      - 'traefik.http.middlewares.litechat-compress.compress=true'
+      - 'traefik.http.middlewares.litechat-compress.compress.excludedContentTypes=image/webp,image/png,image/jpeg,image/gif,font/woff2,application/octet-stream'
+      # 아주 작은 응답은 압축 헤더 오버헤드가 이득을 넘는다.
+      - 'traefik.http.middlewares.litechat-compress.compress.minResponseBodyBytes=1024'
+      - 'traefik.http.routers.litechat-lc-moveto.middlewares=litechat-compress'
     depends_on:
       redis:
         condition: service_healthy
@@ -74,7 +84,27 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      # start_period 동안의 실패는 재시도 횟수에 포함되지 않는다. start_interval을 주면
+      # 그 구간에서는 1초마다 확인해, 정상 부팅한 컨테이너가 최대 30초씩 기다리지 않는다.
+      start_period: 30s
+      start_interval: 1s
+    # SIGTERM → 우아한 종료(apps/server/src/index.ts). 서버는 진행 중인 요청을 흘려보낸 뒤
+    # 10초 안에 끝내므로, Docker 기본값 10초로는 SIGKILL과 겹칠 수 있어 여유를 둔다.
+    stop_grace_period: 20s
+    # 컨테이너 로그가 디스크를 채우지 않게 한다 (Dokploy 기본 json-file 드라이버).
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          # 2 OCPU / 12 GB 호스트. Sharp의 이미지 변환이 순간적으로 메모리를 쓰므로
+          # 넉넉히 잡되, 폭주 시 호스트 전체가 아니라 이 컨테이너만 죽도록 상한을 둔다.
+          memory: 3g
+        reservations:
+          memory: 512m
 
   # 볼륨 소유권 정렬 (app보다 먼저 1회 실행되고 종료된다).
   #
@@ -83,11 +113,30 @@ services:
   # 들어 있으므로, 나중에 USER bun(uid 1000)으로 바꿔도 볼륨은 root 소유로 남는다.
   # Dockerfile의 `chown -R bun:bun /app`은 빌드 타임 레이어라 런타임 볼륨 마운트에
   # 가려져 아무 효과가 없다 → 앱이 SQLite에 쓰지 못해 부팅 중 죽는다.
-  # 그래서 마운트된 볼륨 자체를 root 권한으로 한 번 정렬한 뒤 앱을 띄운다.
+  #
+  # 다만 매 배포마다 `chown -R /app/data`를 도는 것은 업로드 파일 수에 비례해
+  # 배포 시간이 늘어난다는 뜻이다(사진이 쌓일수록 영원히 느려진다). 소유권 정렬은
+  # 본질적으로 **한 번만** 필요한 일이므로 완료 표식을 남기고 건너뛴다.
+  #  - 표식이 있으면 즉시 종료 (배포 시간 O(1))
+  #  - 표식이 없으면 기존과 동일하게 한 번 정렬하고 표식을 남긴다
+  #  - 새로 만들어지는 파일은 앱이 uid 1000으로 쓰므로 처음부터 올바른 소유자다
+  # 표식을 지우면(`docker run --rm -v litechat-data:/d busybox rm /d/.perms-ok`)
+  # 다음 배포에서 다시 전체 정렬이 돈다 — 복구 경로가 열려 있다.
   init-data-perms:
     image: busybox:1.36
     user: '0:0'
-    command: ['sh', '-c', 'chown -R 1000:1000 /app/data']
+    command:
+      - sh
+      - -c
+      - |
+        if [ -f /app/data/.perms-ok ]; then
+          echo "ownership already normalised — skipping chown"
+          exit 0
+        fi
+        echo "normalising ownership of /app/data (one-off)"
+        chown -R 1000:1000 /app/data
+        touch /app/data/.perms-ok
+        chown 1000:1000 /app/data/.perms-ok
     restart: 'no'
     volumes:
       - litechat-data:/app/data
