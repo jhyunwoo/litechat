@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createApp, type AppType } from '../../app';
 import { createTestDeps, type AppDeps } from '../../deps';
 import { fakeSocket, jsonRequest, signup } from '../../test/helpers';
+import { MessagesRepo } from './messages-repo';
 
 let deps: AppDeps;
 let app: AppType;
@@ -284,5 +285,51 @@ describe('WebSocket /ws (실서버 통합)', () => {
     } finally {
       server.stop(true);
     }
+  });
+});
+
+describe('MessagesRepo — 답장', () => {
+  test('replyToId를 저장하고 WireMessage에 r로 되돌려준다', () => {
+    const repo = new MessagesRepo(deps.db);
+    const target = repo.insert(conversationId, alice.user.id, 't', '원본');
+    const reply = repo.insert(conversationId, bob.user.id, 't', '답장', target.id);
+
+    expect(target.r).toBeUndefined();
+    expect(reply.r).toBe(target.id);
+    expect(repo.findWire(reply.id)!.r).toBe(target.id);
+  });
+
+  test('listQuotes는 본문을 100자로 자른다', () => {
+    const repo = new MessagesRepo(deps.db);
+    const target = repo.insert(conversationId, alice.user.id, 't', 'ㄱ'.repeat(150));
+
+    const [quote] = repo.listQuotes(conversationId, [target.id]);
+    expect(quote).toEqual({ id: target.id, s: alice.user.id, k: 't', x: 'ㄱ'.repeat(100) });
+  });
+
+  // 보안 경계: 대화 ID를 조건에서 빼면 남의 대화 본문을 ID만으로 긁을 수 있다.
+  test('listQuotes는 다른 대화의 메시지를 절대 반환하지 않는다', async () => {
+    const carol = await signup(app, 'carol', 'Carol');
+    const requested = await jsonRequest(app, '/api/friends/requests', {
+      method: 'POST',
+      cookie: alice.cookie,
+      body: { userId: carol.user.id },
+    });
+    const { id: friendshipId } = (await requested.json()) as { id: number };
+    const accepted = await jsonRequest(app, `/api/friends/requests/${friendshipId}/respond`, {
+      method: 'POST',
+      cookie: carol.cookie,
+      body: { accept: true },
+    });
+    const otherConv = ((await accepted.json()) as { conversationId: number }).conversationId;
+
+    const repo = new MessagesRepo(deps.db);
+    const secret = repo.insert(otherConv, alice.user.id, 't', '비밀 이야기');
+
+    expect(repo.listQuotes(conversationId, [secret.id])).toEqual([]);
+  });
+
+  test('listQuotes는 빈 배열을 받으면 빈 배열을 준다', () => {
+    expect(new MessagesRepo(deps.db).listQuotes(conversationId, [])).toEqual([]);
   });
 });

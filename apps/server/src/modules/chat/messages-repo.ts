@@ -5,7 +5,7 @@
  * 이미지 메시지는 images 테이블을 LEFT JOIN하여 메타데이터(im)를 붙인다.
  */
 import type { Database } from 'bun:sqlite';
-import type { MessageKind, WireMessage } from '@litechat/types';
+import type { MessageKind, WireMessage, WireQuote } from '@litechat/types';
 
 /** JOIN 결과 행 (이미지 메타 포함 가능) */
 interface MessageJoinRow {
@@ -19,16 +19,25 @@ interface MessageJoinRow {
   img_height: number | null;
   img_webp_bytes: number | null;
   img_orig_bytes: number | null;
+  reply_to_id: number | null;
 }
 
 /** 이미지 메타 조인을 포함한 SELECT 공통 부분 */
 const SELECT_WITH_IMAGE = `
-  SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.content, m.created_at,
+  SELECT m.id, m.conversation_id, m.sender_id, m.kind, m.content, m.created_at, m.reply_to_id,
          i.width AS img_width, i.height AS img_height,
          i.webp_bytes AS img_webp_bytes, i.orig_bytes AS img_orig_bytes
   FROM messages m
   LEFT JOIN images i ON m.kind = 'i' AND i.id = m.content
 `;
+
+/**
+ * 인용 미리보기 본문 최대 길이 (문자).
+ * 클라이언트는 인용문을 한 줄로만 표시하므로 이보다 길 필요가 없다.
+ * service.ts의 PREVIEW_MAX_CHARS와 같은 이유로 서버 안에 둔다 — 클라이언트가 쓰지도
+ * 않는 상수를 공유 패키지에 두면 세 프론트엔드 번들에 그대로 딸려 들어간다.
+ */
+const QUOTE_MAX_CHARS = 100;
 
 /** DB 행 → 와이어 포맷 변환 */
 function toWire(row: MessageJoinRow): WireMessage {
@@ -40,6 +49,7 @@ function toWire(row: MessageJoinRow): WireMessage {
     x: row.content,
     ts: row.created_at,
   };
+  if (row.reply_to_id !== null) wire.r = row.reply_to_id;
   if (row.kind === 'i' && row.img_width !== null) {
     wire.im = {
       id: row.content,
@@ -55,17 +65,42 @@ function toWire(row: MessageJoinRow): WireMessage {
 export class MessagesRepo {
   constructor(private db: Database) {}
 
-  /** 메시지 저장 후 와이어 포맷으로 반환 */
-  insert(conversationId: number, senderId: number, kind: MessageKind, content: string): WireMessage {
+  /** 메시지 저장 후 와이어 포맷으로 반환. replyToId가 있으면 답장으로 기록한다. */
+  insert(
+    conversationId: number,
+    senderId: number,
+    kind: MessageKind,
+    content: string,
+    replyToId?: number,
+  ): WireMessage {
     const ts = Math.floor(Date.now() / 1000);
     const result = this.db
       .query(
-        `INSERT INTO messages (conversation_id, sender_id, kind, content, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO messages (conversation_id, sender_id, kind, content, created_at, reply_to_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(conversationId, senderId, kind, content, ts);
+      .run(conversationId, senderId, kind, content, ts, replyToId ?? null);
     const id = Number(result.lastInsertRowid);
     return this.findWire(id)!;
+  }
+
+  /**
+   * 인용 표시용 축약 조회 — 답장이 가리키는 원본을 한 줄 미리보기로만 가져온다.
+   *
+   * conversation_id 조건이 보안 경계다. 이게 없으면 남의 대화 메시지 ID를 찍어
+   * 본문 앞 100자를 긁어낼 수 있다. 절대 빼지 말 것.
+   */
+  listQuotes(conversationId: number, ids: number[]): WireQuote[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db
+      .query<{ id: number; sender_id: number; kind: MessageKind; content: string }, number[]>(
+        `SELECT m.id, m.sender_id, m.kind, substr(m.content, 1, ?) AS content
+         FROM messages m
+         WHERE m.conversation_id = ? AND m.id IN (${placeholders})`,
+      )
+      .all(QUOTE_MAX_CHARS, conversationId, ...ids)
+      .map((row) => ({ id: row.id, s: row.sender_id, k: row.kind, x: row.content }));
   }
 
   /** 단일 메시지를 와이어 포맷으로 조회 */
