@@ -3,6 +3,7 @@
  */
 import type { WireMessage } from '@litechat/types';
 import { render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { MessageBubble } from '../message-bubble';
 
 // 제스처 설정(방향/엣지 제외 영역)을 검사할 수 있도록 GestureDetector를 통과 View로 바꾼다.
@@ -23,6 +24,13 @@ function panConfig(): Record<string, number | undefined> {
   const gesture = screen.getByTestId('message-gesture').props.gesture;
   const pan = Array.isArray(gesture?.gestures) ? gesture.gestures[0] : gesture;
   return pan.config;
+}
+
+/** 제스처가 실제로 덮는 영역의 스타일 — 행 전체인지 말풍선 묶음인지 구분한다 */
+function gestureAreaStyle(): Record<string, unknown> {
+  const area = screen.getByTestId('message-gesture');
+  const child = area.children[0] as { props: { style?: unknown } };
+  return StyleSheet.flatten(child.props.style as never) as Record<string, unknown>;
 }
 
 function message(overrides: Partial<WireMessage> = {}): WireMessage {
@@ -127,16 +135,29 @@ describe('MessageBubble — 뒤로가기 엣지 스와이프와의 공존', () =
   test.each([
     ['내', true, 1],
     ['상대', false, 2],
-  ])('%s 메시지는 화면 왼쪽 끝에서 시작한 터치를 받지 않는다', async (_label, mine, sender) => {
+  ])('%s 메시지의 제스처 영역은 행 전체가 아니라 말풍선 묶음이다', async (_label, mine, sender) => {
     await render(<MessageBubble {...base} message={message({ s: sender })} mine={mine} />);
-    // 음수 hitSlop = 활성 영역을 그만큼 좁힌다. 왼쪽 끝은 iOS 뒤로가기 제스처 몫으로 남긴다.
-    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThanOrEqual(-24);
+    const style = gestureAreaStyle();
+    // 말풍선 묶음(maxWidth 78%)이어야 하고, 화면 폭을 채우는 행(paddingHorizontal)이면 안 된다.
+    expect(style.maxWidth).toBe('78%');
+    expect(style.paddingHorizontal).toBeUndefined();
+  });
+
+  test('오른쪽 끝에 있는 내 말풍선에는 엣지 여백이 없다', async () => {
+    await render(<MessageBubble {...base} message={message()} />);
+    expect(panConfig().hitSlop).toBeUndefined();
+  });
+
+  test('왼쪽 끝과 겹치는 상대 말풍선은 그만큼 터치를 받지 않는다', async () => {
+    await render(<MessageBubble {...base} message={message({ s: 2 })} mine={false} />);
+    // 음수 hitSlop = 활성 영역을 그만큼 좁힌다. 겹치는 폭은 뒤로가기 제스처 몫으로 남긴다.
+    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThan(0);
   });
 
   test('길게 눌러 신고와 묶여도(Race) 엣지 영역 제외는 유지된다', async () => {
     await render(
       <MessageBubble {...base} message={message({ s: 2 })} mine={false} onLongPress={jest.fn()} />,
     );
-    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThanOrEqual(-24);
+    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThan(0);
   });
 });

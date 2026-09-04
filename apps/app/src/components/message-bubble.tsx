@@ -8,7 +8,8 @@
  * - 등장 애니메이션은 마운트 이후 추가된 메시지에만 (히스토리는 애니메이션 없음)
  * - 답장: 말풍선 위에 인용 한 줄. 스와이프(상대 →, 내 것 ←)로 답장 대상을 고르고,
  *   길게 눌러 신고와는 Gesture.Race로 묶어 둘 중 하나만 발동한다.
- * - 화면 왼쪽 끝은 iOS 뒤로가기(엣지 스와이프) 몫으로 비워 둔다 — BACK_GESTURE_EDGE 참고.
+ * - 제스처는 행 전체가 아니라 말풍선 묶음에만 붙는다. 화면 왼쪽 끝은 iOS 뒤로가기
+ *   (엣지 스와이프) 몫으로 비워 두기 위함이다 — BACK_GESTURE_EDGE 참고.
  */
 import type { WireMessage } from '@litechat/types';
 import { Image } from 'expo-image';
@@ -35,21 +36,28 @@ const MAX_IMAGE_WIDTH = 240;
 const MAX_IMAGE_HEIGHT = 288;
 
 /**
- * 화면 왼쪽 끝에서 이 폭(px) 안에 시작한 터치는 답장 스와이프가 아예 받지 않는다.
+ * 화면 왼쪽 끝에서 iOS 뒤로가기 엣지 스와이프가 시작되는 구간의 폭 (px).
  *
- * 말풍선 행은 화면 폭 전체를 덮으므로 iOS 뒤로가기 엣지 스와이프(약 20px 구간)가
- * 시작되는 자리도 이 Pan 제스처의 영역이다. RNGH 핸들러는 UIKit의
- * interactivePopGestureRecognizer와 동시 인식/실패 관계를 맺지 않고
- * (RNGestureHandler.mm의 shouldRecognizeSimultaneously… 는 RNGH 핸들러가 아닌
- * 인식기에 NO를 준다), react-native-screens도 엣지 인식기에 UIScrollView 팬보다만
- * 우선권을 준다. 결국 둘은 배타적으로 경쟁하고 먼저 활성화된 쪽이 상대를 취소하는데,
- * 답장 스와이프가 이기면 화면이 뒤로 가지 않는다.
+ * RNGH 핸들러는 UIKit의 interactivePopGestureRecognizer와 동시 인식/실패 관계를 맺지 않고
+ * (RNGestureHandler.mm의 shouldRecognizeSimultaneously… 는 RNGH 핸들러가 아닌 인식기에 NO를 준다),
+ * react-native-screens도 엣지 인식기에 UIScrollView 팬보다만 우선권을 준다(RNSScreenStack.mm).
+ * 둘은 배타적으로 경쟁하므로, 답장 스와이프가 이 구간을 덮으면 화면이 뒤로 가지 않는다.
  *
- * 음수 hitSlop은 "이 영역에서 시작한 터치는 받지 않는다"는 뜻이라
- * (RNGestureHandler.mm의 gestureRecognizer:shouldReceiveTouch:), 엣지 구간을 시스템에 양보한다.
- * 행 전체가 스와이프 영역이라 말풍선 왼쪽 끝 30px을 내줘도 답장은 그대로 걸린다.
+ * 그래서 답장 제스처는 말풍선 묶음에만 붙인다 — 행 전체를 덮으면 오른쪽 정렬인 내 말풍선
+ * 옆의 빈 공간까지 제스처 영역이 되어, 정작 뒤로가기를 시작하는 자리를 잡아먹는다.
+ * UIKit이 이 구간의 폭을 공개하지 않아 실측치(약 20px)에 여유를 둔 값이다.
  */
 const BACK_GESTURE_EDGE = 30;
+
+/**
+ * 상대 말풍선이 위 구간과 겹치는 만큼 — 이 폭 안에서 시작한 터치는 답장 스와이프가 받지 않는다.
+ *
+ * 상대 말풍선은 왼쪽 정렬이라 행 패딩(spacing.md)만큼만 안쪽에서 시작하므로 엣지 구간과 겹친다.
+ * 음수 hitSlop은 "이 영역에서 시작한 터치는 받지 않는다"는 뜻이다
+ * (RNGestureHandler.mm의 gestureRecognizer:shouldReceiveTouch:).
+ * 내 말풍선은 오른쪽 끝에 있어 겹치지 않으므로 이 여백이 필요 없다.
+ */
+const PEER_BUBBLE_EDGE_INSET = BACK_GESTURE_EDGE - spacing.md;
 
 /** 이만큼 가로로 끌면 답장 스와이프가 활성화된다 (px) */
 const REPLY_SWIPE_ACTIVATE = 15;
@@ -139,8 +147,8 @@ export const MessageBubble = memo(function MessageBubble({
     // 어차피 0을 돌려주므로, 활성화해 봐야 뒤로가기 스와이프만 잡아먹는다.
     .activeOffsetX(mine ? -REPLY_SWIPE_ACTIVATE : REPLY_SWIPE_ACTIVATE)
     .failOffsetY([-10, 10])
-    // 화면 왼쪽 끝은 iOS 뒤로가기 제스처 몫 — 거기서 시작한 터치는 받지 않는다.
-    .hitSlop({ left: -BACK_GESTURE_EDGE })
+    // 상대 말풍선의 왼쪽 끝은 뒤로가기 엣지 구간과 겹친다 — 겹치는 만큼은 시스템에 양보한다.
+    .hitSlop(mine ? undefined : { left: -PEER_BUBBLE_EDGE_INSET })
     .onUpdate((event) => {
       translateX.value = replySwipe(event.translationX, event.translationY, mine).offset;
     })
@@ -168,19 +176,19 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View
-        entering={animate ? springEntry : undefined}
-        style={[
-          styles.row,
-          mine ? styles.rowMine : styles.rowPeer,
-          { marginBottom: isTail ? spacing.sm : spacing.xxs },
-          pending && styles.pending,
-          highlighted && styles.highlighted,
-          swipeStyle,
-        ]}
-      >
-        <View style={[styles.group, mine && styles.groupMine]}>
+    <Animated.View
+      entering={animate ? springEntry : undefined}
+      style={[
+        styles.row,
+        mine ? styles.rowMine : styles.rowPeer,
+        { marginBottom: isTail ? spacing.sm : spacing.xxs },
+        pending && styles.pending,
+        highlighted && styles.highlighted,
+      ]}
+    >
+      {/* 제스처는 말풍선 묶음에만 — 행 전체를 덮으면 화면 왼쪽 끝의 뒤로가기 스와이프를 가로챈다 */}
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={[styles.group, mine && styles.groupMine, swipeStyle]}>
           <View style={mine ? styles.stackMine : styles.stack}>
             {/* 인용문 — 원본을 못 찾으면 플레이스홀더를 보여준다 */}
             {message.r !== undefined && (
@@ -235,9 +243,9 @@ export const MessageBubble = memo(function MessageBubble({
               <Text style={styles.time}>{formatTime(message.ts)}</Text>
             </View>
           )}
-        </View>
-      </Animated.View>
-    </GestureDetector>
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
   );
 });
 
