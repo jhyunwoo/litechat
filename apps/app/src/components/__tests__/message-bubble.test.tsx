@@ -5,6 +5,26 @@ import type { WireMessage } from '@litechat/types';
 import { render, screen } from '@testing-library/react-native';
 import { MessageBubble } from '../message-bubble';
 
+// 제스처 설정(방향/엣지 제외 영역)을 검사할 수 있도록 GestureDetector를 통과 View로 바꾼다.
+// 실제 제스처 객체를 그대로 prop에 실어 보내므로, 검사 대상은 말풍선이 만든 진짜 설정이다.
+jest.mock('react-native-gesture-handler', () => {
+  const actual = jest.requireActual('react-native-gesture-handler');
+  const React = jest.requireActual('react');
+  const { View } = jest.requireActual('react-native');
+  return {
+    ...actual,
+    GestureDetector: ({ gesture, children }: { gesture: unknown; children: unknown }) =>
+      React.createElement(View, { testID: 'message-gesture', gesture }, children),
+  };
+});
+
+/** 렌더된 말풍선이 RNGH에 넘긴 Pan 제스처 설정 (Race로 묶였으면 그 안의 Pan) */
+function panConfig(): Record<string, number | undefined> {
+  const gesture = screen.getByTestId('message-gesture').props.gesture;
+  const pan = Array.isArray(gesture?.gestures) ? gesture.gestures[0] : gesture;
+  return pan.config;
+}
+
 function message(overrides: Partial<WireMessage> = {}): WireMessage {
   return { id: 1, c: 10, s: 1, k: 't', x: '안녕하세요', ts: 1_700_000_000, ...overrides };
 }
@@ -53,7 +73,11 @@ describe('MessageBubble', () => {
     await render(
       <MessageBubble
         {...base}
-        message={message({ k: 'i', x: 'img1', im: { id: 'img1', w: 640, h: 480, tb: 1000, ob: 5000 } })}
+        message={message({
+          k: 'i',
+          x: 'img1',
+          im: { id: 'img1', w: 640, h: 480, tb: 1000, ob: 5000 },
+        })}
       />,
     );
     expect(screen.getByLabelText('사진')).toBeTruthy();
@@ -81,5 +105,38 @@ describe('MessageBubble — 답장', () => {
   test('답장이 아니면 인용 영역이 없다', async () => {
     await render(<MessageBubble {...base} message={message()} />);
     expect(screen.queryByText('메시지')).toBeNull();
+  });
+});
+
+describe('MessageBubble — 뒤로가기 엣지 스와이프와의 공존', () => {
+  test('내 메시지는 답장 방향(←)으로만 활성화된다', async () => {
+    await render(<MessageBubble {...base} message={message()} />);
+    const config = panConfig();
+    expect(config.activeOffsetXStart).toBeLessThan(0);
+    // 오른쪽(=뒤로가기 방향)으로 끌 때는 답장이 될 수 없으므로 활성화 임계값이 없어야 한다.
+    expect(config.activeOffsetXEnd).toBeUndefined();
+  });
+
+  test('상대 메시지는 답장 방향(→)으로만 활성화된다', async () => {
+    await render(<MessageBubble {...base} message={message({ s: 2 })} mine={false} />);
+    const config = panConfig();
+    expect(config.activeOffsetXEnd).toBeGreaterThan(0);
+    expect(config.activeOffsetXStart).toBeUndefined();
+  });
+
+  test.each([
+    ['내', true, 1],
+    ['상대', false, 2],
+  ])('%s 메시지는 화면 왼쪽 끝에서 시작한 터치를 받지 않는다', async (_label, mine, sender) => {
+    await render(<MessageBubble {...base} message={message({ s: sender })} mine={mine} />);
+    // 음수 hitSlop = 활성 영역을 그만큼 좁힌다. 왼쪽 끝은 iOS 뒤로가기 제스처 몫으로 남긴다.
+    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThanOrEqual(-24);
+  });
+
+  test('길게 눌러 신고와 묶여도(Race) 엣지 영역 제외는 유지된다', async () => {
+    await render(
+      <MessageBubble {...base} message={message({ s: 2 })} mine={false} onLongPress={jest.fn()} />,
+    );
+    expect((panConfig().hitSlop as unknown as { left: number })?.left).toBeLessThanOrEqual(-24);
   });
 });

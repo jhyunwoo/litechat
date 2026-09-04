@@ -8,6 +8,7 @@
  * - 등장 애니메이션은 마운트 이후 추가된 메시지에만 (히스토리는 애니메이션 없음)
  * - 답장: 말풍선 위에 인용 한 줄. 스와이프(상대 →, 내 것 ←)로 답장 대상을 고르고,
  *   길게 눌러 신고와는 Gesture.Race로 묶어 둘 중 하나만 발동한다.
+ * - 화면 왼쪽 끝은 iOS 뒤로가기(엣지 스와이프) 몫으로 비워 둔다 — BACK_GESTURE_EDGE 참고.
  */
 import type { WireMessage } from '@litechat/types';
 import { Image } from 'expo-image';
@@ -32,6 +33,26 @@ import { spacing } from '@/theme/tokens';
 /** 이미지 말풍선 최대 크기 */
 const MAX_IMAGE_WIDTH = 240;
 const MAX_IMAGE_HEIGHT = 288;
+
+/**
+ * 화면 왼쪽 끝에서 이 폭(px) 안에 시작한 터치는 답장 스와이프가 아예 받지 않는다.
+ *
+ * 말풍선 행은 화면 폭 전체를 덮으므로 iOS 뒤로가기 엣지 스와이프(약 20px 구간)가
+ * 시작되는 자리도 이 Pan 제스처의 영역이다. RNGH 핸들러는 UIKit의
+ * interactivePopGestureRecognizer와 동시 인식/실패 관계를 맺지 않고
+ * (RNGestureHandler.mm의 shouldRecognizeSimultaneously… 는 RNGH 핸들러가 아닌
+ * 인식기에 NO를 준다), react-native-screens도 엣지 인식기에 UIScrollView 팬보다만
+ * 우선권을 준다. 결국 둘은 배타적으로 경쟁하고 먼저 활성화된 쪽이 상대를 취소하는데,
+ * 답장 스와이프가 이기면 화면이 뒤로 가지 않는다.
+ *
+ * 음수 hitSlop은 "이 영역에서 시작한 터치는 받지 않는다"는 뜻이라
+ * (RNGestureHandler.mm의 gestureRecognizer:shouldReceiveTouch:), 엣지 구간을 시스템에 양보한다.
+ * 행 전체가 스와이프 영역이라 말풍선 왼쪽 끝 30px을 내줘도 답장은 그대로 걸린다.
+ */
+const BACK_GESTURE_EDGE = 30;
+
+/** 이만큼 가로로 끌면 답장 스와이프가 활성화된다 (px) */
+const REPLY_SWIPE_ACTIVATE = 15;
 
 /** 인용문 표시용 — 원본 해석과 이름 붙이기는 MessageList가 미리 끝낸다 */
 export interface QuoteView {
@@ -114,8 +135,12 @@ export const MessageBubble = memo(function MessageBubble({
   // activeOffsetX/failOffsetY로 FlashList의 세로 스크롤과 다투지 않게 한다.
   const pan = Gesture.Pan()
     .enabled(canReply)
-    .activeOffsetX([-15, 15])
+    // 답장이 될 수 있는 방향(상대 →, 내 것 ←)으로만 활성화한다. 반대 방향은 replySwipe가
+    // 어차피 0을 돌려주므로, 활성화해 봐야 뒤로가기 스와이프만 잡아먹는다.
+    .activeOffsetX(mine ? -REPLY_SWIPE_ACTIVATE : REPLY_SWIPE_ACTIVATE)
     .failOffsetY([-10, 10])
+    // 화면 왼쪽 끝은 iOS 뒤로가기 제스처 몫 — 거기서 시작한 터치는 받지 않는다.
+    .hitSlop({ left: -BACK_GESTURE_EDGE })
     .onUpdate((event) => {
       translateX.value = replySwipe(event.translationX, event.translationY, mine).offset;
     })
