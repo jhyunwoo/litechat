@@ -33,6 +33,15 @@ const CONTROL_SIZE = 44;
 const INPUT_LINE_HEIGHT = 22;
 const INPUT_PADDING_V = (CONTROL_SIZE - INPUT_LINE_HEIGHT) / 2;
 
+/**
+ * 하단 세이프 에어리어를 뺀 입력 바의 기본 높이 — 한 줄 입력, 답장 바/이모지 없음 기준.
+ *
+ * 채팅방이 메시지 리스트의 하단 여백(contentInset)을 **첫 프레임부터** 잡는 데 쓴다.
+ * onLayout 실측만 기다리면 그 사이에 FlashList가 "여백 0" 상태로 바닥을 잡아 버려서,
+ * 마지막 메시지가 입력 바 뒤에 깔린 채로 방이 열린다. 실측이 오면 그 값으로 덮는다.
+ */
+export const COMPOSER_BAR_HEIGHT = StyleSheet.hairlineWidth + spacing.sm * 2 + CONTROL_SIZE;
+
 /** 전송 버튼이 살아나는 팝 — 크기는 항상 CONTROL_SIZE라 정렬은 흔들리지 않는다 */
 const SEND_POP_SPRING = { stiffness: 500, damping: 18, mass: 0.5 } as const;
 

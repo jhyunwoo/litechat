@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { handleFrame } from '@/data/data';
 import { socket } from '@/lib/ws';
 import { ChatRoomView } from '../chat-room-view';
+import { COMPOSER_BAR_HEIGHT } from '../composer';
 
 /** 테스트용 세이프 에어리어 값 */
 const INITIAL_METRICS = {
@@ -152,5 +153,19 @@ describe('ChatRoomView 전송 흐름', () => {
     await waitFor(() => {
       expect(socket.send).toHaveBeenCalledWith({ t: 'r', c: CONV, m: 3 });
     });
+  });
+});
+
+describe('입력 바 아래로 메시지가 숨지 않는다', () => {
+  test('첫 프레임부터 입력 바 높이만큼 리스트 하단 여백을 확보한다', async () => {
+    // 하단 여백을 onLayout 이후에야 채우면, FlashList가 그 사이에 끝으로 스크롤하면서
+    // 마지막 메시지가 입력 바 뒤로 들어간다 (재진입하면 사라지는 그 증상).
+    await setup([{ id: 1, c: CONV, s: 2, k: 't', x: '마지막 메시지', ts: 100 }]);
+
+    const list = screen.getByTestId('chat-messages');
+    expect(list.props.extraContentPadding.value).toBeCloseTo(
+      COMPOSER_BAR_HEIGHT + INITIAL_METRICS.insets.bottom,
+      1,
+    );
   });
 });

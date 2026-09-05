@@ -33,7 +33,7 @@ import { api, errorMessage, unwrap } from '@/lib/api';
 import { quoteText } from '@/lib/format';
 import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
-import { Composer } from './composer';
+import { COMPOSER_BAR_HEIGHT, Composer } from './composer';
 import { ImageViewer } from './image-viewer';
 import { MessageList, type Row } from './message-list';
 
@@ -61,14 +61,24 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   const [viewing, setViewing] = useState<WireMessage | null>(null);
   const [error, setError] = useState('');
   const [awayFromBottom, setAwayFromBottom] = useState(false);
-  const [composerLayoutHeight, setComposerLayoutHeight] = useState(0);
+  /**
+   * 입력 바 높이 — 메시지 리스트의 하단 여백(contentInset)이자 "최신으로" 버튼의 기준.
+   *
+   * 0이 아니라 토큰으로 계산한 값에서 시작한다. 0에서 시작하면 FlashList가 여백이
+   * 아직 0인 상태로 바닥을 잡아 버려서, 방에 들어온 순간 마지막 메시지들이 딱
+   * 입력 바 높이만큼 그 뒤에 깔린다. 실측(onLayout)이 오면 그 값으로 덮는다.
+   */
+  const estimatedComposerHeight = COMPOSER_BAR_HEIGHT + insets.bottom;
+  const [composerLayoutHeight, setComposerLayoutHeight] = useState(estimatedComposerHeight);
   /** 지금 답장 중인 메시지 (없으면 null) */
   const [replyTo, setReplyTo] = useState<WireMessage | null>(null);
   /** 점프 직후 잠깐 밝힐 메시지 ID */
   const [highlighted, setHighlighted] = useState<number | null>(null);
   const focused = useRef(false);
   const listRef = useRef<FlashListRef<Row>>(null);
-  const composerHeight = useSharedValue(0);
+  const composerHeight = useSharedValue(estimatedComposerHeight);
+  /** 첫 실측이 끝났는지 — 추정이 빗나갔을 때 딱 한 번만 바닥을 다시 잡기 위해 */
+  const composerMeasured = useRef(false);
 
   // 키보드가 열리면 최신 메시지가 컴포저 위에 보이도록 바닥으로 스크롤한다.
   const scrollToEnd = useCallback(() => {
@@ -93,8 +103,16 @@ function ChatRoomViewContent({ convId, meId }: Props) {
   const onComposerLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const height = event.nativeEvent.layout.height;
+      const drifted = Math.abs(height - composerHeight.get()) > 0.5;
       composerHeight.set(height);
       setComposerLayoutHeight(height);
+      // 추정과 실측이 다르면(큰 글씨 설정 등) 첫 실측 때 한 번만 바닥을 다시 잡는다.
+      // 이후의 높이 변화(답장 바, 여러 줄 입력)는 keyboard-controller가 스크롤을 함께 옮기므로
+      // 여기서 또 끌어내리면 과거를 읽는 중인 사용자를 아래로 채 간다.
+      if (!composerMeasured.current) {
+        composerMeasured.current = true;
+        if (drifted) listRef.current?.scrollToEnd({ animated: false });
+      }
     },
     [composerHeight],
   );
