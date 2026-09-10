@@ -10,6 +10,8 @@ export function applyRetention(db: Database, now = Math.floor(Date.now() / 1000)
     db.query('DELETE FROM analytics_events WHERE created_at < ?').run(telemetryCutoff);
     db.query('DELETE FROM analytics_vitals WHERE created_at < ?').run(telemetryCutoff);
     db.query('DELETE FROM analytics_sessions WHERE last_seen_at < ?').run(telemetryCutoff);
+    db.query('DELETE FROM watch_push_jobs WHERE expires_at < ?').run(now);
+    db.query('DELETE FROM watch_sessions WHERE expires_at < ? OR revoked=1').run(now);
     db.query('DELETE FROM notification_log WHERE sent_at < ?').run(telemetryCutoff);
     db.query('DELETE FROM geoip_insights WHERE fetched_at < ?').run(now - 30 * DAY);
     db.query("DELETE FROM content_reports WHERE status <> 'open' AND resolved_at < ?").run(

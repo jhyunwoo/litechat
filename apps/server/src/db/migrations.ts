@@ -278,4 +278,43 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE messages ADD COLUMN reply_to_id INTEGER REFERENCES messages(id);
   `,
+  // Independent watchOS sessions, device registrations and durable APNs delivery.
+  `
+  CREATE TABLE watch_sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    platform TEXT NOT NULL DEFAULT 'watchOS' CHECK(platform='watchOS'),
+    created_at INTEGER NOT NULL,
+    last_activity INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX ix_watch_sessions_user ON watch_sessions(user_id);
+  CREATE TABLE watch_push_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL UNIQUE REFERENCES watch_sessions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK(environment IN ('sandbox','production')),
+    registered_at INTEGER NOT NULL,
+    UNIQUE(token,environment)
+  );
+  CREATE INDEX ix_watch_push_user ON watch_push_tokens(user_id);
+  ALTER TABLE messages ADD COLUMN watch_request_id TEXT;
+  CREATE UNIQUE INDEX ix_watch_message_retry ON messages(sender_id,watch_request_id)
+    WHERE watch_request_id IS NOT NULL;
+  CREATE TABLE watch_push_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_id INTEGER NOT NULL REFERENCES watch_push_tokens(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    request_id TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    due_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','failed')),
+    reason TEXT,
+    UNIQUE(token_id,message_id)
+  );
+  CREATE INDEX ix_watch_push_due ON watch_push_jobs(status,due_at);
+  `,
 ];

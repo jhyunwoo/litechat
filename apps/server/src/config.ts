@@ -5,6 +5,10 @@
  */
 
 export interface AppConfig {
+  watchAPNsTeamId: string;
+  watchAPNsTopic: string;
+  watchAPNsSandbox: { keyId: string; privateKey: string };
+  watchAPNsProduction: { keyId: string; privateKey: string };
   /** HTTP 서버 포트 */
   port: number;
   /** SQLite 데이터베이스 파일 경로 (':memory:' 가능) */
@@ -70,6 +74,16 @@ export interface AppConfig {
 export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   const env = process.env;
   return {
+    watchAPNsTeamId: env.WATCH_APNS_TEAM_ID ?? '',
+    watchAPNsTopic: env.WATCH_APNS_TOPIC ?? 'kr.moveto.litechat.watch',
+    watchAPNsSandbox: {
+      keyId: env.WATCH_APNS_SANDBOX_KEY_ID ?? '',
+      privateKey: env.WATCH_APNS_SANDBOX_PRIVATE_KEY ?? '',
+    },
+    watchAPNsProduction: {
+      keyId: env.WATCH_APNS_PRODUCTION_KEY_ID ?? '',
+      privateKey: env.WATCH_APNS_PRODUCTION_PRIVATE_KEY ?? '',
+    },
     port: Number(env.PORT ?? 3000),
     dbPath: env.DB_PATH ?? 'data/litechat.db',
     uploadDir: env.UPLOAD_DIR ?? 'data/uploads',

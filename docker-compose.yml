@@ -34,6 +34,13 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: mailto:admin@moveto.kr
+      # Independent Watch direct APNs (.p8 PEM provided only through server secrets).
+      WATCH_APNS_TEAM_ID: ${WATCH_APNS_TEAM_ID:-}
+      WATCH_APNS_TOPIC: kr.moveto.litechat.watch
+      WATCH_APNS_SANDBOX_KEY_ID: ${WATCH_APNS_SANDBOX_KEY_ID:-}
+      WATCH_APNS_SANDBOX_PRIVATE_KEY: ${WATCH_APNS_SANDBOX_PRIVATE_KEY:-}
+      WATCH_APNS_PRODUCTION_KEY_ID: ${WATCH_APNS_PRODUCTION_KEY_ID:-}
+      WATCH_APNS_PRODUCTION_PRIVATE_KEY: ${WATCH_APNS_PRODUCTION_PRIVATE_KEY:-}
       # 관리자 대시보드 지도(Google Maps JS API). 키가 비면 지도는 표시되지 않는다.
       # HTTP 리퍼러(dash.moveto.kr)로 제한된 브라우저 키를 발급해 주입한다.
       # GOOGLE_MAPS_MAP_ID는 AdvancedMarker 렌더링용 — 비우면 개발용 DEMO_MAP_ID 사용.

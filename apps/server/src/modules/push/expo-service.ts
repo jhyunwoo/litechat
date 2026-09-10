@@ -10,7 +10,7 @@ import type { AppDeps } from '../../deps';
 import type { OfflineMessageHook } from '../chat/service';
 import { ExpoPushRepo } from './expo-repo';
 import { NotificationLogRepo } from './notification-log-repo';
-import { previewOf } from './preview';
+import { messageNotification } from './message-notification';
 
 /** Expo Push API 요청 메시지 */
 export interface ExpoPushMessage {
@@ -18,7 +18,9 @@ export interface ExpoPushMessage {
   title: string;
   body: string;
   /** 알림 탭 시 딥링크에 쓰는 데이터 — c: 대화방 ID, n: notification_log.id(ACK용) */
-  data: { c: number; n: number };
+  data: { c: number; n: number; m?: number };
+  categoryId?: string;
+  threadId?: string;
   sound: 'default';
   /** iOS 앱 아이콘 배지 수 (전체 안읽음) */
   badge: number;
@@ -86,7 +88,8 @@ export class ExpoPushService {
    * fire-and-forget — 발송 실패가 메시지 저장/응답에 영향을 주면 안 된다.
    */
   offlineHook: OfflineMessageHook = (peerId, sender, message) => {
-    void this.sendToUser(peerId, sender.nickname, previewOf(message), message.c);
+    const n = messageNotification(sender, message);
+    void this.sendToUser(peerId, n.title, n.body, n.c, n);
   };
 
   /** 사용자의 모든 기기로 발송. 만료 토큰(DeviceNotRegistered)은 삭제한다. */
@@ -95,6 +98,7 @@ export class ExpoPushService {
     title: string,
     body: string,
     conversationId: number,
+    notification?: ReturnType<typeof messageNotification>,
   ): Promise<void> {
     const rows = this.repo.listByUser(userId);
     if (rows.length === 0) {
@@ -110,7 +114,8 @@ export class ExpoPushService {
       to: row.token,
       title,
       body,
-      data: { c: conversationId, n: logIds[i]! },
+      data: { c: conversationId, n: logIds[i]!, ...(notification ? { m: notification.m } : {}) },
+      ...(notification ? { categoryId: notification.category, threadId: notification.thread } : {}),
       sound: 'default',
       badge,
     }));
@@ -129,7 +134,11 @@ export class ExpoPushService {
             this.log.markFailed(logId, 'expired', 'DeviceNotRegistered');
             console.log(`[expo-push] user=${userId} pruned unregistered token`);
           } else {
-            this.log.markFailed(logId, 'error', ticket.details?.error ?? ticket.message ?? 'unknown');
+            this.log.markFailed(
+              logId,
+              'error',
+              ticket.details?.error ?? ticket.message ?? 'unknown',
+            );
             console.error(`[expo-push] user=${userId} ticket error: ${ticket.details?.error}`);
           }
         } else {

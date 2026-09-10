@@ -5,6 +5,9 @@
  * `AppType`으로 내보낸다. Full Chat 클라이언트는 `hc<AppType>`으로
  * 타입 안전한 RPC 호출을 한다 (Hono Stack).
  */
+import { watchRoutes } from './modules/watch/routes';
+import { WatchPushService } from './modules/watch/push';
+import type { WatchPushSender } from './modules/watch/apns';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { attachDocs } from './docs';
@@ -31,6 +34,7 @@ import { applyRetention } from './db/retention';
 export interface AppVariables {
   /** 인증 미들웨어가 채우는 현재 사용자 ID */
   userId: number;
+  watchSessionId: string;
 }
 
 export type AppEnv = { Variables: AppVariables };
@@ -39,6 +43,8 @@ export type AppEnv = { Variables: AppVariables };
  * 공유할 AnalyticsService 인스턴스를 주입할 때 사용 */
 export interface CreateAppOptions {
   pushSender?: PushSender;
+  watchPushSender?: WatchPushSender;
+  watchPushService?: WatchPushService;
   expoPushSender?: ExpoPushSender;
   analyticsService?: AnalyticsService;
 }
@@ -51,12 +57,19 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   const notificationLogRepo = new NotificationLogRepo(deps.db);
   const pushService = new PushService(deps, notificationLogRepo, options.pushSender);
   const expoPushService = new ExpoPushService(deps, notificationLogRepo, options.expoPushSender);
-  const offlineHook: typeof pushService.offlineHook = (peerId, sender, message) => {
-    pushService.offlineHook(peerId, sender, message);
+  const watchPushService =
+    options.watchPushService ?? new WatchPushService(deps, options.watchPushSender);
+  const offlineHook: typeof pushService.offlineHook = (peerId, sender, message, online) => {
+    if (!online) pushService.offlineHook(peerId, sender, message);
     expoPushService.offlineHook(peerId, sender, message);
   };
   // ChatService는 REST와 WS 라우트가 공유한다.
-  const chatService = new ChatService(deps, offlineHook);
+  const chatService = new ChatService(
+    deps,
+    offlineHook,
+    (peer, message) => watchPushService.enqueue(peer, message),
+    (peer) => watchPushService.hasDevices(peer),
+  );
   const imagesService = new ImagesService(deps);
   // static.ts의 lite 서버사이드 수집 훅과 같은 인스턴스를 쓰도록 index.ts가 주입할 수 있다.
   const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
@@ -88,7 +101,13 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
           // Tailwind가 런타임에 style 속성을 쓰므로 'unsafe-inline'이 필요하다.
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-          imgSrc: ["'self'", 'data:', 'blob:', 'https://maps.googleapis.com', 'https://maps.gstatic.com'],
+          imgSrc: [
+            "'self'",
+            'data:',
+            'blob:',
+            'https://maps.googleapis.com',
+            'https://maps.gstatic.com',
+          ],
           connectSrc: ["'self'", 'https://maps.googleapis.com'],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],
@@ -99,6 +118,7 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
     )
     // 헬스체크 — 배포 환경(Dokploy)의 컨테이너 상태 확인용
     .get('/api/health', (c) => c.json({ ok: true }))
+    .route('/api/watch', watchRoutes(deps, chatService, watchPushService))
     .route('/api/auth', authRoutes(deps))
     .route('/api/friends', friendsRoutes(deps))
     .route('/api/chat', chatRoutes(deps, chatService))

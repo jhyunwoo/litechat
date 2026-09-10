@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>LiteChat</string>
+<key>WKApplication</key><true/>
+<key>WKCompanionAppBundleIdentifier</key><string>kr.moveto.litechat</string>
+<key>WKRunsIndependentlyOfCompanionApp</key><true/>
+<key>WKPrefersNetworkUponForeground</key><true/>
+<key>ITSAppUsesNonExemptEncryption</key><false/>
+<key>LiteChatAPIURL</key><string>$(LITECHAT_API_URL)</string>
+<key>LiteChatAPNsEnvironment</key><string>$(LITECHAT_APNS_ENVIRONMENT)</string>
+</dict></plist>

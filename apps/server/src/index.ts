@@ -5,6 +5,7 @@
  * - Bun.serve로 직접 띄운다 — 반환된 Server 핸들이 있어야 SIGTERM에서
  *   진행 중인 요청을 흘려보내고 깨끗하게 종료할 수 있다.
  */
+import { WatchPushService } from './modules/watch/push';
 import { createApp } from './app';
 import { startCheckpointSchedule } from './db/database';
 import { startRetentionSchedule } from './db/retention';
@@ -23,13 +24,16 @@ const stopCheckpoints = startCheckpointSchedule(deps.db);
 startGeoipAutoRefresh(deps.config);
 // static.ts의 lite 서버사이드 수집 훅과 /api/analytics, /api/admin 라우트가 같은 인스턴스를 공유한다.
 const analyticsService = new AnalyticsService(deps);
-const app = createApp(deps, { analyticsService });
+const watchPushService = new WatchPushService(deps);
+const app = createApp(deps, { analyticsService, watchPushService });
+const stopWatchPush = watchPushService.start();
 
 // 위의 어떤 라우트에도 걸리지 않은 요청은 정적 파일로 처리한다 (SPA fallback 포함).
 app.get('*', serveFrontend(deps, analyticsService));
 
 const server = Bun.serve({
   port: deps.config.port,
+  idleTimeout: 40, // Bounded Watch polls may wait 25 seconds before writing a response.
   fetch: app.fetch,
   // idleTimeout 60초: 클라이언트가 25초마다 앱 레벨 핑을 보내므로 살아있는 연결은
   // 유지되고, 정상 종료(pagehide) 없이 강제 종료된 소켓은 ~120초 기본값 대신
@@ -60,6 +64,8 @@ async function shutdown(signal: string): Promise<void> {
   stopRetention();
   stopCheckpoints();
   deps.hub.closeAll();
+  deps.watchWaiters.close();
+  await stopWatchPush();
 
   const drained = server.stop(false);
   const timeout = new Promise((resolve) => setTimeout(resolve, SHUTDOWN_GRACE_MS));

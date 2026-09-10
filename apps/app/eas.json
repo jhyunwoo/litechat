@@ -31,6 +31,12 @@
         "EXPO_PUBLIC_WEB_URL": "https://chat.moveto.kr"
       },
       "channel": "production"
+    },
+    "watch-simulator": {
+      "extends": "development",
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {

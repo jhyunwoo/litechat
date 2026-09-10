@@ -36,7 +36,9 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "@bacons/apple-targets": "5.0.0",
+    "expo-dev-client": "~57.0.18"
   },
   "devDependencies": {
     "@babel/runtime": "^8.0.0",
@@ -62,7 +64,9 @@
     "test": "jest --ci --forceExit",
     "check-types": "tsc --noEmit",
     "brand:generate": "bun scripts/generate-icons.ts",
-    "brand:preview": "bun scripts/preview-icons.ts"
+    "brand:preview": "bun scripts/preview-icons.ts",
+    "watch:verify-config": "node scripts/verify-watch-config.cjs",
+    "eas-build-post-install": "node scripts/watch-build-checks.cjs"
   },
   "private": true
 }

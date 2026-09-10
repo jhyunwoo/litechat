@@ -30,7 +30,12 @@ import { MessagesRepo } from './messages-repo';
 const PREVIEW_MAX_CHARS = 100;
 
 /** 상대가 오프라인일 때 호출되는 훅 — 푸시 모듈이 구현을 주입한다 */
-export type OfflineMessageHook = (peerId: number, sender: PublicUser, message: WireMessage) => void;
+export type OfflineMessageHook = (
+  peerId: number,
+  sender: PublicUser,
+  message: WireMessage,
+  peerOnline?: boolean,
+) => void;
 
 export class ChatService {
   private conversations: ConversationsRepo;
@@ -43,6 +48,8 @@ export class ChatService {
     private deps: AppDeps,
     /** 상대 오프라인 시 알림 훅 (선택) */
     private onOfflinePeer?: OfflineMessageHook,
+    private onMessage?: (peerId: number, message: WireMessage) => void,
+    private notifyOnlinePeer?: (peerId: number) => boolean,
   ) {
     this.conversations = new ConversationsRepo(deps.db);
     this.messages = new MessagesRepo(deps.db);
@@ -71,6 +78,7 @@ export class ChatService {
     excludeSocket?: WSContext,
     /** 답장 대상 메시지 ID (선택) */
     replyToId?: number,
+    requestId?: string,
   ): WireMessage {
     const [, peerId] = this.requireMembership(meId, conversationId);
 
@@ -93,7 +101,29 @@ export class ChatService {
       if (!target || target.c !== conversationId) throw errors.badRequest('INVALID_REPLY');
     }
 
-    const message = this.messages.insert(conversationId, meId, kind, trimmed, replyToId);
+    if (requestId) {
+      const existing = this.deps.db
+        .query<{ id: number }, [number, string]>(
+          'SELECT id FROM messages WHERE sender_id=? AND watch_request_id=?',
+        )
+        .get(meId, requestId);
+      if (existing) {
+        const old = this.messages.findWire(existing.id)!;
+        if (old.c !== conversationId || old.k !== kind || old.x !== trimmed || old.r !== replyToId)
+          throw errors.conflict('IDEMPOTENCY_CONFLICT');
+        return old;
+      }
+    }
+    const message = this.deps.db.transaction(() => {
+      const saved = this.messages.insert(conversationId, meId, kind, trimmed, replyToId);
+      if (requestId)
+        this.deps.db
+          .query('UPDATE messages SET watch_request_id=? WHERE id=?')
+          .run(requestId, saved.id);
+      this.onMessage?.(peerId, saved);
+      return saved;
+    })();
+    this.deps.watchWaiters.wakeConversation(conversationId);
 
     // 실시간 팬아웃: 상대방의 모든 기기 + 내 다른 기기.
     // 같은 프레임이므로 직렬화는 한 번만 한다 (전송마다 stringify 2회 → 1회).
@@ -105,9 +135,9 @@ export class ChatService {
     // 온라인이라 푸시를 건너뛴 경우는 로그를 남기지 않는다 — 메시지 하나마다 stdout
     // 쓰기가 발생해 서비스에서 가장 뜨거운 경로에 동기 I/O를 얹는 데다,
     // 컨테이너 로그도 대화량에 비례해 불어난다.
-    if (!peerOnline && this.onOfflinePeer) {
+    if ((!peerOnline || this.notifyOnlinePeer?.(peerId)) && this.onOfflinePeer) {
       const sender = this.users.findPublicById(meId)!;
-      this.onOfflinePeer(peerId, sender, message);
+      this.onOfflinePeer(peerId, sender, message, peerOnline);
     }
 
     return message;
@@ -148,9 +178,18 @@ export class ChatService {
 
     // 실제로 전진했을 때만 알림을 보내 불필요한 프레임을 줄인다.
     if (watermark > previous) {
+      this.deps.watchWaiters.wakeConversation(conversationId);
       this.deps.hub.sendToUser(peerId, { t: 'r', c: conversationId, u: meId, m: watermark });
     }
     return { watermark };
+  }
+
+  getReadState(meId: number, conversationId: number) {
+    const [, peerId] = this.requireMembership(meId, conversationId);
+    return {
+      read: this.messages.getWatermark(conversationId, meId),
+      peerRead: this.messages.getWatermark(conversationId, peerId),
+    };
   }
 
   /** 채팅 탭용 대화 목록 — 상대/마지막 메시지/안읽음 수/상대 워터마크 */

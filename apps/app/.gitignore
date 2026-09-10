@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Swift package build products
+.build/

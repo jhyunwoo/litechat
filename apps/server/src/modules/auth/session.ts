@@ -5,6 +5,7 @@
  * 조회할 때마다 만료 시간이 연장되는 슬라이딩 방식이다.
  * (활성 사용자는 로그인이 풀리지 않고, 방치된 세션은 자동 소멸)
  */
+import { revokeWatchSessions } from '../watch/session';
 import type { AppDeps } from '../../deps';
 
 /** KV 키 접두사 */
@@ -39,6 +40,7 @@ export async function destroySession(deps: AppDeps, token: string): Promise<void
 
 /** 계정에 연결된 모든 기기의 세션을 파기한다. */
 export async function destroyAllUserSessions(deps: AppDeps, userId: number): Promise<number> {
+  revokeWatchSessions(deps, userId);
   return deps.kv.deleteByValue(PREFIX, String(userId));
 }
 
