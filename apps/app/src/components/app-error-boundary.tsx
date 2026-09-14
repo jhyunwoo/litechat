@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -23,20 +24,21 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.failed) return this.props.children;
-    return (
-      <View style={styles.screen} accessibilityRole="alert">
-        <Text style={styles.title}>화면을 불러오지 못했어요</Text>
-        <Text style={styles.body}>잠시 후 다시 시도해 주세요.</Text>
-        <Pressable
-          style={styles.button}
-          onPress={() => this.setState({ failed: false })}
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>다시 시도</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorFallback onRetry={() => this.setState({ failed: false })} />;
   }
+}
+
+function ErrorFallback({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslation();
+  return (
+    <View style={styles.screen} accessibilityRole="alert">
+      <Text style={styles.title}>{t('화면을 불러오지 못했어요')}</Text>
+      <Text style={styles.body}>{t('잠시 후 다시 시도해 주세요.')}</Text>
+      <Pressable style={styles.button} onPress={onRetry} accessibilityRole="button">
+        <Text style={styles.buttonText}>{t('다시 시도')}</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

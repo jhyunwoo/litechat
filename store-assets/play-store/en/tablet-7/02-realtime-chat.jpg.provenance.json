@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "en",
+  "capture": "captures/en/android/tablet-7/02-realtime-chat.jpg",
+  "capturedAt": "2026-09-13T07:12:49.852Z",
+  "nativeBuild": null,
+  "inputSha256": "23db806286c22e880fc211569aafc6ffce04359c5e372fb82cea93050428ed03",
+  "outputSha256": "f898b364581db05ec8e453aa763268ebd04a546e2794cc97013c1e6d7df26d42"
+}

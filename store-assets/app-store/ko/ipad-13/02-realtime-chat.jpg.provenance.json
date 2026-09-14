@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/ipad/02-realtime-chat.jpg",
+  "capturedAt": "2026-09-13T07:15:44.429Z",
+  "nativeBuild": null,
+  "inputSha256": "dc46718c3a8390255f3a59b2bd22fc1e55b4f3eb3d4e2f42edfd386b871cbb3b",
+  "outputSha256": "9abb924b746be2c344d85f688624947dccaab169946c654b3f538fbd80914794"
+}

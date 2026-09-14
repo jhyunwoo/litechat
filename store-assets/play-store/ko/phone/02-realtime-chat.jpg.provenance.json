@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/phone/02-realtime-chat.jpg",
+  "capturedAt": "2026-09-13T07:15:57.587Z",
+  "nativeBuild": null,
+  "inputSha256": "284abd78d5a43350091b68b19961dddbf8b61ead7dd3590f484b5f964569bc6e",
+  "outputSha256": "152dd067d9de38442d87a899dee552f3050f2f3e8d896d481cca23a6134b1139"
+}

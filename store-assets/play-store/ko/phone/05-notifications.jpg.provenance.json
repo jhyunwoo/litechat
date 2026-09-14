@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/phone/05-notifications.jpg",
+  "capturedAt": "2026-09-13T07:16:03.658Z",
+  "nativeBuild": null,
+  "inputSha256": "fd80bccd86a3ba822a353fc252a0d54c7eb87f23c3503858fa68050551996d78",
+  "outputSha256": "973df09452eba2589c82e98cde610ac0d3b2c7fe77f677662889007bf6556871"
+}

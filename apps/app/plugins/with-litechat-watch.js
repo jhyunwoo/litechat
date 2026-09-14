@@ -39,6 +39,14 @@ module.exports = function withLiteChatWatch(config) {
     if (!target) throw new Error('LiteChatWatch target missing');
     target.setBuildSetting('INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp', 'YES');
     target.setBuildSetting('LITECHAT_API_URL', api);
+    // Apple requires the Watch app and its companion to carry identical versions. Derive them
+    // from the same inputs Expo writes into the companion Info.plist; when EAS assigns a remote
+    // build number after generation, scripts/sync-watch-version.cjs re-mirrors it before Xcode runs.
+    target.setBuildSetting(
+      'CURRENT_PROJECT_VERSION',
+      String(process.env.EAS_BUILD_IOS_BUILD_NUMBER || config.ios?.buildNumber || '1'),
+    );
+    target.setBuildSetting('MARKETING_VERSION', config.ios?.version || config.version || '1.0.0');
     for (const build of target.props.buildConfigurationList.props.buildConfigurations) {
       build.props.buildSettings.LITECHAT_APNS_ENVIRONMENT =
         process.env.EAS_BUILD === 'true' || process.env.EAS_BUILD_PROFILE

@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/ipad/05-notifications.jpg",
+  "capturedAt": "2026-09-13T07:15:50.373Z",
+  "nativeBuild": null,
+  "inputSha256": "3e14ad3a98301b06c63ce3982c80e0256b774061352ad11f585d55a3c888c31f",
+  "outputSha256": "98b1ca839cabff2ea86f17f14e8338db864bd6089b0379796ea9c256ca724e17"
+}

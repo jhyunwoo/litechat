@@ -7,6 +7,7 @@
  * - 셀 재활용 + React.memo 말풍선으로 대화가 길어져도 프레임을 유지한다
  * - 등장 애니메이션은 첫 렌더 이후 도착한 메시지에만 적용 (히스토리 제외)
  */
+import { useTranslation } from '@/lib/i18n';
 import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
@@ -76,6 +77,7 @@ export function MessageList({
   onReply,
   onQuotePress,
 }: Props) {
+  const t = useTranslation();
   const styles = useStyles();
   const queryClient = useQueryClient();
   const loadingOlder = useRef(false);
@@ -101,12 +103,12 @@ export function MessageList({
       if (!source) continue;
       views.set(message.r, {
         id: message.r,
-        name: source.s === meId ? '나' : (peerNickname ?? '상대'),
+        name: source.s === meId ? t('나') : (peerNickname ?? t('상대')),
         text: quoteText(source.k, source.x),
       });
     }
     return views;
-  }, [messages, convId, meId, peerNickname]);
+  }, [messages, convId, meId, peerNickname, t]);
 
   // 오름차순 메시지 → 파생 플래그를 포함한 렌더 행
   const rows = useMemo<Row[]>(
@@ -191,7 +193,7 @@ export function MessageList({
   if (messages.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>첫 메시지를 보내 대화를 시작해 보세요 👋</Text>
+        <Text style={styles.emptyText}>{t('첫 메시지를 보내 대화를 시작해 보세요 👋')}</Text>
       </View>
     );
   }

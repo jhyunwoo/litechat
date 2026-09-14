@@ -4,18 +4,18 @@ enum WatchError: Error, LocalizedError {
     case unauthorized, storage, configuration, invalidResponse, server(Int, String), offline
     var errorDescription: String? {
         switch self {
-        case .unauthorized: return "다시 로그인해 주세요."
-        case .storage: return "보안 저장소에 접근할 수 없어요. Watch 잠금을 해제하고 다시 시도해 주세요."
-        case .configuration: return "앱 설정을 확인할 수 없어요."
-        case .invalidResponse: return "응답을 읽을 수 없어요. 다시 시도해 주세요."
-        case .offline: return "연결을 기다리는 중…"
+        case .unauthorized: return WatchL10n.text("Please sign in again.")
+        case .storage: return WatchL10n.text("Cannot access secure storage. Unlock your Watch and try again.")
+        case .configuration: return WatchL10n.text("Could not read app settings.")
+        case .invalidResponse: return WatchL10n.text("Could not read the response. Please try again.")
+        case .offline: return WatchL10n.text("Waiting for connection…")
         case .server(_, let code):
             switch code {
-            case "INVALID_CREDENTIALS": return "아이디 또는 비밀번호가 올바르지 않아요."
-            case "USERNAME_TAKEN": return "이미 사용 중인 아이디예요."
-            case "FORBIDDEN", "NOT_FOUND": return "이 대화를 열 수 없어요."
-            case "RATE_LIMITED", "POLL_LIMIT": return "잠시 후 다시 시도해 주세요."
-            default: return "요청을 완료하지 못했어요. 다시 시도해 주세요."
+            case "INVALID_CREDENTIALS": return WatchL10n.text("Incorrect username or password.")
+            case "USERNAME_TAKEN": return WatchL10n.text("This username is already taken.")
+            case "FORBIDDEN", "NOT_FOUND": return WatchL10n.text("This conversation is unavailable.")
+            case "RATE_LIMITED", "POLL_LIMIT": return WatchL10n.text("Please try again shortly.")
+            default: return WatchL10n.text("Could not complete the request. Please try again.")
             }
         }
     }

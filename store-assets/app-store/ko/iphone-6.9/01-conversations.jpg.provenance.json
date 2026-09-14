@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/iphone/01-conversations.jpg",
+  "capturedAt": "2026-09-13T07:15:28.468Z",
+  "nativeBuild": null,
+  "inputSha256": "ee0b3639209435e9ca835011721a0e7768e8737c884f8ab40e745ac11b4b810e",
+  "outputSha256": "de3d52a6a44baa73aaadec2fe0620d8673fbe57b534102f0d67a08064c61de3f"
+}

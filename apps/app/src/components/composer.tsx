@@ -7,6 +7,7 @@
  * - 전송 버튼: Action Blue 필, 입력이 생기면 스프링으로 커지며 또렷해진다
  * - 사진: 앨범에서 선택 → /api/images 업로드 → 이미지 메시지 전송
  */
+import { useTranslation } from '@/lib/i18n';
 import type { MessageKind } from '@litechat/types';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,6 +55,7 @@ interface Props {
 }
 
 export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props) {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors } = useTheme();
   const [draft, setDraft] = useState('');
@@ -84,7 +86,7 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
         quality: 0.9,
       });
     } catch {
-      onError('사진 보관함을 열 수 없어요. 기기 설정에서 litechat의 사진 접근을 확인해 주세요.');
+      onError(t('사진 보관함을 열 수 없어요. 기기 설정에서 litechat의 사진 접근을 확인해 주세요.'));
       return;
     }
     const asset = result.assets?.[0];
@@ -137,14 +139,16 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
       {replyPreview && (
         <View style={styles.replyBar}>
           <View style={styles.replyText}>
-            <Text style={styles.replyName}>{replyPreview.name}에게 답장</Text>
+            <Text style={styles.replyName}>
+              {t('{name}에게 답장', { name: replyPreview.name })}
+            </Text>
             <Text style={styles.replyPreview} numberOfLines={1}>
               {replyPreview.text}
             </Text>
           </View>
           <Pressable
             onPress={onCancelReply}
-            accessibilityLabel="답장 취소"
+            accessibilityLabel={t('답장 취소')}
             style={({ pressed }) => [styles.iconButton, pressed && styles.iconPressed]}
           >
             <Text style={styles.icon}>✕</Text>
@@ -157,7 +161,7 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
         <Pressable
           onPress={() => void pickImage()}
           disabled={uploading}
-          accessibilityLabel="사진 보내기"
+          accessibilityLabel={t('사진 보내기')}
           style={({ pressed }) => [styles.iconButton, pressed && styles.iconPressed]}
         >
           {uploading ? (
@@ -170,7 +174,7 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
         {/* 이모지 토글 */}
         <Pressable
           onPress={() => setShowEmoji((v) => !v)}
-          accessibilityLabel="이모지"
+          accessibilityLabel={t('이모지')}
           style={({ pressed }) => [styles.iconButton, pressed && styles.iconPressed]}
         >
           <Text style={styles.icon}>😊</Text>
@@ -180,7 +184,7 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder="메시지 보내기"
+          placeholder={t('메시지 보내기')}
           placeholderTextColor={colors.inkMute}
           multiline
           style={styles.input}
@@ -192,7 +196,7 @@ export function Composer({ onSend, onError, replyPreview, onCancelReply }: Props
           <Pressable
             onPress={() => void submit()}
             disabled={!canSend}
-            accessibilityLabel="전송"
+            accessibilityLabel={t('전송')}
             accessibilityState={{ disabled: !canSend }}
             style={({ pressed }) => [styles.sendButton, pressed && styles.sendPressed]}
           >

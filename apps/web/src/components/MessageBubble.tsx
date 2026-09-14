@@ -143,7 +143,7 @@ export const MessageBubble = memo(function MessageBubble({
               className="block overflow-hidden rounded-2xl"
             >
               <img
-                src={`/img/${message.im.id}/thumb`}
+                src={`/img/${message.im.id}/thumb?cache=private-v2`}
                 width={message.im.w}
                 height={message.im.h}
                 alt="사진"

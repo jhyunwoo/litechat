@@ -4,6 +4,7 @@
  * 네이티브 앱이므로 iOS PWA 온보딩은 필요 없다 — 토글이 곧바로
  * 권한 요청 → Expo 토큰 등록으로 이어진다.
  */
+import { useTranslation } from '@/lib/i18n';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -27,7 +28,7 @@ import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 import { WEB_URL } from '@/lib/env';
 
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+const THEME_OPTIONS: { value: ThemePreference; label: '시스템' | '라이트' | '다크' }[] = [
   { value: 'system', label: '시스템' },
   { value: 'light', label: '라이트' },
   { value: 'dark', label: '다크' },
@@ -44,6 +45,7 @@ function ThemeSegments({
   value: ThemePreference;
   onChange: (next: ThemePreference) => void;
 }) {
+  const t = useTranslation();
   const styles = useStyles();
   // 각 칸의 실제 위치/폭을 측정해 그 위로 필을 옮긴다 (라벨 길이가 언어마다 다르다).
   const [frames, setFrames] = useState<{ x: number; width: number }[]>([]);
@@ -92,7 +94,7 @@ function ThemeSegments({
           style={styles.segment}
         >
           <Text style={[styles.segmentLabel, value === option.value && styles.segmentLabelOn]}>
-            {option.label}
+            {t(option.label)}
           </Text>
         </Pressable>
       ))}
@@ -101,6 +103,7 @@ function ThemeSegments({
 }
 
 export default function ProfileTab() {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors, pref, setPref } = useTheme();
   const { me, logout } = useAuth();
@@ -119,7 +122,7 @@ export default function ProfileTab() {
     try {
       await Linking.openURL(`${WEB_URL}${path}`);
     } catch {
-      Alert.alert('페이지를 열 수 없어요', '인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+      Alert.alert(t('페이지를 열 수 없어요'), t('인터넷 연결을 확인한 뒤 다시 시도해 주세요.'));
     }
   }
 
@@ -143,7 +146,7 @@ export default function ProfileTab() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Text style={styles.headerTitle}>프로필</Text>
+        <Text style={styles.headerTitle}>{t('프로필')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}>
@@ -157,8 +160,8 @@ export default function ProfileTab() {
           {/* 푸시 알림 토글 */}
           <View style={styles.cardRow}>
             <View style={styles.cardRowText}>
-              <Text style={styles.rowTitle}>푸시 알림</Text>
-              <Text style={styles.rowHint}>접속 중이 아닐 때 새 메시지를 알려드려요</Text>
+              <Text style={styles.rowTitle}>{t('푸시 알림')}</Text>
+              <Text style={styles.rowHint}>{t('접속 중이 아닐 때 새 메시지를 알려드려요')}</Text>
             </View>
             <Switch
               value={pushOn}
@@ -175,7 +178,7 @@ export default function ProfileTab() {
             accessibilityRole="button"
             style={styles.cardRow}
           >
-            <Text style={styles.rowTitle}>차단한 사용자</Text>
+            <Text style={styles.rowTitle}>{t('차단한 사용자')}</Text>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -185,7 +188,7 @@ export default function ProfileTab() {
             accessibilityRole="button"
             style={styles.cardRow}
           >
-            <Text style={styles.rowTitle}>계정 관리</Text>
+            <Text style={styles.rowTitle}>{t('계정 관리')}</Text>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -195,7 +198,7 @@ export default function ProfileTab() {
             accessibilityRole="link"
             style={styles.cardRow}
           >
-            <Text style={styles.rowTitle}>개인정보처리방침</Text>
+            <Text style={styles.rowTitle}>{t('개인정보처리방침')}</Text>
             <Text style={styles.chevron}>↗</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -204,7 +207,7 @@ export default function ProfileTab() {
             accessibilityRole="link"
             style={styles.cardRow}
           >
-            <Text style={styles.rowTitle}>이용약관</Text>
+            <Text style={styles.rowTitle}>{t('이용약관')}</Text>
             <Text style={styles.chevron}>↗</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -213,7 +216,7 @@ export default function ProfileTab() {
             accessibilityRole="link"
             style={styles.cardRow}
           >
-            <Text style={styles.rowTitle}>지원 및 문의</Text>
+            <Text style={styles.rowTitle}>{t('지원 및 문의')}</Text>
             <Text style={styles.chevron}>↗</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -221,7 +224,7 @@ export default function ProfileTab() {
           {/* 화면 테마 — 시스템 추종 또는 수동 고정 */}
           <View style={styles.cardRow}>
             <View style={styles.cardRowText}>
-              <Text style={styles.rowTitle}>화면 테마</Text>
+              <Text style={styles.rowTitle}>{t('화면 테마')}</Text>
             </View>
             <ThemeSegments value={pref} onChange={setPref} />
           </View>
@@ -232,7 +235,7 @@ export default function ProfileTab() {
           <Pressable
             onPress={() =>
               void logout().catch(() =>
-                Alert.alert('로그아웃할 수 없어요', '잠시 후 다시 시도해 주세요.'),
+                Alert.alert(t('로그아웃할 수 없어요'), t('잠시 후 다시 시도해 주세요.')),
               )
             }
             style={({ pressed }) => [
@@ -240,7 +243,7 @@ export default function ProfileTab() {
               pressed && { backgroundColor: colors.canvasSoft },
             ]}
           >
-            <Text style={styles.logout}>로그아웃</Text>
+            <Text style={styles.logout}>{t('로그아웃')}</Text>
           </Pressable>
         </View>
 

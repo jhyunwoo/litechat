@@ -5,6 +5,7 @@
  *   - 절대 base URL (네이티브 앱은 same-origin이 없다)
  *   - 쿠키 대신 Authorization: Bearer 헤더 (Keychain에 보관된 세션 토큰)
  */
+import { t } from '@/lib/i18n';
 import type { AppType } from 'server/src/app';
 import { hc } from 'hono/client';
 import { API_URL } from './env';
@@ -76,19 +77,19 @@ export function errorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
   const code = error instanceof ApiFailure ? error.code : '';
   const messages: Record<string, string> = {
-    USERNAME_TAKEN: '이미 사용 중인 아이디예요.',
-    INVALID_CREDENTIALS: '아이디 또는 비밀번호가 올바르지 않아요.',
-    UNAUTHORIZED: '로그인이 필요해요.',
-    CANNOT_FRIEND_SELF: '자기 자신에게는 친구 요청을 보낼 수 없어요.',
-    ALREADY_RELATED: '이미 친구이거나 요청이 진행 중이에요.',
-    INVALID_IMAGE: '지원하지 않는 이미지 형식이에요.',
-    INVALID_CONTENT: '메시지 내용을 확인해 주세요.',
-    NOT_FOUND: '요청한 대상을 찾을 수 없어요.',
-    FORBIDDEN: '이 작업을 수행할 수 없어요.',
-    RATE_LIMITED: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.',
+    USERNAME_TAKEN: t('이미 사용 중인 아이디예요.'),
+    INVALID_CREDENTIALS: t('아이디 또는 비밀번호가 올바르지 않아요.'),
+    UNAUTHORIZED: t('로그인이 필요해요.'),
+    CANNOT_FRIEND_SELF: t('자기 자신에게는 친구 요청을 보낼 수 없어요.'),
+    ALREADY_RELATED: t('이미 친구이거나 요청이 진행 중이에요.'),
+    INVALID_IMAGE: t('지원하지 않는 이미지 형식이에요.'),
+    INVALID_CONTENT: t('메시지 내용을 확인해 주세요.'),
+    NOT_FOUND: t('요청한 대상을 찾을 수 없어요.'),
+    FORBIDDEN: t('이 작업을 수행할 수 없어요.'),
+    RATE_LIMITED: t('요청이 너무 많아요. 잠시 후 다시 시도해 주세요.'),
   };
   if (error instanceof Error && error.name === 'AbortError') {
-    return '서버 응답이 지연되고 있어요. 연결을 확인한 뒤 다시 시도해 주세요.';
+    return t('서버 응답이 지연되고 있어요. 연결을 확인한 뒤 다시 시도해 주세요.');
   }
-  return messages[code] ?? '문제가 발생했어요. 잠시 후 다시 시도해 주세요.';
+  return messages[code] ?? t('문제가 발생했어요. 잠시 후 다시 시도해 주세요.');
 }

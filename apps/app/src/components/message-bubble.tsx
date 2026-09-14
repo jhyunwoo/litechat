@@ -4,13 +4,14 @@
  * - 내 메시지: 인디고 말풍선, 오른쪽 정렬
  * - 상대 메시지: canvas-soft 말풍선, 왼쪽 정렬
  * - 이모지 전용 메시지: 말풍선 없이 크게 표시
- * - 이미지: 저화질 webp 썸네일 (디스크 캐시 — 썸네일은 불변), 탭하면 뷰어
+ * - 이미지: 저화질 webp 썸네일 (인증 재검증을 위해 캐시하지 않음), 탭하면 뷰어
  * - 등장 애니메이션은 마운트 이후 추가된 메시지에만 (히스토리는 애니메이션 없음)
  * - 답장: 말풍선 위에 인용 한 줄. 스와이프(상대 →, 내 것 ←)로 답장 대상을 고르고,
  *   길게 눌러 신고와는 Gesture.Race로 묶어 둘 중 하나만 발동한다.
  * - 제스처는 행 전체가 아니라 말풍선 묶음에만 붙는다. 화면 왼쪽 끝은 iOS 뒤로가기
  *   (엣지 스와이프) 몫으로 비워 두기 위함이다 — BACK_GESTURE_EDGE 참고.
  */
+import { useTranslation, useLocale } from '@/lib/i18n';
 import type { WireMessage } from '@litechat/types';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -122,6 +123,8 @@ export const MessageBubble = memo(function MessageBubble({
   onReply,
   onQuotePress,
 }: Props) {
+  const t = useTranslation();
+  const locale = useLocale();
   const styles = useStyles();
   const emojiOnly = message.k === 'e' || (message.k === 't' && isEmojiOnly(message.x));
 
@@ -196,11 +199,11 @@ export const MessageBubble = memo(function MessageBubble({
                 onPress={() => onQuotePress(message.r!)}
                 style={styles.quote}
                 accessibilityRole="button"
-                accessibilityLabel="인용한 원본 메시지로 이동"
+                accessibilityLabel={t('인용한 원본 메시지로 이동')}
               >
                 {quote ? <Text style={styles.quoteName}>{quote.name}</Text> : null}
                 <Text style={styles.quoteText} numberOfLines={1}>
-                  {quote?.text ?? '메시지'}
+                  {quote?.text ?? t('메시지')}
                 </Text>
               </Pressable>
             )}
@@ -214,11 +217,11 @@ export const MessageBubble = memo(function MessageBubble({
                   // 메모리 캐시가 없으면 위아래로 스크롤할 때마다 디스크에서 다시 읽고 **다시 디코딩**한다.
                   // 셀을 재활용하는 리스트에서 이 디코딩이 스크롤 프레임을 갉아먹는다.
                   // 640px 썸네일이라 항목당 메모리 비용은 작다.
-                  cachePolicy="memory-disk"
+                  cachePolicy="none"
                   // 재활용된 셀이 이전 메시지의 사진을 잠깐 보여주지 않게 한다.
                   recyclingKey={message.im.id}
                   transition={150}
-                  accessibilityLabel="사진"
+                  accessibilityLabel={t('사진')}
                 />
               </Pressable>
             ) : emojiOnly ? (
@@ -239,8 +242,8 @@ export const MessageBubble = memo(function MessageBubble({
           {/* 시간 + 읽음 표시 (묶음 마지막에만) */}
           {isTail && (
             <View style={styles.meta}>
-              {mine && read && <Text style={styles.readLabel}>읽음</Text>}
-              <Text style={styles.time}>{formatTime(message.ts)}</Text>
+              {mine && read && <Text style={styles.readLabel}>{t('읽음')}</Text>}
+              <Text style={styles.time}>{formatTime(message.ts, locale)}</Text>
             </View>
           )}
         </Animated.View>

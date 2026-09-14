@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/tablet-10/06-safety.jpg",
+  "capturedAt": "2026-09-13T07:16:28.697Z",
+  "nativeBuild": null,
+  "inputSha256": "1d80a948393b98f791b3d64a6c5e83becc44ec75e9b948a293b16c9fae2c86d8",
+  "outputSha256": "062131630c48f55357cd5649e4971c831d25952ad4022f0a319cd481c49bc1e4"
+}

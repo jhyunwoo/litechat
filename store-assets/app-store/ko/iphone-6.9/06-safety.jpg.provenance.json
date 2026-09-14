@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/iphone/06-safety.jpg",
+  "capturedAt": "2026-09-13T07:15:38.971Z",
+  "nativeBuild": null,
+  "inputSha256": "4e6da5426f4ae0c948ab85fad328f1cf0891e7aa3fbff2223efb1fb16c81ca06",
+  "outputSha256": "39eef4396bd909419fcb7a7c4bf57dcb2e50b10b5b395403274a5ecf61bc0041"
+}

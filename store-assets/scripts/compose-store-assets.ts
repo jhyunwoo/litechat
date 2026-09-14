@@ -1,5 +1,6 @@
+import { digest } from './submission-checks';
 /** Compose deterministic App Store and Google Play marketing assets. */
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -30,7 +31,7 @@ type Story = {
   supporting: string;
 };
 
-const stories: Story[] = [
+const koreanStories: Story[] = [
   {
     file: '01-conversations',
     headline: '대화가 가볍게 시작돼요',
@@ -68,6 +69,45 @@ const stories: Story[] = [
   },
 ];
 
+const englishStories: Story[] = [
+  {
+    file: '01-conversations',
+    headline: 'Everyday chats, made simple',
+    supporting: 'A little hello can go a long way',
+  },
+  {
+    file: '02-realtime-chat',
+    headline: 'Pick up the conversation',
+    supporting: 'Stay in touch with text and emoji',
+  },
+  {
+    file: '03-photo-chat',
+    headline: 'Share a moment',
+    supporting: 'Bring your day into the conversation',
+  },
+  {
+    file: '04-friend-search',
+    headline: 'Find friends by username',
+    supporting: 'Send a request and start connecting',
+  },
+  {
+    file: '05-notifications',
+    headline: 'Make it feel like you',
+    supporting: 'Choose your notifications and theme',
+  },
+  {
+    file: '06-safety',
+    headline: 'Set your boundaries',
+    supporting: 'Block users and report messages',
+  },
+  {
+    file: '07-account-controls',
+    headline: 'Your account, your choice',
+    supporting: 'Review your details or delete your account',
+  },
+];
+let stories = koreanStories;
+
 const layouts: Record<'applePhone' | 'appleTablet' | 'playPhone' | 'playTablet', Layout> = {
   applePhone: {
     width: 1320,
@@ -93,7 +133,7 @@ const layouts: Record<'applePhone' | 'appleTablet' | 'playPhone' | 'playTablet',
   playTablet: {
     width: 1920,
     height: 1080,
-    frame: { left: 180, top: 240, width: 1560, height: 878, radius: 42 },
+    frame: { left: 240, top: 240, width: 1440, height: 810, radius: 42 },
     headline: { left: 160, top: 56, width: 1600, height: 90, size: 52 },
     supporting: { left: 162, top: 154, width: 1596, height: 54, size: 27 },
   },
@@ -201,6 +241,25 @@ async function composeScreenshot(
     .removeAlpha()
     .jpeg({ quality: 94, chromaSubsampling: '4:4:4', mozjpeg: true })
     .toFile(output);
+  let provenance = { source: 'browser-preview' };
+  try {
+    provenance = JSON.parse(await readFile(input + '.provenance.json', 'utf8'));
+  } catch {
+    /* Legacy previews have no receipt. */
+  }
+  await writeFile(
+    output + '.provenance.json',
+    JSON.stringify(
+      {
+        ...provenance,
+        capture: path.relative(ROOT, input),
+        inputSha256: digest(await readFile(input)),
+        outputSha256: digest(await readFile(output)),
+      },
+      null,
+      2,
+    ) + '\n',
+  );
   console.log(`compose: ${path.relative(REPO, output)} (${layout.width}×${layout.height})`);
 }
 
@@ -238,23 +297,7 @@ async function composeSet(
   }
 }
 
-await composeSet('ios/iphone', 'app-store/ko/iphone-6.9', layouts.applePhone);
-await composeSet('ios/ipad', 'app-store/ko/ipad-13', layouts.appleTablet);
-await composeSet('android/phone', 'play-store/ko/phone', layouts.playPhone);
-await composeSet(
-  'android/tablet-7',
-  'play-store/ko/tablet-7',
-  layouts.playTablet,
-  stories.slice(0, 6),
-);
-await composeSet(
-  'android/tablet-10',
-  'play-store/ko/tablet-10',
-  layouts.playTablet,
-  stories.slice(0, 6),
-);
-
-async function composeFeatureGraphic() {
+async function composeFeatureGraphic(language: 'ko' | 'en') {
   const width = 1024;
   const height = 500;
   const pathElement = canonicalPath.replace('currentColor', PALETTE.primary);
@@ -270,9 +313,16 @@ async function composeFeatureGraphic() {
   `);
   const [wordmark, tagline] = await Promise.all([
     textLayer('litechat', 460, 100, 66, PALETTE.ink, 700),
-    textLayer('가볍게 이어지는 우리 대화', 480, 58, 27, PALETTE.ink, 400),
+    textLayer(
+      language === 'ko' ? '가볍게 이어지는 우리 대화' : 'Everyday chats, made simple',
+      480,
+      58,
+      27,
+      PALETTE.ink,
+      400,
+    ),
   ]);
-  const destination = path.join(ROOT, 'play-store/ko/feature-graphic.png');
+  const destination = path.join(ROOT, `play-store/${language}/feature-graphic.png`);
   await sharp(base)
     .composite([
       { input: wordmark, left: 96, top: 151 },
@@ -285,5 +335,29 @@ async function composeFeatureGraphic() {
   console.log(`compose: ${path.relative(REPO, destination)} (1024×500)`);
 }
 
-await composeFeatureGraphic();
+const requestedLanguage = process.env.STORE_COMPOSE_LANGUAGE;
+if (requestedLanguage && !['ko', 'en'].includes(requestedLanguage))
+  throw new Error('STORE_COMPOSE_LANGUAGE must be ko or en');
+for (const language of ['ko', 'en'] as const) {
+  if (requestedLanguage && language !== requestedLanguage) continue;
+  stories = language === 'ko' ? koreanStories : englishStories;
+  const prefix = language === 'ko' ? '' : 'en/';
+  await composeSet(`${prefix}ios/iphone`, `app-store/${language}/iphone-6.9`, layouts.applePhone);
+  await composeSet(`${prefix}ios/ipad`, `app-store/${language}/ipad-13`, layouts.appleTablet);
+  await composeSet(`${prefix}android/phone`, `play-store/${language}/phone`, layouts.playPhone);
+  for (const tablet of ['tablet-7', 'tablet-10']) {
+    await composeSet(
+      `${prefix}android/${tablet}`,
+      `play-store/${language}/${tablet}`,
+      layouts.playTablet,
+      stories.slice(0, 6),
+    );
+  }
+  await composeFeatureGraphic(language);
+  if (language === 'en')
+    await copyFile(
+      path.join(ROOT, 'play-store/ko/icon-512.png'),
+      path.join(ROOT, 'play-store/en/icon-512.png'),
+    );
+}
 console.log('Store asset composition complete.');

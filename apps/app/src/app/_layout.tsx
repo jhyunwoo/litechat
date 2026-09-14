@@ -4,6 +4,7 @@
  * GestureHandler > Keyboard > Query > Auth 순서로 프로바이더를 쌓고,
  * Stack.Protected로 로그인 여부에 따라 화면 트리를 가른다.
  */
+import { useTranslation } from '@/lib/i18n';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -35,6 +36,7 @@ const queryClient = new QueryClient({
 });
 
 function Root() {
+  const t = useTranslation();
   const { me, ready, bootstrapError, retryBootstrap } = useAuth();
   const { colors } = useTheme();
 
@@ -76,10 +78,10 @@ function Root() {
         accessibilityRole="alert"
       >
         <Text style={{ fontSize: 20, fontWeight: '600', color: colors.ink }}>
-          서버에 연결할 수 없어요
+          {t('서버에 연결할 수 없어요')}
         </Text>
         <Text style={{ marginTop: 8, color: colors.inkMute, textAlign: 'center' }}>
-          인터넷 연결을 확인한 뒤 다시 시도해 주세요.
+          {t('인터넷 연결을 확인한 뒤 다시 시도해 주세요.')}
         </Text>
         <Pressable
           onPress={retryBootstrap}
@@ -93,7 +95,7 @@ function Root() {
           }}
           accessibilityRole="button"
         >
-          <Text style={{ color: colors.onPrimary, fontSize: 16 }}>다시 시도</Text>
+          <Text style={{ color: colors.onPrimary, fontSize: 16 }}>{t('다시 시도')}</Text>
         </Pressable>
       </View>
     );

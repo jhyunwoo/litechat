@@ -12,27 +12,33 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../app';
 import type { AppDeps } from '../deps';
-import { getSessionUserId, SESSION_COOKIE } from '../modules/auth/session';
+import { getSessionUserId, sessionCookieName } from '../modules/auth/session';
 
 /** 요청에서 세션 토큰을 추출한다 — Bearer 헤더 우선, 쿠키 폴백. */
-export function tokenFromRequest(c: Context<AppEnv>): string | undefined {
+export function tokenFromRequest(c: Context<AppEnv>, deps: AppDeps): string | undefined {
   const header = c.req.header('Authorization');
   if (header) {
     const [scheme, token] = header.split(' ');
     if (scheme === 'Bearer' && token) return token;
     return undefined; // 형식이 어긋난 Authorization 헤더는 쿠키로 폴백하지 않고 거부한다
   }
-  return getCookie(c, SESSION_COOKIE);
+  return getCookie(c, sessionCookieName(deps));
 }
 
 /** 로그인이 필요한 라우트에 붙이는 미들웨어. 무효 세션이면 401. */
 export function requireAuth(deps: AppDeps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const token = tokenFromRequest(c);
+    const token = tokenFromRequest(c, deps);
     if (!token) return c.json({ error: 'UNAUTHORIZED' }, 401);
 
     const userId = await getSessionUserId(deps, token);
     if (userId === null) return c.json({ error: 'UNAUTHORIZED' }, 401);
+
+    const budget = await deps.kv.increment(`rate:user:${userId}`, 60);
+    if (budget.count > 240) {
+      c.header('Retry-After', String(budget.retryAfter));
+      return c.json({ error: 'RATE_LIMITED' }, 429);
+    }
 
     c.set('userId', userId);
     await next();

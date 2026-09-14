@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/tablet-7/01-conversations.jpg",
+  "capturedAt": "2026-09-13T07:16:07.816Z",
+  "nativeBuild": null,
+  "inputSha256": "aacb77cdaec75b2e30ef6083c91318439c33c1f50b82a71011a44eb4e0e41246",
+  "outputSha256": "60222a3fcfb2c46460026ca0586123b3f99d9bc8c17db18487e53a94cf73cefd"
+}

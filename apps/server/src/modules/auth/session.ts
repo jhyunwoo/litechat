@@ -36,6 +36,7 @@ export async function getSessionUserId(deps: AppDeps, token: string): Promise<nu
 /** 세션 파기 (로그아웃) */
 export async function destroySession(deps: AppDeps, token: string): Promise<void> {
   await deps.kv.del(PREFIX + token);
+  deps.hub.disconnectSession(token);
 }
 
 /** 계정에 연결된 모든 기기의 세션을 파기한다. */
@@ -46,3 +47,8 @@ export async function destroyAllUserSessions(deps: AppDeps, userId: number): Pro
 
 /** 세션 쿠키 이름 — 클라이언트/미들웨어가 공유 */
 export const SESSION_COOKIE = 'lc_sess';
+
+/** A new protected name prevents reuse/shadowing of legacy parent-domain cookies. */
+export function sessionCookieName(deps: AppDeps): string {
+  return deps.config.isProduction ? '__Host-lc_sess' : SESSION_COOKIE;
+}

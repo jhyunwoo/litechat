@@ -5,7 +5,7 @@ struct WireImage: Codable, Equatable { let id: String; let w: Int; let h: Int; l
 struct WireMessage: Codable, Identifiable, Equatable {
     let id: Int64; let c: Int64; let s: Int64; let k: String; let x: String; let ts: Int64
     let im: WireImage?; let r: Int64?
-    var preview: String { k == "i" ? "📷 사진" : x }
+    var preview: String { k == "i" ? WatchL10n.text("📷 Photo") : x }
 }
 struct WireQuote: Codable, Identifiable { let id: Int64; let s: Int64; let k: String; let x: String }
 struct ConversationSummary: Codable, Identifiable {

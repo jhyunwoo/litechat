@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "en",
+  "capture": "captures/en/android/tablet-10/01-conversations.jpg",
+  "capturedAt": "2026-09-13T07:15:05.803Z",
+  "nativeBuild": null,
+  "inputSha256": "b9cd73ad8cc74a5e934ccc23be47c67f9da9f5a136eae4373bf14485aed55ab5",
+  "outputSha256": "19878ecec125a0e0e91a75f1f552e551548ca1a42bcde1471744cc66a26d3106"
+}

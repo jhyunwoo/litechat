@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Allow litechat to access your photo library to send photos."
+  }
+}

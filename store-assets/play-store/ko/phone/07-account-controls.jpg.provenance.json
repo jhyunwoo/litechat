@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/phone/07-account-controls.jpg",
+  "capturedAt": "2026-09-13T07:16:05.967Z",
+  "nativeBuild": null,
+  "inputSha256": "a25318f2e358d47d96408c5d8399b3f5a8122e3fb6141a06dcbbe770185e5b9a",
+  "outputSha256": "bbd1d113b066373e9650fae3ca05339e1bb82560ec570869d516ad7da5a83e02"
+}

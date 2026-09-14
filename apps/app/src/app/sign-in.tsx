@@ -4,6 +4,7 @@
  * 상단은 니어블랙 히어로 밴드(심벌 + 워드마크) — 웹 AuthPage와 같은 문법.
  * 밴드 색은 스킴과 무관한 브랜드 표면이라 팔레트가 아닌 상수로 둔다.
  */
+import { useTranslation } from '@/lib/i18n';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,6 +31,7 @@ const HERO_INK = '#FFFFFF';
 const HERO_INK_MUTE = 'rgba(255, 255, 255, 0.72)';
 
 export default function SignIn() {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors } = useTheme();
   const { login, register } = useAuth();
@@ -61,7 +63,7 @@ export default function SignIn() {
     try {
       await Linking.openURL(`${WEB_URL}/privacy`);
     } catch {
-      setError('개인정보처리방침을 열 수 없어요. 인터넷 연결을 확인해 주세요.');
+      setError(t('개인정보처리방침을 열 수 없어요. 인터넷 연결을 확인해 주세요.'));
     }
   }
 
@@ -77,7 +79,7 @@ export default function SignIn() {
         />
         <View>
           <Text style={styles.heroTitle}>litechat</Text>
-          <Text style={styles.heroTagline}>가볍게 이어지는 우리 대화</Text>
+          <Text style={styles.heroTagline}>{t('가볍게 이어지는 우리 대화')}</Text>
         </View>
       </View>
 
@@ -88,7 +90,7 @@ export default function SignIn() {
         <Animated.View style={styles.form} layout={LinearTransition.duration(200)}>
           <TextInput
             style={styles.input}
-            placeholder="아이디 (영문 소문자/숫자/_)"
+            placeholder={t('아이디 (영문 소문자/숫자/_)')}
             placeholderTextColor={colors.inkMute}
             value={username}
             onChangeText={(text) => setUsername(text.toLowerCase())}
@@ -101,7 +103,7 @@ export default function SignIn() {
             <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
               <TextInput
                 style={styles.input}
-                placeholder="닉네임"
+                placeholder={t('닉네임')}
                 placeholderTextColor={colors.inkMute}
                 value={nickname}
                 onChangeText={setNickname}
@@ -111,7 +113,7 @@ export default function SignIn() {
           )}
           <TextInput
             style={styles.input}
-            placeholder="비밀번호 (8자 이상)"
+            placeholder={t('비밀번호 (8자 이상)')}
             placeholderTextColor={colors.inkMute}
             value={password}
             onChangeText={setPassword}
@@ -140,14 +142,14 @@ export default function SignIn() {
             {busy ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.ctaLabel}>{isRegister ? '가입하기' : '로그인'}</Text>
+              <Text style={styles.ctaLabel}>{isRegister ? t('가입하기') : t('로그인')}</Text>
             )}
           </Pressable>
         </Animated.View>
 
         <Animated.View style={styles.switchRow} layout={LinearTransition.duration(200)}>
           <Text style={styles.switchHint}>
-            {isRegister ? '이미 계정이 있나요? ' : '처음이신가요? '}
+            {isRegister ? t('이미 계정이 있나요? ') : t('처음이신가요? ')}
           </Text>
           <Pressable
             onPress={() => {
@@ -156,19 +158,19 @@ export default function SignIn() {
             }}
             hitSlop={8}
           >
-            <Text style={styles.switchLink}>{isRegister ? '로그인' : '가입하기'}</Text>
+            <Text style={styles.switchLink}>{isRegister ? t('로그인') : t('가입하기')}</Text>
           </Pressable>
         </Animated.View>
 
         <Text style={styles.notice}>
-          서비스 개선과 보안을 위해 접속 IP·기기 정보 등을 수집해요.
+          {t('서비스 개선과 보안을 위해 접속 IP·기기 정보 등을 수집해요.')}
         </Text>
         <Pressable
           onPress={() => void openPrivacy()}
           accessibilityRole="link"
           style={styles.privacyLink}
         >
-          <Text style={styles.privacyLinkText}>개인정보처리방침 보기</Text>
+          <Text style={styles.privacyLinkText}>{t('개인정보처리방침 보기')}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

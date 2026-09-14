@@ -4,6 +4,7 @@
  * 서버는 상대가 오프라인일 때 { title, body, data: { c }, badge }로 발송한다
  * (apps/server/src/modules/push/expo-service.ts).
  */
+import { t } from '@/lib/i18n';
 import type { ConversationSummary } from '@litechat/types';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -45,7 +46,7 @@ export async function registerForPush(): Promise<boolean> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('messages', {
-      name: '새 메시지',
+      name: t('새 메시지'),
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 200, 150, 200],
     });

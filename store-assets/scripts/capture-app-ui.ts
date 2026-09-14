@@ -2,20 +2,34 @@
  * Reproducible store capture runner.
  *
  * It exports the actual Expo app for web, starts the real API against a fresh
- * temporary database, creates fictional Korean demo accounts, and captures the
+ * temporary database, creates fictional Korean or English demo accounts, and captures the
  * real app routes at device-native DPRs. No production data is read.
  *
  * Native-device follow-up commands are documented in store-assets/README.md.
  */
 import { chromium, type BrowserContext, type Page } from '@playwright/test';
-import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 
 const REPO = path.resolve(import.meta.dir, '../..');
 const BASE_URL = 'http://localhost:3100';
-const CAPTURES = path.join(REPO, 'store-assets/captures');
+const CAPTURES = path.join(
+  REPO,
+  'store-assets/captures',
+  process.env.STORE_CAPTURE_LANGUAGE === 'en' ? 'en' : '',
+);
+import { translations } from '../../apps/app/src/lib/i18n/translations';
+import demoEnglish from '../source/demo-en.json';
+const language = process.env.STORE_CAPTURE_LANGUAGE ?? 'ko';
+if (!['ko', 'en'].includes(language)) throw new Error('STORE_CAPTURE_LANGUAGE must be ko or en');
+function localized(value: string): string {
+  if (language === 'ko') return value;
+  const dictionary: Record<string, string> = { ...translations, ...demoEnglish };
+  if (!(value in dictionary)) throw new Error(`Missing capture translation: ${value}`);
+  return dictionary[value];
+}
 const PASSWORD = 'screenshot-only-2026';
 
 type DemoUser = { id: number; username: string; nickname: string; token: string };
@@ -75,7 +89,7 @@ async function register(username: string, nickname: string): Promise<DemoUser> {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, nickname, password: PASSWORD }),
+      body: JSON.stringify({ username, nickname: localized(nickname), password: PASSWORD }),
     },
   );
   return { ...result.user, token: result.token };
@@ -110,7 +124,10 @@ async function becomeFriends(requester: DemoUser, receiver: DemoUser): Promise<n
 async function send(user: DemoUser, conversationId: number, kind: 't' | 'e' | 'i', body: string) {
   await json(
     `/api/chat/${conversationId}/messages`,
-    auth(user.token, { method: 'POST', body: JSON.stringify({ k: kind, x: body }) }),
+    auth(user.token, {
+      method: 'POST',
+      body: JSON.stringify({ k: kind, x: kind === 't' ? localized(body) : body }),
+    }),
   );
 }
 
@@ -164,7 +181,7 @@ async function seedDemo() {
 }
 
 async function waitForApp(page: Page, text: string) {
-  const matches = page.getByText(text, { exact: false });
+  const matches = page.getByText(localized(text), { exact: false });
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     for (let index = 0; index < (await matches.count()); index += 1) {
@@ -202,8 +219,8 @@ async function login(context: BrowserContext): Promise<Page> {
   });
   await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'networkidle' });
   await applyCaptureFont(page);
-  await page.getByPlaceholder('아이디 (영문 소문자/숫자/_)').fill('seoyun_demo');
-  const password = page.getByPlaceholder('비밀번호 (8자 이상)');
+  await page.getByPlaceholder(localized('아이디 (영문 소문자/숫자/_)')).fill('seoyun_demo');
+  const password = page.getByPlaceholder(localized('비밀번호 (8자 이상)'));
   await password.fill(PASSWORD);
   await password.press('Enter');
   try {
@@ -225,15 +242,57 @@ async function openRoute(page: Page, route: string, expectedText: string) {
   await waitForApp(page, expectedText);
 }
 
+/** The keyboard-controller web fallback does not apply native composer insets.
+ * Reserve the real composer's measured height in this browser preview only. */
+async function prepareChatCapture(page: Page, lastMessage: string) {
+  await waitForApp(page, lastMessage);
+  const composer = page.getByTestId('chat-composer').filter({ visible: true }).first();
+  const scroll = page.getByTestId('chat-messages').filter({ visible: true }).first();
+  const composerBox = await composer.boundingBox();
+  if (!composerBox) throw new Error('Visible chat composer missing');
+  await scroll.evaluate((element, height) => {
+    (element as HTMLElement).style.marginBottom = `${height + 12}px`;
+  }, composerBox.height);
+  await page.waitForTimeout(700);
+  await scroll.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await page.waitForTimeout(500);
+  const last = scroll
+    .getByText(localized(lastMessage), { exact: true })
+    .filter({ visible: true })
+    .last();
+  const lastBox = await last.boundingBox();
+  if (!lastBox || lastBox.y + lastBox.height > composerBox.y) {
+    throw new Error(
+      'Latest message is obscured by the composer; do not save an incomplete chat preview',
+    );
+  }
+}
+
 async function save(page: Page, directory: string, name: string) {
   const destination = path.join(CAPTURES, directory, `${name}.jpg`);
   await mkdir(path.dirname(destination), { recursive: true });
   await page.screenshot({ path: destination, type: 'jpeg', quality: 94, animations: 'disabled' });
+  await writeFile(
+    destination + '.provenance.json',
+    JSON.stringify(
+      {
+        source: 'browser-preview',
+        language,
+        capture: path.relative(REPO, destination),
+        capturedAt: new Date().toISOString(),
+        nativeBuild: null,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
   console.log(`capture: ${path.relative(REPO, destination)}`);
 }
 
 async function clickVisibleText(page: Page, value: string) {
-  const matches = page.getByText(value, { exact: true });
+  const matches = page.getByText(localized(value), { exact: true });
   for (let index = 0; index < (await matches.count()); index += 1) {
     const candidate = matches.nth(index);
     if (await candidate.isVisible()) {
@@ -245,9 +304,15 @@ async function clickVisibleText(page: Page, value: string) {
 }
 
 async function revealWideChatsTab(page: Page) {
-  const conversation = page.getByText('민준', { exact: true }).first();
-  for (let index = 0; index < (await page.getByText('민준', { exact: true }).count()); index += 1) {
-    if (await page.getByText('민준', { exact: true }).nth(index).isVisible()) return;
+  const conversation = page.getByText(localized('민준'), { exact: true }).first();
+  // Tab labels can hydrate before the authenticated conversation query finishes.
+  await conversation.waitFor({ state: 'attached', timeout: 20_000 });
+  for (
+    let index = 0;
+    index < (await page.getByText(localized('민준'), { exact: true }).count());
+    index += 1
+  ) {
+    if (await page.getByText(localized('민준'), { exact: true }).nth(index).isVisible()) return;
   }
 
   // Expo NativeTabs currently renders the root tab in the browser but can
@@ -297,7 +362,7 @@ async function captureProfile(
     viewport: profile.viewport,
     deviceScaleFactor: profile.deviceScaleFactor,
     colorScheme: 'light',
-    locale: 'ko-KR',
+    locale: language === 'ko' ? 'ko-KR' : 'en-US',
     reducedMotion: 'reduce',
   });
   const page = await login(context);
@@ -315,6 +380,7 @@ async function captureProfile(
   } else {
     await openRoute(page, `/chat/${seeded.conversations.minjun}`, '민준');
   }
+  await prepareChatCapture(page, '천천히 걸으면서 이야기하자');
   await save(page, profile.directory, '02-realtime-chat');
 
   if (isSplit) {
@@ -323,10 +389,11 @@ async function captureProfile(
   } else {
     await openRoute(page, `/chat/${seeded.conversations.jiwoo}`, '지우');
   }
+  await prepareChatCapture(page, '색감이 정말 포근하다!');
   await save(page, profile.directory, '03-photo-chat');
 
   await openRoute(page, '/friends', '친구');
-  await page.getByPlaceholder('아이디로 검색').fill(seeded.discover.username);
+  await page.getByPlaceholder(localized('아이디로 검색')).fill(seeded.discover.username);
   await waitForApp(page, '도윤');
   await save(page, profile.directory, '04-friend-search');
 
@@ -354,73 +421,87 @@ async function waitForHealth() {
   throw new Error('Capture server did not become healthy');
 }
 
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH ?? chromium.executablePath();
+try {
+  await access(executablePath);
+} catch {
+  throw new Error(
+    'Chromium is missing. Install Playwright Chromium or set PLAYWRIGHT_CHROMIUM_PATH to an installed executable.',
+  );
+}
+
 const runtime = await mkdtemp(path.join(tmpdir(), 'litechat-store-capture-'));
 const exportDir = path.join(runtime, 'app');
 const dataDir = path.join(runtime, 'data');
 await mkdir(dataDir, { recursive: true });
 
-const exportProcess = Bun.spawn(
-  [process.execPath, 'x', 'expo', 'export', '--platform', 'web', '--output-dir', exportDir],
-  {
-    cwd: path.join(REPO, 'apps/app'),
+try {
+  const exportProcess = Bun.spawn(
+    [process.execPath, 'x', 'expo', 'export', '--platform', 'web', '--output-dir', exportDir],
+    {
+      cwd: path.join(REPO, 'apps/app'),
+      env: {
+        ...process.env,
+        // Web export evaluates native plugins but never runs the Watch target.
+        WATCH_API_URL: 'https://invalid.invalid',
+        EXPO_PUBLIC_API_URL: BASE_URL,
+        EXPO_PUBLIC_WEB_URL: BASE_URL,
+      },
+      stdout: 'inherit',
+      stderr: 'inherit',
+    },
+  );
+  if ((await exportProcess.exited) !== 0) throw new Error('Expo web export failed');
+  await copyFile(
+    path.join(REPO, 'store-assets/source/NotoSansKR-VF.otf'),
+    path.join(exportDir, 'store-font.otf'),
+  );
+  await copyFile(
+    path.join(REPO, 'store-assets/source/NotoColorEmoji.ttf'),
+    path.join(exportDir, 'store-emoji.ttf'),
+  );
+
+  const server = Bun.spawn([process.execPath, 'run', path.join(REPO, 'apps/server/src/index.ts')], {
+    cwd: path.join(REPO, 'apps/server'),
     env: {
       ...process.env,
-      EXPO_PUBLIC_API_URL: BASE_URL,
-      EXPO_PUBLIC_WEB_URL: BASE_URL,
+      PORT: '3100',
+      DB_PATH: path.join(dataDir, 'capture.db'),
+      UPLOAD_DIR: path.join(dataDir, 'uploads'),
+      REDIS_URL: 'memory',
+      WEB_STATIC_DIR: exportDir,
+      LITE_STATIC_DIR: path.join(runtime, 'unused-lite'),
+      PASSWORD_MEMORY_COST: '4096',
+      TRUSTED_PROXY_HOPS: '0',
     },
     stdout: 'inherit',
     stderr: 'inherit',
-  },
-);
-if ((await exportProcess.exited) !== 0) throw new Error('Expo web export failed');
-await copyFile(
-  path.join(REPO, 'store-assets/source/NotoSansKR-VF.otf'),
-  path.join(exportDir, 'store-font.otf'),
-);
-await copyFile(
-  path.join(REPO, 'store-assets/source/NotoColorEmoji.ttf'),
-  path.join(exportDir, 'store-emoji.ttf'),
-);
-
-const server = Bun.spawn([process.execPath, 'run', path.join(REPO, 'apps/server/src/index.ts')], {
-  cwd: path.join(REPO, 'apps/server'),
-  env: {
-    ...process.env,
-    PORT: '3100',
-    DB_PATH: path.join(dataDir, 'capture.db'),
-    UPLOAD_DIR: path.join(dataDir, 'uploads'),
-    REDIS_URL: 'memory',
-    WEB_STATIC_DIR: exportDir,
-    LITE_STATIC_DIR: path.join(runtime, 'unused-lite'),
-    PASSWORD_MEMORY_COST: '4096',
-    TRUSTED_PROXY_HOPS: '0',
-  },
-  stdout: 'inherit',
-  stderr: 'inherit',
-});
-
-try {
-  await waitForHealth();
-  const seeded = await seedDemo();
-  const browser = await chromium.launch({
-    executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH ?? '/usr/bin/chromium',
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
+
   try {
-    const requested = process.env.STORE_CAPTURE_PROFILE;
-    const requestedProfiles = new Set(requested?.split(',').map((item) => item.trim()));
-    const profiles = requested
-      ? PROFILES.filter((profile) => requestedProfiles.has(profile.directory))
-      : PROFILES;
-    if (profiles.length === 0) throw new Error(`Unknown STORE_CAPTURE_PROFILE: ${requested}`);
-    for (const profile of profiles) await captureProfile(browser, profile, seeded);
+    await waitForHealth();
+    const seeded = await seedDemo();
+    const browser = await chromium.launch({
+      executablePath,
+      headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    });
+    try {
+      const requested = process.env.STORE_CAPTURE_PROFILE;
+      const requestedProfiles = new Set(requested?.split(',').map((item) => item.trim()));
+      const profiles = requested
+        ? PROFILES.filter((profile) => requestedProfiles.has(profile.directory))
+        : PROFILES;
+      if (profiles.length === 0) throw new Error(`Unknown STORE_CAPTURE_PROFILE: ${requested}`);
+      for (const profile of profiles) await captureProfile(browser, profile, seeded);
+    } finally {
+      await browser.close();
+    }
   } finally {
-    await browser.close();
+    server.kill();
+    await server.exited;
   }
 } finally {
-  server.kill();
-  await server.exited;
   await rm(runtime, { recursive: true, force: true });
 }
 

@@ -633,7 +633,7 @@ function chatView(convId: number): HTMLElement {
           class: 'imgbtn',
           onclick: (e: Event) => {
             const btn = e.currentTarget as HTMLElement;
-            const img = h('img', { src: `/img/${image.id}/thumb`, width: image.w, height: image.h, alt: '사진' });
+            const img = h('img', { src: `/img/${image.id}/thumb?cache=private-v2`, width: image.w, height: image.h, alt: '사진' });
             img.onclick = () => showImageOverlay(image);
             btn.parentElement?.style.setProperty('--s', '8'); // 사진이 들어갈 만큼 셀을 넓힌다
             btn.replaceWith(img);
@@ -933,12 +933,12 @@ function showImageOverlay(image: NonNullable<WireMessage['im']>): void {
   const overlay = h(
     'div',
     { class: 'ov', onclick: () => overlay.remove() },
-    h('img', { src: `/img/${image.id}/thumb`, alt: '사진' }),
+    h('img', { src: `/img/${image.id}/thumb?cache=private-v2`, alt: '사진' }),
     h(
       'div',
       { style: 'display:flex;gap:10px' },
-      h('a', { href: `/img/${image.id}/thumb`, download: `litechat-${image.id}.webp` }, `저화질 저장 (${fmtBytes(image.tb)})`),
-      h('a', { href: `/img/${image.id}/orig` }, `원본 저장 (${fmtBytes(image.ob)})`),
+      h('a', { href: `/img/${image.id}/thumb?cache=private-v2`, download: `litechat-${image.id}.webp` }, `저화질 저장 (${fmtBytes(image.tb)})`),
+      h('a', { href: `/img/${image.id}/orig?cache=private-v2` }, `원본 저장 (${fmtBytes(image.ob)})`),
     ),
   );
   document.body.append(overlay);

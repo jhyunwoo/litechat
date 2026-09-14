@@ -107,10 +107,10 @@ export const readBodySchema = z.object({
 
 /** Web Push 구독 등록 요청 (PushSubscription.toJSON() 형태) */
 export const pushSubscribeSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().max(2048).url(),
   keys: z.object({
-    p256dh: z.string().min(1),
-    auth: z.string().min(1),
+    p256dh: z.string().min(1).max(128),
+    auth: z.string().min(1).max(64),
   }),
 });
 export type PushSubscribeInput = z.infer<typeof pushSubscribeSchema>;

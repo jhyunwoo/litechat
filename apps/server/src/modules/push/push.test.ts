@@ -19,7 +19,7 @@ let bob: Awaited<ReturnType<typeof signup>>;
 let conversationId: number;
 
 const SUBSCRIPTION = {
-  endpoint: 'https://push.example.com/sub/bob-phone',
+  endpoint: 'https://fcm.googleapis.com/fcm/send/bob-phone',
   keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
 };
 

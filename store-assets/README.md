@@ -1,6 +1,6 @@
 # Store asset workflow
 
-This directory contains reproducible litechat App Store and Google Play artwork. Generated listing images always use fictional Korean accounts and conversations created in a temporary database.
+This directory contains reproducible litechat App Store and Google Play artwork. Generated listing images use fictional Korean or English accounts and conversations created in a temporary database. Open `index.html` for the visual index and `SUBMISSION.md` for console field mapping and remaining native gates.
 
 ## Commands
 
@@ -9,9 +9,12 @@ From the repository root:
 ```sh
 bun run brand:generate
 bun run brand:preview
-bun run store-assets:capture
+STORE_CAPTURE_LANGUAGE=ko bun run store-assets:capture
+STORE_CAPTURE_LANGUAGE=en bun run store-assets:capture
 bun run store-assets:compose
+bun run store-assets:preview
 bun run store-assets:validate
+bun run store-assets:test
 ```
 
 `STORE_CAPTURE_PROFILE` limits a capture run to comma-separated profiles, for example:
@@ -83,3 +86,13 @@ Then compare all outputs visually on a calibrated display, including Korean head
 ## Fonts and licensing
 
 `source/NotoSansKR-VF.otf` and `source/NotoColorEmoji.ttf` make Korean and emoji rendering deterministic across developer machines. Their Open Font License texts are stored alongside them. These fonts are capture/build inputs only and are not bundled into the application.
+
+## Bilingual outputs and native provenance
+
+The composer emits both `app-store/{ko,en}` and `play-store/{ko,en}`. English source captures are under `captures/en/`; Korean paths remain compatible with the original workflow. Browser language controls the actual app UI; fixtures localize names and conversations before insertion into the temporary database. The capture runner uses Playwright's installed Chromium by default, or `PLAYWRIGHT_CHROMIUM_PATH`.
+
+`metadata/{ko,en}.json` contains store copy, with matching Markdown for copy/paste. `previews/` contains per-device contact sheets. Apple Watch native capture prerequisites and tooling are under `watch/`.
+
+Each newly captured browser image records `browser-preview` provenance. Composition creates receipts binding the source and output SHA-256 hashes. `bun run store-assets:validate-submission` additionally requires native capture attestations and all eight Watch screenshots. It deliberately fails while only previews exist. See `SUBMISSION.md` before replacing inputs.
+
+The browser capture runner reserves the measured composer height because the keyboard-controller web fallback does not apply native content insets. It then scrolls to the latest message and refuses to capture if that message remains obscured. This browser-only adjustment does not modify the native application or fabricate message content.

@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/iphone/07-account-controls.jpg",
+  "capturedAt": "2026-09-13T07:15:40.143Z",
+  "nativeBuild": null,
+  "inputSha256": "0481f0191256808136e92d32571bb193990b66dcd364c8bbc1fc9706fc9c6904",
+  "outputSha256": "cf3b908da8c8b3e269b4a82f00f07d7c07b2490dd69c1b2a6297a957234aea4e"
+}

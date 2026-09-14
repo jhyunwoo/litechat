@@ -260,6 +260,7 @@ From `apps/app`:
 ```sh
 npx expo config --type prebuild
 npx expo prebuild --clean -p ios
+node scripts/sync-watch-version.cjs
 node scripts/verify-watch-config.cjs
 swift test
 # macOS, after clean prebuild and CocoaPods installation:
@@ -275,6 +276,77 @@ eas submit --platform ios --profile production
 `watch-simulator` is an additional unsigned cloud compilation profile. It cannot
 validate remote APNs, provisioning or real Watch networking. Source/entitlement/icons
 changes require EAS Build. Existing EAS Update configuration remains in place.
+
+## TestFlight runbook
+
+TestFlight distributes the Watch app inside the signed iOS archive; there is no separate
+watchOS upload and no additional App Store Connect record. `production` is the TestFlight
+profile: it is App Store distribution, and every store build reaches testers through
+TestFlight before release. Building and submitting run in EAS's cloud macOS workers, so
+the sequence below works from this Linux workspace; only `verify-watch-archive.py`
+requires a Mac. No new EAS profile is needed.
+
+### Version parity
+
+Apple requires a Watch app's `CFBundleVersion` and `CFBundleShortVersionString` to equal
+its companion's, and App Store Connect rejects a mismatched archive (ITMS-90473) after the
+build already succeeded. `appVersionSource` is `remote` with `autoIncrement`, and EAS
+applies that build number to the companion alone, which
+[expo/expo#43740](https://github.com/expo/expo/issues/43740) tracks upstream. Three
+checked-in pieces close it: the config plugin applies the resolved build number to the
+Watch target during generation, `scripts/sync-watch-version.cjs` re-mirrors the
+companion's generated version inside the iOS post-install hook — which EAS runs after
+prebuild and CocoaPods, before compiling — and `verify-watch-config.cjs` fails the build
+when the two disagree instead of letting the upload be rejected.
+
+### One-time Apple and server setup
+
+Credentials cannot be created noninteractively, which is what stopped the earlier
+development build. Run once, from `apps/app`:
+
+```sh
+eas login
+eas credentials --platform ios   # App Store distribution, for both targets
+```
+
+`extra.eas.build.experimental.ios.appExtensions` already declares
+`kr.moveto.litechat.watch` and its `aps-environment` entitlement, so EAS provisions both
+bundle identifiers and enables Push on the Watch App ID. Adding `ios.appleTeamId` to
+`app.json` silences the apple-targets warning and is required only for local Xcode
+archives, not for EAS.
+
+TestFlight builds use **production** APNs. `WATCH_APNS_TEAM_ID`,
+`WATCH_APNS_PRODUCTION_KEY_ID` and `WATCH_APNS_PRODUCTION_PRIVATE_KEY` must exist in the
+deployed backend; the sandbox pair only serves local Debug builds. The deployment must
+already expose `/api/watch`.
+
+### Build, submit, install
+
+```sh
+eas build --platform ios --profile production --auto-submit
+# or, for an existing build: eas submit --platform ios --profile production
+```
+
+Export compliance is pre-answered by `ITSAppUsesNonExemptEncryption` in both bundles.
+After processing, add the build to a TestFlight internal group. Write “what to test”
+instructions that cover Watch sign-in, because the Watch app authenticates on its own.
+
+Testers install the iPhone build from TestFlight first: this app is not `WKWatchOnly`, so
+the watchOS TestFlight app cannot install it directly. The Watch app then arrives through
+the iPhone's Watch app — automatically with Automatic App Install on, otherwise from
+Available Apps. After that, sign in on the Watch under “계정 및 알림” and run the physical
+matrix above; powering the iPhone off is what distinguishes independence from forwarding.
+
+Optionally download the `.ipa` from the build page and inspect it on a Mac before
+releasing to a wider group:
+
+```sh
+python3 scripts/verify-watch-archive.py /path/to/build.ipa
+```
+
+TestFlight verifies signed distribution, installation and production APNs. It does not
+establish that the companion may be absent, which Apple's Watch installation flow still
+requires; record that separately.
 
 ## Verification record (2026-09-09)
 

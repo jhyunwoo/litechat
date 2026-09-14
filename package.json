@@ -17,7 +17,10 @@
     "store-assets:capture": "bun store-assets/scripts/capture-app-ui.ts",
     "store-assets:compose": "bun store-assets/scripts/compose-store-assets.ts",
     "store-assets:validate": "bun store-assets/scripts/validate-store-assets.ts",
-    "format": "prettier --write \"**/*.{ts,tsx,md,json,css,html}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css,html}\"",
+    "store-assets:preview": "bun store-assets/scripts/preview-store-assets.ts",
+    "store-assets:validate-submission": "bun store-assets/scripts/validate-store-assets.ts --submission",
+    "store-assets:test": "bun test store-assets/scripts/submission-checks.test.ts"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

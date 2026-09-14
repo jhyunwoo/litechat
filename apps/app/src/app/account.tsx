@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import { makeStyles, useTheme } from '@/theme/theme';
 import { rounded, spacing } from '@/theme/tokens';
 
 export default function AccountScreen() {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors } = useTheme();
   const { deleteAccount } = useAuth();
@@ -28,12 +30,14 @@ export default function AccountScreen() {
   function confirmDeletion() {
     if (password.length < 8 || busy) return;
     Alert.alert(
-      '계정을 영구 삭제할까요?',
-      '프로필, 친구 관계, 대화와 메시지, 업로드한 사진, 알림 토큰 및 계정에 연결된 분석 데이터가 삭제됩니다. 이 작업은 되돌릴 수 없어요.',
+      t('계정을 영구 삭제할까요?'),
+      t(
+        '프로필, 친구 관계, 대화와 메시지, 업로드한 사진, 알림 토큰 및 계정에 연결된 분석 데이터가 삭제됩니다. 이 작업은 되돌릴 수 없어요.',
+      ),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('취소'), style: 'cancel' },
         {
-          text: '영구 삭제',
+          text: t('영구 삭제'),
           style: 'destructive',
           onPress: () => void performDeletion(),
         },
@@ -59,33 +63,34 @@ export default function AccountScreen() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="뒤로"
+          accessibilityLabel={t('뒤로')}
           hitSlop={8}
         >
           <Text style={styles.back}>‹</Text>
         </Pressable>
-        <Text style={styles.title}>계정 관리</Text>
+        <Text style={styles.title}>{t('계정 관리')}</Text>
       </View>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.heading}>계정 삭제</Text>
+        <Text style={styles.heading}>{t('계정 삭제')}</Text>
         <Text style={styles.body}>
-          로그아웃이나 비활성화가 아닌 영구 삭제입니다. 프로필, 친구 관계, 대화와 메시지, 업로드한
-          사진, 푸시 토큰 및 계정에 연결된 분석 데이터가 삭제됩니다.
+          {t(
+            '로그아웃이나 비활성화가 아닌 영구 삭제입니다. 프로필, 친구 관계, 대화와 메시지, 업로드한 사진, 푸시 토큰 및 계정에 연결된 분석 데이터가 삭제됩니다.',
+          )}
         </Text>
-        <Text style={styles.label}>현재 비밀번호로 확인</Text>
+        <Text style={styles.label}>{t('현재 비밀번호로 확인')}</Text>
         <TextInput
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="current-password"
-          placeholder="비밀번호"
+          placeholder={t('비밀번호')}
           placeholderTextColor={colors.inkMute}
           maxLength={72}
           style={styles.input}
-          accessibilityLabel="현재 비밀번호"
+          accessibilityLabel={t('현재 비밀번호')}
         />
         {error ? (
           <Text style={styles.error} accessibilityRole="alert">
@@ -96,7 +101,7 @@ export default function AccountScreen() {
           onPress={confirmDeletion}
           disabled={busy || password.length < 8}
           accessibilityRole="button"
-          accessibilityLabel="계정 영구 삭제"
+          accessibilityLabel={t('계정 영구 삭제')}
           style={({ pressed }) => [
             styles.deleteButton,
             (busy || password.length < 8) && styles.disabled,
@@ -106,7 +111,7 @@ export default function AccountScreen() {
           {busy ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.deleteLabel}>계정 영구 삭제</Text>
+            <Text style={styles.deleteLabel}>{t('계정 영구 삭제')}</Text>
           )}
         </Pressable>
       </ScrollView>

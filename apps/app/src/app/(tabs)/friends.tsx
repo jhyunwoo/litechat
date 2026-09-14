@@ -1,6 +1,7 @@
 /**
  * 친구 탭 — 아이디 검색 → 친구 요청 → 수락/거절 → 친구 목록 (웹 FriendsTab 포팅)
  */
+import { useTranslation } from '@/lib/i18n';
 import type { PublicUser } from '@litechat/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -18,16 +19,17 @@ type SearchUser = PublicUser & { rel: string };
 
 /** 검색 결과의 관계 상태 → 버튼/라벨 */
 function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number) => void }) {
+  const t = useTranslation();
   const styles = useStyles();
   switch (user.rel) {
     case 'self':
-      return <Text style={styles.relLabel}>나</Text>;
+      return <Text style={styles.relLabel}>{t('나')}</Text>;
     case 'friends':
-      return <Text style={styles.relLabel}>친구</Text>;
+      return <Text style={styles.relLabel}>{t('친구')}</Text>;
     case 'pending_out':
-      return <Text style={styles.relLabel}>요청됨</Text>;
+      return <Text style={styles.relLabel}>{t('요청됨')}</Text>;
     case 'pending_in':
-      return <Text style={styles.relLink}>받은 요청 확인</Text>;
+      return <Text style={styles.relLink}>{t('받은 요청 확인')}</Text>;
     default:
       return (
         <Pressable
@@ -35,13 +37,14 @@ function RelationAction({ user, onAdd }: { user: SearchUser; onAdd: (id: number)
           accessibilityRole="button"
           style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
         >
-          <Text style={styles.pillLabel}>친구 추가</Text>
+          <Text style={styles.pillLabel}>{t('친구 추가')}</Text>
         </Pressable>
       );
   }
 }
 
 export default function FriendsTab() {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
@@ -74,7 +77,7 @@ export default function FriendsTab() {
       await unwrap(res);
     },
     onSuccess: () => {
-      setNotice('친구 요청을 보냈어요!');
+      setNotice(t('친구 요청을 보냈어요!'));
       void queryClient.invalidateQueries({ queryKey: ['search'] });
       void queryClient.invalidateQueries({ queryKey: ['requests'] });
     },
@@ -99,11 +102,11 @@ export default function FriendsTab() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Text style={styles.headerTitle}>친구</Text>
+        <Text style={styles.headerTitle}>{t('친구')}</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="아이디로 검색"
+          placeholder={t('아이디로 검색')}
           placeholderTextColor={colors.inkMute}
           autoCapitalize="none"
           autoCorrect={false}
@@ -125,9 +128,11 @@ export default function FriendsTab() {
         {/* 검색 결과 */}
         {debounced !== '' && (
           <Animated.View entering={FadeIn.duration(150)} style={styles.section}>
-            <Text style={styles.sectionTitle}>검색 결과</Text>
+            <Text style={styles.sectionTitle}>{t('검색 결과')}</Text>
             {searchResults?.length === 0 && (
-              <Text style={styles.sectionHint}>‘{debounced}’ 사용자를 찾지 못했어요.</Text>
+              <Text style={styles.sectionHint}>
+                {t('‘{query}’ 사용자를 찾지 못했어요.', { query: debounced })}
+              </Text>
             )}
             {searchResults?.map((user, index) => (
               <Animated.View
@@ -148,7 +153,7 @@ export default function FriendsTab() {
         {/* 받은 친구 요청 */}
         {requests && requests.incoming.length > 0 && (
           <Animated.View layout={LinearTransition.duration(200)} style={styles.section}>
-            <Text style={styles.sectionTitle}>받은 요청</Text>
+            <Text style={styles.sectionTitle}>{t('받은 요청')}</Text>
             {requests.incoming.map((request) => (
               <Animated.View
                 key={request.id}
@@ -167,7 +172,7 @@ export default function FriendsTab() {
                     accessibilityRole="button"
                     style={({ pressed }) => [styles.pillButton, pressed && styles.pillPressed]}
                   >
-                    <Text style={styles.pillLabel}>수락</Text>
+                    <Text style={styles.pillLabel}>{t('수락')}</Text>
                   </Pressable>
                   {/* button-secondary-pill — 두 번째 CTA는 고스트 필 (테두리만) */}
                   <Pressable
@@ -175,7 +180,7 @@ export default function FriendsTab() {
                     accessibilityRole="button"
                     style={({ pressed }) => [styles.pillGhost, pressed && styles.pillGhostPressed]}
                   >
-                    <Text style={styles.pillGhostLabel}>거절</Text>
+                    <Text style={styles.pillGhostLabel}>{t('거절')}</Text>
                   </Pressable>
                 </View>
               </Animated.View>
@@ -185,9 +190,11 @@ export default function FriendsTab() {
 
         {/* 친구 목록 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>친구 {friends?.length ?? 0}</Text>
+          <Text style={styles.sectionTitle}>
+            {t('친구 {count}', { count: friends?.length ?? 0 })}
+          </Text>
           {friends?.length === 0 && (
-            <Text style={styles.sectionHint}>위 검색창에서 아이디로 친구를 찾아보세요.</Text>
+            <Text style={styles.sectionHint}>{t('위 검색창에서 아이디로 친구를 찾아보세요.')}</Text>
           )}
           {friends?.map(({ user, c }, index) => (
             <Animated.View

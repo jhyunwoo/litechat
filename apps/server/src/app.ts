@@ -29,6 +29,9 @@ import { safetyRoutes } from './modules/safety/routes';
 import { wsRoutes } from './ws/routes';
 import { secureHeaders } from 'hono/secure-headers';
 import { applyRetention } from './db/retention';
+import { browserOrigin } from './middleware/browser-origin';
+import { bodyLimit } from 'hono/body-limit';
+import { deleteCookie, getCookie } from 'hono/cookie';
 
 /** 라우트 핸들러에서 사용할 수 있는 컨텍스트 변수 타입 */
 export interface AppVariables {
@@ -75,6 +78,26 @@ export function createApp(deps: AppDeps, options: CreateAppOptions = {}) {
   const analyticsService = options.analyticsService ?? new AnalyticsService(deps);
 
   const app = new Hono<AppEnv>()
+    .use('*', browserOrigin(deps))
+    .use('/api/*', async (c, next) => {
+      c.header('Cache-Control', 'no-store');
+      if (deps.config.isProduction && getCookie(c, 'lc_sess')) {
+        deleteCookie(c, 'lc_sess', { path: '/', secure: true });
+        if (deps.config.legacySessionCookieDomain)
+          deleteCookie(c, 'lc_sess', {
+            path: '/',
+            secure: true,
+            domain: deps.config.legacySessionCookieDomain,
+          });
+      }
+      return next();
+    })
+    .use('/api/*', (c, next) =>
+      bodyLimit({
+        maxSize: /^\/api\/images\/?$/.test(c.req.path) ? 11 * 1024 * 1024 : 64 * 1024,
+        onError: (c) => c.json({ error: 'BODY_TOO_LARGE' }, 413),
+      })(c, next),
+    )
     .use(
       '*',
       secureHeaders({

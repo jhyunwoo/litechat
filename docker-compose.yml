@@ -24,7 +24,10 @@ services:
       - '3000'
     environment:
       REDIS_URL: redis://redis:6379
-      COOKIE_DOMAIN: .moveto.kr        # moveto.kr 서브도메인들이 세션 쿠키를 공유
+      COOKIE_DOMAIN: ''               # 사이트별 로그인; 세션 쿠키는 host-only
+      LEGACY_SESSION_COOKIE_DOMAIN: .moveto.kr
+      UPLOAD_USER_QUOTA_BYTES: ${UPLOAD_USER_QUOTA_BYTES:-1073741824}
+      UPLOAD_TOTAL_QUOTA_BYTES: ${UPLOAD_TOTAL_QUOTA_BYTES:-10737418240}
       WEB_HOST: chat.moveto.kr
       LITE_HOST: litechat.moveto.kr
       LITE_HOST_ALIASES: ${LITE_HOST_ALIASES:-lc.moveto.kr}

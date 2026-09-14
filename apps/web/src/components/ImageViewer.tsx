@@ -42,7 +42,7 @@ export function ImageViewer({ message, onClose }: Props) {
             animate={{ scale: 1 }}
             exit={{ scale: 0.85 }}
             transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            src={`/img/${image.id}/thumb`}
+            src={`/img/${image.id}/thumb?cache=private-v2`}
             alt="사진"
             className="m-auto max-h-[80vh] max-w-full object-contain"
             onClick={(e) => e.stopPropagation()}
@@ -53,14 +53,14 @@ export function ImageViewer({ message, onClose }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <a
-              href={`/img/${image.id}/thumb`}
+              href={`/img/${image.id}/thumb?cache=private-v2`}
               download={`litechat-${image.id}.webp`}
               className="tnum flex min-h-11 items-center rounded-full bg-white/15 px-5 text-sm text-white backdrop-blur transition active:scale-95"
             >
               저화질 저장 ({formatBytes(image.tb)})
             </a>
             <a
-              href={`/img/${image.id}/orig`}
+              href={`/img/${image.id}/orig?cache=private-v2`}
               className="tnum flex min-h-11 items-center rounded-full bg-white/15 px-5 text-sm text-white backdrop-blur transition active:scale-95"
             >
               원본 저장 ({formatBytes(image.ob)})

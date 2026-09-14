@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/ipad/03-photo-chat.jpg",
+  "capturedAt": "2026-09-13T07:15:46.935Z",
+  "nativeBuild": null,
+  "inputSha256": "454f8d05a6563c9aa975786a8bafa2d7b18378e9cf260762c6d792cd72a2750a",
+  "outputSha256": "f75a59c1a7a7c33451df44faa133623622b5ff318a9baead95d0291750ec5a51"
+}

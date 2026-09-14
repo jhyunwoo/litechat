@@ -2,7 +2,7 @@
  * 인증 REST 라우트: /api/auth/*
  *
  * 성공한 register/login은 httpOnly 세션 쿠키를 발급한다.
- * 쿠키는 Domain 설정으로 chat/litechat 두 서브도메인에서 공유된다.
+ * 프로덕션 쿠키는 __Host- 이름으로 각 사이트에 격리된다.
  */
 import { validator as zValidator } from 'hono-openapi/zod';
 import { deleteAccountSchema, loginSchema, registerSchema } from '@litechat/types';
@@ -13,7 +13,12 @@ import type { AppDeps } from '../../deps';
 import { requireAuth, tokenFromRequest } from '../../middleware/auth';
 import { rateLimit } from '../../middleware/rate-limit';
 import { clearVisitorCookies } from '../analytics/cookies';
-import { createSession, destroyAllUserSessions, destroySession, SESSION_COOKIE } from './session';
+import {
+  createSession,
+  destroyAllUserSessions,
+  destroySession,
+  sessionCookieName,
+} from './session';
 import { AuthService } from './service';
 
 /** 세션 쿠키 공통 속성 — 발급/삭제 시 동일해야 브라우저가 같은 쿠키로 취급한다 */
@@ -23,7 +28,6 @@ function cookieOptions(deps: AppDeps) {
     httpOnly: true,
     sameSite: 'Lax' as const,
     secure: deps.config.isProduction,
-    ...(deps.config.cookieDomain ? { domain: deps.config.cookieDomain } : {}),
   };
 }
 
@@ -34,7 +38,7 @@ function cookieOptions(deps: AppDeps) {
  */
 async function issueSession(c: Context<AppEnv>, deps: AppDeps, userId: number): Promise<string> {
   const token = await createSession(deps, userId);
-  setCookie(c, SESSION_COOKIE, token, {
+  setCookie(c, sessionCookieName(deps), token, {
     ...cookieOptions(deps),
     maxAge: deps.config.sessionTtlSeconds,
   });
@@ -74,9 +78,9 @@ export function authRoutes(deps: AppDeps) {
       )
       // 로그아웃 — 서버 세션 파기 + 쿠키 삭제 (Bearer/쿠키 양쪽 지원)
       .post('/logout', async (c) => {
-        const token = tokenFromRequest(c);
+        const token = tokenFromRequest(c, deps);
         if (token) await destroySession(deps, token);
-        deleteCookie(c, SESSION_COOKIE, cookieOptions(deps));
+        deleteCookie(c, sessionCookieName(deps), cookieOptions(deps));
         return c.json({ ok: true }, 200);
       })
       // 내 정보 조회 — 앱 시작 시 로그인 상태 확인용
@@ -90,7 +94,7 @@ export function authRoutes(deps: AppDeps) {
         await service.deleteAccount(userId, c.req.valid('json').password);
         await destroyAllUserSessions(deps, userId);
         deps.hub.disconnectUser(userId);
-        deleteCookie(c, SESSION_COOKIE, cookieOptions(deps));
+        deleteCookie(c, sessionCookieName(deps), cookieOptions(deps));
         clearVisitorCookies(c, deps);
         return c.json({ ok: true }, 200);
       })

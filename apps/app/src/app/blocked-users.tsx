@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n';
 import type { BlockedUser } from '@litechat/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -9,6 +10,7 @@ import { makeStyles } from '@/theme/theme';
 import { spacing } from '@/theme/tokens';
 
 export default function BlockedUsersScreen() {
+  const t = useTranslation();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -25,7 +27,7 @@ export default function BlockedUsersScreen() {
       );
       await queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
     } catch (cause) {
-      Alert.alert('차단 해제 실패', errorMessage(cause));
+      Alert.alert(t('차단 해제 실패'), errorMessage(cause));
     }
   }
 
@@ -35,21 +37,23 @@ export default function BlockedUsersScreen() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="뒤로"
+          accessibilityLabel={t('뒤로')}
           hitSlop={8}
         >
           <Text style={styles.back}>‹</Text>
         </Pressable>
-        <Text style={styles.title}>차단한 사용자</Text>
+        <Text style={styles.title}>{t('차단한 사용자')}</Text>
       </View>
       <View style={styles.content}>
-        {query.isPending ? <Text style={styles.hint}>불러오는 중…</Text> : null}
+        {query.isPending ? <Text style={styles.hint}>{t('불러오는 중…')}</Text> : null}
         {query.isError ? (
           <Pressable onPress={() => void query.refetch()}>
-            <Text style={styles.error}>목록을 불러오지 못했어요. 다시 시도</Text>
+            <Text style={styles.error}>{t('목록을 불러오지 못했어요. 다시 시도')}</Text>
           </Pressable>
         ) : null}
-        {query.data?.length === 0 ? <Text style={styles.hint}>차단한 사용자가 없어요.</Text> : null}
+        {query.data?.length === 0 ? (
+          <Text style={styles.hint}>{t('차단한 사용자가 없어요.')}</Text>
+        ) : null}
         {query.data?.map((item) => (
           <View key={item.user.id} style={styles.row}>
             <Avatar nickname={item.user.nickname} size={40} />
@@ -62,7 +66,7 @@ export default function BlockedUsersScreen() {
               accessibilityRole="button"
               style={({ pressed }) => [styles.unblock, pressed && styles.unblockPressed]}
             >
-              <Text style={styles.unblockLabel}>차단 해제</Text>
+              <Text style={styles.unblockLabel}>{t('차단 해제')}</Text>
             </Pressable>
           </View>
         ))}

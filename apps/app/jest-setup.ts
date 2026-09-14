@@ -75,3 +75,8 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
   };
 });
+
+// Existing regression fixtures use Korean; locale tests override this primary locale.
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [{ languageCode: 'ko', languageTag: 'ko-KR' }]),
+}));

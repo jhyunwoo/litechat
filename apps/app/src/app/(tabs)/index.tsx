@@ -4,6 +4,7 @@
  * iPad(폭 ≥768pt): 2-pane — 좌측 대화 목록 + 우측 인라인 채팅방.
  * iPhone: 목록만, 행 탭 → /chat/[id] 라우트로 push.
  */
+import { useTranslation, useLocale } from '@/lib/i18n';
 import type { ConversationSummary, WireMessage } from '@litechat/types';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
@@ -40,9 +41,9 @@ import { api, errorMessage, unwrap } from '@/lib/api';
 const SPLIT_BREAKPOINT = 768;
 
 /** 마지막 메시지 미리보기 텍스트 */
-function preview(last: WireMessage | null): string {
-  if (!last) return '대화를 시작해 보세요';
-  if (last.k === 'i') return '📷 사진';
+function preview(last: WireMessage | null, t: ReturnType<typeof useTranslation>): string {
+  if (!last) return t('대화를 시작해 보세요');
+  if (last.k === 'i') return t('📷 사진');
   return last.x;
 }
 
@@ -87,6 +88,8 @@ function ConversationRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const t = useTranslation();
+  const locale = useLocale();
   const styles = useStyles();
   const { colors } = useTheme();
   return (
@@ -103,11 +106,11 @@ function ConversationRow({
           <Text style={styles.nickname} numberOfLines={1}>
             {conv.peer.nickname}
           </Text>
-          {conv.last && <Text style={styles.time}>{formatTime(conv.last.ts)}</Text>}
+          {conv.last && <Text style={styles.time}>{formatTime(conv.last.ts, locale)}</Text>}
         </View>
         <View style={styles.rowBottom}>
           <Text style={styles.preview} numberOfLines={1}>
-            {preview(conv.last)}
+            {preview(conv.last, t)}
           </Text>
           {conv.unread > 0 && <UnreadBadge convId={conv.id} count={conv.unread} />}
         </View>
@@ -117,6 +120,7 @@ function ConversationRow({
 }
 
 export default function ChatsTab() {
+  const t = useTranslation();
   const styles = useStyles();
   const { me } = useAuth();
   const insets = useSafeAreaInsets();
@@ -131,9 +135,9 @@ export default function ChatsTab() {
 
   function safetyMenu() {
     if (!selected) return;
-    Alert.alert(selected.peer.nickname, '안전 옵션', [
+    Alert.alert(selected.peer.nickname, t('안전 옵션'), [
       {
-        text: '사용자 신고',
+        text: t('사용자 신고'),
         onPress: () =>
           void (async () => {
             try {
@@ -142,27 +146,27 @@ export default function ChatsTab() {
                   json: {
                     userId: selected.peer.id,
                     reason: 'other',
-                    details: '사용자 프로필에서 신고',
+                    details: t('사용자 프로필에서 신고'),
                   },
                 }),
               );
-              Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+              Alert.alert(t('신고 접수'), t('신고가 접수되었어요. 운영팀이 검토합니다.'));
             } catch (cause) {
-              Alert.alert('신고 실패', errorMessage(cause));
+              Alert.alert(t('신고 실패'), errorMessage(cause));
             }
           })(),
       },
       {
-        text: '사용자 차단',
+        text: t('사용자 차단'),
         style: 'destructive',
         onPress: () =>
           Alert.alert(
-            '이 사용자를 차단할까요?',
-            '서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.',
+            t('이 사용자를 차단할까요?'),
+            t('서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.'),
             [
-              { text: '취소', style: 'cancel' },
+              { text: t('취소'), style: 'cancel' },
               {
-                text: '차단',
+                text: t('차단'),
                 style: 'destructive',
                 onPress: () =>
                   void (async () => {
@@ -173,14 +177,14 @@ export default function ChatsTab() {
                       setSelectedId(null);
                       await queryClient.invalidateQueries();
                     } catch (cause) {
-                      Alert.alert('차단 실패', errorMessage(cause));
+                      Alert.alert(t('차단 실패'), errorMessage(cause));
                     }
                   })(),
               },
             ],
           ),
       },
-      { text: '취소', style: 'cancel' },
+      { text: t('취소'), style: 'cancel' },
     ]);
   }
 
@@ -195,16 +199,18 @@ export default function ChatsTab() {
   const list = (
     <View style={[styles.listPane, isSplit && styles.listPaneSplit]}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Text style={styles.headerTitle}>채팅</Text>
+        <Text style={styles.headerTitle}>{t('채팅')}</Text>
       </View>
 
       {isPending ? (
-        <Text style={styles.hint}>불러오는 중…</Text>
+        <Text style={styles.hint}>{t('불러오는 중…')}</Text>
       ) : conversations?.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>💬</Text>
           <Text style={styles.hint}>
-            아직 대화가 없어요.{'\n'}친구 탭에서 친구를 추가하고 대화를 시작해 보세요!
+            {t('아직 대화가 없어요.')}
+            {'\n'}
+            {t('친구 탭에서 친구를 추가하고 대화를 시작해 보세요!')}
           </Text>
         </View>
       ) : (
@@ -247,7 +253,7 @@ export default function ChatsTab() {
               <Pressable
                 onPress={safetyMenu}
                 accessibilityRole="button"
-                accessibilityLabel="대화 안전 옵션"
+                accessibilityLabel={t('대화 안전 옵션')}
                 style={styles.detailMenu}
               >
                 <Text style={styles.detailMenuText}>•••</Text>
@@ -258,7 +264,7 @@ export default function ChatsTab() {
         ) : (
           <View style={styles.detailEmpty}>
             <Text style={styles.emptyEmoji}>💬</Text>
-            <Text style={styles.hint}>대화를 선택하세요</Text>
+            <Text style={styles.hint}>{t('대화를 선택하세요')}</Text>
           </View>
         )}
       </View>

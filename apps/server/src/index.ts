@@ -33,12 +33,13 @@ app.get('*', serveFrontend(deps, analyticsService));
 
 const server = Bun.serve({
   port: deps.config.port,
+  maxRequestBodySize: 11 * 1024 * 1024,
   idleTimeout: 40, // Bounded Watch polls may wait 25 seconds before writing a response.
   fetch: app.fetch,
   // idleTimeout 60초: 클라이언트가 25초마다 앱 레벨 핑을 보내므로 살아있는 연결은
   // 유지되고, 정상 종료(pagehide) 없이 강제 종료된 소켓은 ~120초 기본값 대신
   // 60초 안에 정리된다 → 오프라인 인식이 빨라져 푸시 알림이 제때 발송된다.
-  websocket: { ...websocket, idleTimeout: 60 },
+  websocket: { ...websocket, idleTimeout: 60, maxPayloadLength: 8192 },
 });
 
 console.log(`litechat server listening on :${server.port}`);

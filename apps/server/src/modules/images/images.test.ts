@@ -86,8 +86,8 @@ describe('GET /img/:id/{thumb,orig}', () => {
     const thumb = await app.request(`/img/${id}/thumb`, { headers: { cookie: alice.cookie } });
     expect(thumb.status).toBe(200);
     expect(thumb.headers.get('content-type')).toBe('image/webp');
-    // 불변 컨텐츠 — 재방문 시 전송량 0을 위한 캐시 헤더
-    expect(thumb.headers.get('cache-control')).toContain('immutable');
+    // 인증된 이미지가 계정 전환 뒤 캐시에서 노출되지 않아야 한다.
+    expect(thumb.headers.get('cache-control')).toBe('no-store');
 
     const orig = await app.request(`/img/${id}/orig`, { headers: { cookie: alice.cookie } });
     expect(orig.status).toBe(200);

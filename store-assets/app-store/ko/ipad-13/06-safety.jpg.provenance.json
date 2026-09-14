@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/ipad/06-safety.jpg",
+  "capturedAt": "2026-09-13T07:15:51.563Z",
+  "nativeBuild": null,
+  "inputSha256": "bf4e9e24a2b23e837e8621dac234945e0fdd66c07767a484213c799dc3cfc601",
+  "outputSha256": "bb4bb9e3c3b9758cd3db955cc35b7e756b9b3642346c454e5d722d0db5c25127"
+}

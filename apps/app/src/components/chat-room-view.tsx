@@ -8,6 +8,7 @@
  * - 보고 있는 동안 이 방의 푸시 알림을 억제 (activeConversation)
  * - 키보드: keyboard-controller로 프레임 동기 이동 + 인터랙티브 내리기
  */
+import { useTranslation } from '@/lib/i18n';
 import type { MessageKind, WireMessage } from '@litechat/types';
 import type { FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,7 +29,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setActiveConversation } from '@/data/active-conversation';
-import { loadOlderMessages, markRead, sendMessage, useConversations, useMessages } from '@/data/data';
+import {
+  loadOlderMessages,
+  markRead,
+  sendMessage,
+  useConversations,
+  useMessages,
+} from '@/data/data';
 import { api, errorMessage, unwrap } from '@/lib/api';
 import { quoteText } from '@/lib/format';
 import { makeStyles } from '@/theme/theme';
@@ -50,6 +57,7 @@ export function ChatRoomView({ convId, meId }: Props) {
 }
 
 function ChatRoomViewContent({ convId, meId }: Props) {
+  const t = useTranslation();
   const styles = useStyles();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -181,9 +189,9 @@ function ChatRoomViewContent({ convId, meId }: Props) {
           return;
         }
       }
-      setError('원본 메시지를 찾을 수 없습니다');
+      setError(t('원본 메시지를 찾을 수 없습니다'));
     },
-    [queryClient, convId],
+    [queryClient, convId, t],
   );
   const onLoadError = useCallback((cause: unknown) => setError(errorMessage(cause)), []);
 
@@ -194,16 +202,16 @@ function ChatRoomViewContent({ convId, meId }: Props) {
         text: string;
         reason?: 'harassment' | 'hate' | 'sexual' | 'violence' | 'spam';
       }[] = [
-        { text: '괴롭힘', reason: 'harassment' },
-        { text: '혐오 표현', reason: 'hate' },
-        { text: '성적 콘텐츠', reason: 'sexual' },
-        { text: '폭력적 콘텐츠', reason: 'violence' },
-        { text: '스팸', reason: 'spam' },
-        { text: '취소' },
+        { text: t('괴롭힘'), reason: 'harassment' },
+        { text: t('혐오 표현'), reason: 'hate' },
+        { text: t('성적 콘텐츠'), reason: 'sexual' },
+        { text: t('폭력적 콘텐츠'), reason: 'violence' },
+        { text: t('스팸'), reason: 'spam' },
+        { text: t('취소') },
       ];
       Alert.alert(
-        '메시지 신고',
-        '신고 사유를 선택해 주세요. 운영팀이 해당 메시지와 계정을 검토합니다.',
+        t('메시지 신고'),
+        t('신고 사유를 선택해 주세요. 운영팀이 해당 메시지와 계정을 검토합니다.'),
         choices.map((choice) => ({
           text: choice.text,
           style: choice.reason ? 'default' : 'cancel',
@@ -220,7 +228,7 @@ function ChatRoomViewContent({ convId, meId }: Props) {
                         },
                       }),
                     );
-                    Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+                    Alert.alert(t('신고 접수'), t('신고가 접수되었어요. 운영팀이 검토합니다.'));
                   } catch (cause) {
                     setError(errorMessage(cause));
                   }
@@ -229,7 +237,7 @@ function ChatRoomViewContent({ convId, meId }: Props) {
         })),
       );
     },
-    [conversation, meId],
+    [conversation, meId, t],
   );
 
   return (
@@ -263,7 +271,7 @@ function ChatRoomViewContent({ convId, meId }: Props) {
             <Pressable
               onPress={scrollToEnd}
               accessibilityRole="button"
-              accessibilityLabel="최신 메시지로 이동"
+              accessibilityLabel={t('최신 메시지로 이동')}
               hitSlop={8}
               style={({ pressed }) => [styles.latestButton, pressed && styles.latestButtonPressed]}
             >
@@ -293,7 +301,7 @@ function ChatRoomViewContent({ convId, meId }: Props) {
             replyPreview={
               replyTo
                 ? {
-                    name: replyTo.s === meId ? '나' : (conversation?.peer.nickname ?? '상대'),
+                    name: replyTo.s === meId ? t('나') : (conversation?.peer.nickname ?? t('상대')),
                     text: quoteText(replyTo.k, replyTo.x),
                   }
                 : undefined

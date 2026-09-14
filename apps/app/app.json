@@ -16,7 +16,9 @@
       "bundleIdentifier": "kr.moveto.litechat",
       "supportsTablet": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleDevelopmentRegion": "en"
       },
       "privacyManifests": {
         "NSPrivacyCollectedDataTypes": [
@@ -163,7 +165,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "사진을 보내기 위해 앨범에 접근해요.",
+          "photosPermission": "Allow litechat to access your photo library to send photos.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -172,7 +174,22 @@
       "expo-status-bar",
       "./plugins/with-minimal-android-queries.js",
       "./plugins/with-litechat-watch.js",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "ko"
+            ],
+            "android": [
+              "en",
+              "ko"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -190,6 +207,10 @@
     },
     "updates": {
       "url": "https://u.expo.dev/f9d4e7f1-3315-4e8b-8325-6a7127c27d11"
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "ko": "./locales/ko.json"
     }
   }
 }

@@ -18,6 +18,9 @@ function verifySources(directory) {
 verifySources(join(__dirname, '../targets/litechat-watch'));
 console.log('Watch source independence check passed.');
 if (process.env.EAS_BUILD_PLATFORM === 'ios') {
+  // This hook runs after prebuild and CocoaPods, so the remote build number EAS applied to the
+  // companion is already generated and can be mirrored onto the Watch app before compiling.
+  execFileSync(process.execPath, [join(__dirname, 'sync-watch-version.cjs')], { stdio: 'inherit' });
   execFileSync(process.execPath, [join(__dirname, 'verify-watch-config.cjs')], { stdio: 'inherit' });
   execFileSync('swift', ['test', '--package-path', join(__dirname, '..')], { stdio: 'inherit' });
 }

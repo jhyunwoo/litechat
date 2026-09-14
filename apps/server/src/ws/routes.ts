@@ -9,7 +9,8 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../app';
 import type { AppDeps } from '../deps';
 import { ApiError } from '../errors';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, tokenFromRequest } from '../middleware/auth';
+import { getSessionUserId } from '../modules/auth/session';
 import type { ChatService } from '../modules/chat/service';
 import { upgradeWebSocket } from './hub';
 
@@ -20,17 +21,35 @@ export function wsRoutes(deps: AppDeps, chat: ChatService) {
     upgradeWebSocket((c) => {
       // 업그레이드 시점의 인증된 사용자 — 소켓 수명 동안 고정된다.
       const userId = c.var.userId;
+      const token = tokenFromRequest(c, deps)!;
 
       return {
-        onOpen(_event, ws) {
-          deps.hub.add(userId, ws);
+        async onOpen(_event, ws) {
+          if ((await getSessionUserId(deps, token)) !== userId) {
+            ws.close(1008, 'Session ended');
+            return;
+          }
+          deps.hub.add(userId, ws, token);
         },
 
-        onMessage(event, ws) {
+        async onMessage(event, ws) {
           const frame = parseClientFrame(event.data);
           if (!frame) return; // 알 수 없는 프레임은 조용히 무시 (프로토콜 강건성)
 
           try {
+            if ((await getSessionUserId(deps, token)) !== userId) {
+              deps.hub.remove(userId, ws);
+              ws.close(1008, 'Session ended');
+              return;
+            }
+            const budget = await deps.kv.increment(`rate:user:${userId}`, 60);
+            // Logout may have removed the socket while Redis was awaited.
+            if (!deps.hub.hasSession(userId, ws, token)) return;
+            if (budget.count > 240) {
+              ws.close(1008, 'RATE_LIMITED');
+              deps.hub.remove(userId, ws);
+              return;
+            }
             switch (frame.t) {
               case 'm': {
                 // 메시지 전송 → 본인에게는 ack, 상대에게는 m 프레임

@@ -10,16 +10,19 @@
  */
 import { MAX_IMAGE_BYTES, type WireImage } from '@litechat/types';
 import { mkdirSync } from 'node:fs';
+import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import type { AppDeps } from '../../deps';
-import { errors } from '../../errors';
+import { ApiError, errors } from '../../errors';
 import { ImagesRepo } from './repo';
 import { SafetyRepo } from '../safety/repo';
 
 /** 저화질 webp 변환 파라미터 — 데이터 절약과 알아볼 수 있는 화질의 절충점 */
 const WEBP_MAX_WIDTH = 640;
 const WEBP_QUALITY = 40;
+// Shared across service instances (REST and Watch) for this single-process deployment.
+const activeUploads = new WeakSet<AppDeps>();
 
 /**
  * 디코딩을 허용할 최대 픽셀 수 (5천만 = 50 MP).
@@ -62,6 +65,16 @@ export class ImagesService {
 
   /** 원본 저장 + webp 변환 + 메타데이터 기록. 반환값은 와이어 포맷. */
   async upload(ownerId: number, file: File): Promise<WireImage> {
+    if (activeUploads.has(this.deps)) throw new ApiError(503, 'UPLOAD_BUSY');
+    activeUploads.add(this.deps);
+    try {
+      return await this.uploadOne(ownerId, file);
+    } finally {
+      activeUploads.delete(this.deps);
+    }
+  }
+
+  private async uploadOne(ownerId: number, file: File): Promise<WireImage> {
     if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
       throw errors.badRequest('INVALID_IMAGE');
     }
@@ -96,19 +109,37 @@ export class ImagesService {
     const id = crypto.randomUUID().replaceAll('-', '');
     const origPath = join(this.deps.config.uploadDir, `${id}.${info.ext}`);
     const webpPath = join(this.deps.config.uploadDir, `${id}.thumb.webp`);
-    await Bun.write(origPath, original);
-    await Bun.write(webpPath, new Uint8Array(webp.data));
+    const usage = this.deps.db
+      .query<{ total: number; owned: number }, [number]>(
+        `SELECT COALESCE(SUM(orig_bytes + webp_bytes), 0) total,
+       COALESCE(SUM(CASE WHEN owner_id = ? THEN orig_bytes + webp_bytes ELSE 0 END), 0) owned
+       FROM images`,
+      )
+      .get(ownerId)!;
+    const bytes = original.byteLength + webp.data.byteLength;
+    if (
+      !(usage.owned + bytes <= this.deps.config.uploadUserQuotaBytes) ||
+      !(usage.total + bytes <= this.deps.config.uploadTotalQuotaBytes)
+    )
+      throw new ApiError(413, 'UPLOAD_QUOTA_EXCEEDED');
+    try {
+      await Bun.write(origPath, original);
+      await Bun.write(webpPath, new Uint8Array(webp.data));
 
-    this.repo.insert({
-      id,
-      owner_id: ownerId,
-      orig_path: origPath,
-      webp_path: webpPath,
-      orig_bytes: original.byteLength,
-      webp_bytes: webp.data.byteLength,
-      width: webp.info.width,
-      height: webp.info.height,
-    });
+      this.repo.insert({
+        id,
+        owner_id: ownerId,
+        orig_path: origPath,
+        webp_path: webpPath,
+        orig_bytes: original.byteLength,
+        webp_bytes: webp.data.byteLength,
+        width: webp.info.width,
+        height: webp.info.height,
+      });
+    } catch (error) {
+      await Promise.allSettled([unlink(origPath), unlink(webpPath)]);
+      throw error;
+    }
 
     return {
       id,

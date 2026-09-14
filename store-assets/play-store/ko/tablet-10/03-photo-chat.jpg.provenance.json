@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/tablet-10/03-photo-chat.jpg",
+  "capturedAt": "2026-09-13T07:16:24.350Z",
+  "nativeBuild": null,
+  "inputSha256": "57a813bd60e08f307df007ef7afa3148c556bf769a2a240ded46350d1d3eb500",
+  "outputSha256": "c1e1f5c1e3824c864ba8818d2b305725995e6f11ec4613127901c772af6922f6"
+}

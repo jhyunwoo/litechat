@@ -23,5 +23,5 @@ export function wsUrl(): string {
 
 /** 이미지 URL 헬퍼 */
 export function imageUrl(id: string, variant: 'thumb' | 'orig'): string {
-  return `${API_URL}/img/${id}/${variant}`;
+  return `${API_URL}/img/${id}/${variant}?cache=private-v2`;
 }

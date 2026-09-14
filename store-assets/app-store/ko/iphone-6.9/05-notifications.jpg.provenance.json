@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/ios/iphone/05-notifications.jpg",
+  "capturedAt": "2026-09-13T07:15:37.784Z",
+  "nativeBuild": null,
+  "inputSha256": "303e90d83960773844db1d1223e0efeb7a13996d4ce5668883fb2abd7ed1a9dd",
+  "outputSha256": "61df45082bbc4e694e459cfc2c6d086919692ae34ad24e49dc9e365a24527c21"
+}

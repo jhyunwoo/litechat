@@ -8,6 +8,7 @@ import WatchKit
     var body: some Scene {
         WindowGroup {
             WatchRootView().environmentObject(model)
+                .environment(\.locale, WatchL10n.locale)
                 .task { delegate.attach(model); await model.finishPendingLogout(); await model.bootstrap() }
                 .onChange(of: phase) { _, phase in
                     model.setActive(phase == .active)

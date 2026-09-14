@@ -42,19 +42,26 @@ function keyOf(ws: WSContext): object {
 export class WsHub {
   /** userId → (원시 소켓 → WSContext) — 원시 소켓을 키로 써서 래퍼 재생성에 안전 */
   private connections = new Map<number, Map<object, WSContext>>();
+  private sessions = new Map<object, string>();
 
   /** 소켓 등록 (WS onOpen 시) */
-  add(userId: number, ws: WSContext): void {
+  add(userId: number, ws: WSContext, token?: string): void {
     let sockets = this.connections.get(userId);
+    if (sockets && sockets.size >= 8) {
+      ws.close(1013, 'Connection limit');
+      return;
+    }
     if (!sockets) {
       sockets = new Map();
       this.connections.set(userId, sockets);
     }
     sockets.set(keyOf(ws), ws);
+    if (token) this.sessions.set(keyOf(ws), token);
   }
 
   /** 소켓 해제 (WS onClose 시) */
   remove(userId: number, ws: WSContext): void {
+    this.sessions.delete(keyOf(ws));
     const sockets = this.connections.get(userId);
     if (!sockets) return;
     sockets.delete(keyOf(ws));
@@ -87,6 +94,7 @@ export class WsHub {
       if (bufferedAmountOf(ws) > MAX_BUFFERED_BYTES) {
         ws.close(1013, 'Too slow');
         sockets.delete(key);
+        this.sessions.delete(key);
         continue;
       }
       ws.send(payload);
@@ -105,8 +113,26 @@ export class WsHub {
   disconnectUser(userId: number): void {
     const sockets = this.connections.get(userId);
     if (!sockets) return;
-    for (const ws of sockets.values()) ws.close(1000, 'Session ended');
+    for (const ws of sockets.values()) {
+      this.sessions.delete(keyOf(ws));
+      ws.close(1000, 'Session ended');
+    }
     this.connections.delete(userId);
+  }
+
+  disconnectSession(token: string): void {
+    for (const [userId, sockets] of this.connections) {
+      for (const [key, ws] of sockets) {
+        if (this.sessions.get(key) !== token) continue;
+        this.remove(userId, ws);
+        ws.close(1008, 'Session ended');
+      }
+    }
+  }
+
+  hasSession(userId: number, ws: WSContext, token: string): boolean {
+    const key = keyOf(ws);
+    return this.connections.get(userId)?.has(key) === true && this.sessions.get(key) === token;
   }
 
   /** 현재 열린 소켓 수 — 종료 로그/관측성용 */
@@ -130,5 +156,6 @@ export class WsHub {
       for (const ws of sockets.values()) ws.close(1001, 'Server restarting');
     }
     this.connections.clear();
+    this.sessions.clear();
   }
 }

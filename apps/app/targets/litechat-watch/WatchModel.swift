@@ -34,7 +34,7 @@ import Network
                 guard let self else { return }
                 let restored = !self.online && path.status == .satisfied
                 self.online = path.status == .satisfied
-                if !self.online { self.status = "오프라인"; self.poll?.cancel() }
+                if !self.online { self.status = WatchL10n.text("Offline"); self.poll?.cancel() }
                 if restored && self.active && self.booted { await self.refresh(); self.startPolling() }
             }
         }
@@ -81,7 +81,7 @@ import Network
             status = nil; persist(); registerNotifications?()
             if let id = notificationConversation {
                 notificationConversation = nil
-                if ids.contains(id) { path = [id] } else { error = "이 대화를 열 수 없어요." }
+                if ids.contains(id) { path = [id] } else { error = WatchL10n.text("This conversation is unavailable.") }
             }
         } catch { if generation == sessionGeneration { await handle(error) } }
     }
@@ -169,7 +169,7 @@ import Network
     }
     func send(_ text: String, in id: Int64) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.utf16.count <= 2000, pending.count < 50 else { error = "메시지는 2,000자 이내로 입력해 주세요."; return }
+        guard !trimmed.isEmpty, trimmed.utf16.count <= 2000, pending.count < 50 else { error = WatchL10n.text("Messages must be 2,000 characters or fewer."); return }
         let item = PendingMessage(id: UUID().uuidString.lowercased(),conversation:id,text:trimmed,createdAt:Date())
         pending.append(item)
         guard await saveNow() else { return } // Persist the retry key before the request.
@@ -240,7 +240,7 @@ import Network
     }
     private func handle(_ error: Error) async {
         if case WatchError.unauthorized = error { await clearSession(); self.error = error.localizedDescription }
-        else { status = "연결을 기다리는 중…" }
+        else { status = WatchL10n.text("Waiting for connection…") }
     }
     private func persist() {
         saveTask?.cancel()
@@ -249,6 +249,6 @@ import Network
     private func saveNow() async -> Bool {
         guard let user else { return false }
         let snapshot = WatchSnapshot(user:user,conversations:conversations,chats:Dictionary(uniqueKeysWithValues:chats.map { (String($0.key),$0.value) }),pending:pending)
-        do { try await cache.save(snapshot); return true } catch { self.error = "기기에 대화를 저장하지 못했어요."; return false }
+        do { try await cache.save(snapshot); return true } catch { self.error = WatchL10n.text("Could not save conversations on this device."); return false }
     }
 }

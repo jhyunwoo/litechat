@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "사진을 보내기 위해 앨범에 접근해요."
+  }
+}

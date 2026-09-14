@@ -270,7 +270,7 @@ describe('WebSocket /ws (실서버 통합)', () => {
       const url = `ws://localhost:${server.port}/ws`;
       const open = (cookie: string) =>
         new Promise<WebSocket>((resolve, reject) => {
-          const ws = new WebSocket(url, { headers: { cookie } });
+          const ws = new WebSocket(url, { headers: { cookie, Origin: `http://localhost:${server.port}` } });
           ws.onopen = () => resolve(ws);
           ws.onerror = (e) => reject(e);
         });

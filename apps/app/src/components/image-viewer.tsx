@@ -4,6 +4,7 @@
  * 파일 크기를 보여줘 데이터 사용량을 예측하게 한다.
  * 저장은 iOS 공유 시트(expo-sharing)로 — 사진 앱 저장/메시지 전달 등 사용자가 고른다.
  */
+import { useTranslation } from '@/lib/i18n';
 import type { WireMessage } from '@litechat/types';
 import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function ImageViewer({ message, onClose }: Props) {
+  const t = useTranslation();
   const styles = useStyles();
   const { colors } = useTheme();
   const [busy, setBusy] = useState<'thumb' | 'orig' | null>(null);
@@ -57,8 +59,8 @@ export function ImageViewer({ message, onClose }: Props) {
               source={{ uri: imageUrl(image.id, 'thumb'), headers: authHeaders() }}
               style={styles.image}
               contentFit="contain"
-              cachePolicy="disk"
-              accessibilityLabel="사진"
+              cachePolicy="none"
+              accessibilityLabel={t('사진')}
             />
             {/* 다운로드 옵션 — 탭이 배경 닫기로 전파되지 않게 한다 */}
             <View style={styles.actions} onStartShouldSetResponder={() => true}>
@@ -69,7 +71,10 @@ export function ImageViewer({ message, onClose }: Props) {
                 {busy === 'thumb' ? (
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
-                  <Text style={styles.actionText}>저화질 저장 ({formatBytes(image.tb)})</Text>
+                  <Text style={styles.actionText}>
+                    {t('저화질 저장 (')}
+                    {formatBytes(image.tb)})
+                  </Text>
                 )}
               </Pressable>
               <Pressable
@@ -79,7 +84,10 @@ export function ImageViewer({ message, onClose }: Props) {
                 {busy === 'orig' ? (
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
-                  <Text style={styles.actionText}>원본 저장 ({formatBytes(image.ob)})</Text>
+                  <Text style={styles.actionText}>
+                    {t('원본 저장 (')}
+                    {formatBytes(image.ob)})
+                  </Text>
                 )}
               </Pressable>
             </View>

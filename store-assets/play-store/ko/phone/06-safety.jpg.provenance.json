@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/phone/06-safety.jpg",
+  "capturedAt": "2026-09-13T07:16:04.819Z",
+  "nativeBuild": null,
+  "inputSha256": "2af2d5f7feff8859df8286b38e736b9a6479a3a76ea2d20feb5d3b30c085e4fc",
+  "outputSha256": "4304e8e5731a3485a1d5003bb375a5eafe4f49ea99d76a80433efd5e5dce9599"
+}

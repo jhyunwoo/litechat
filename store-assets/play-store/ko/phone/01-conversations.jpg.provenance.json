@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/phone/01-conversations.jpg",
+  "capturedAt": "2026-09-13T07:15:54.568Z",
+  "nativeBuild": null,
+  "inputSha256": "991ae940f67010bc64f5266edfb96f5700b286e051325362b1752f4586ceee63",
+  "outputSha256": "64dc84f290e8865f03cdfc82b48f4b3f9945d23ec667b0b544f62c23e4c364a9"
+}

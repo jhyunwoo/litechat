@@ -8,6 +8,8 @@
  */
 import type { PushSubscribeInput } from '@litechat/types';
 import webpush from 'web-push';
+import { isPushEndpoint } from './endpoint';
+import { errors } from '../../errors';
 import type { AppDeps } from '../../deps';
 import type { OfflineMessageHook } from '../chat/service';
 import { previewOf } from './preview';
@@ -44,7 +46,7 @@ function createWebPushSender(deps: AppDeps): PushSender {
       },
       payload,
       // TTL: 하루 — 그 안에 기기가 온라인되지 않으면 폐기
-      { TTL: 86400 },
+      { TTL: 86400, timeout: 10_000 },
     );
   };
 }
@@ -72,6 +74,10 @@ export class PushService {
   }
 
   subscribe(userId: number, input: PushSubscribeInput): void {
+    if (!isPushEndpoint(input.endpoint)) throw errors.badRequest('INVALID_PUSH_ENDPOINT');
+    const subscriptions = this.repo.listByUser(userId);
+    if (subscriptions.length >= 10 && !subscriptions.some((s) => s.endpoint === input.endpoint))
+      throw errors.badRequest('PUSH_SUBSCRIPTION_LIMIT');
     this.repo.upsert(userId, input.endpoint, input.keys.p256dh, input.keys.auth);
   }
 
@@ -101,6 +107,8 @@ export class PushService {
     let ok = 0;
     let failed = 0;
     for (const subscription of subscriptions) {
+      // Recheck rows saved before endpoint validation was introduced.
+      if (!isPushEndpoint(subscription.endpoint)) continue;
       const logId = this.log.insert({
         userId,
         channel: 'web',

@@ -15,10 +15,14 @@ export interface AppConfig {
   dbPath: string;
   /** 업로드된 이미지 원본/webp를 저장할 디렉터리 */
   uploadDir: string;
+  uploadUserQuotaBytes: number;
+  uploadTotalQuotaBytes: number;
   /** Redis 접속 URL (테스트에서는 사용하지 않음) */
   redisUrl: string;
   /** 세션 쿠키 Domain 값 — 두 서브도메인이 공유하도록 '.moveto.kr' 형태. 비우면 host-only */
   cookieDomain: string;
+  /** Old shared login cookie to expire during the host-only migration. */
+  legacySessionCookieDomain: string;
   /** 세션 유효 기간 (초) — 슬라이딩 방식으로 연장된다 */
   sessionTtlSeconds: number;
   /** Full Chat 사이트 호스트명 (Host 헤더 라우팅용) */
@@ -87,8 +91,11 @@ export function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     port: Number(env.PORT ?? 3000),
     dbPath: env.DB_PATH ?? 'data/litechat.db',
     uploadDir: env.UPLOAD_DIR ?? 'data/uploads',
+    uploadUserQuotaBytes: Number(env.UPLOAD_USER_QUOTA_BYTES ?? 1024 ** 3),
+    uploadTotalQuotaBytes: Number(env.UPLOAD_TOTAL_QUOTA_BYTES ?? 10 * 1024 ** 3),
     redisUrl: env.REDIS_URL ?? 'redis://localhost:6379',
     cookieDomain: env.COOKIE_DOMAIN ?? '',
+    legacySessionCookieDomain: env.LEGACY_SESSION_COOKIE_DOMAIN ?? '.moveto.kr',
     sessionTtlSeconds: Number(env.SESSION_TTL_SECONDS ?? 60 * 60 * 24 * 30),
     webHost: env.WEB_HOST ?? 'chat.moveto.kr',
     liteHost: env.LITE_HOST ?? 'litechat.moveto.kr',

@@ -1,5 +1,6 @@
+import { metadataErrors, nativeCaptureErrors } from './submission-checks';
 /** Fail loudly when generated brand/store assets do not match store requirements. */
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -169,9 +170,36 @@ expect.push({
   alpha: false,
 });
 
+// Mirror the listing sets for English; canonical brand assets remain shared.
+for (const item of [...expect]) {
+  if (item.file.includes('/ko/')) expect.push({ ...item, file: item.file.replace('/ko/', '/en/') });
+}
+for (const language of ['ko', 'en']) {
+  const data = JSON.parse(await readFile(path.join(ROOT, 'metadata', `${language}.json`), 'utf8'));
+  errors.push(...metadataErrors(data).map((error) => `${language}: ${error}`));
+}
+const submission = process.argv.includes('--submission');
+if (submission) {
+  for (const language of ['ko', 'en']) {
+    for (const name of ['01-conversations', '02-messages', '03-photo', '04-account']) {
+      add({
+        file: `app-store/${language}/watch/${name}.png`,
+        width: 416,
+        height: 496,
+        formats: ['png'],
+        alpha: false,
+      });
+    }
+  }
+}
 for (const item of expect) {
   const absolute = path.isAbsolute(item.file) ? item.file : path.join(ROOT, item.file);
   const label = path.relative(REPO, absolute);
+  if (submission && /(?:iphone-6\.9|ipad-13|phone|tablet-7|tablet-10|watch)\//.test(item.file)) {
+    errors.push(
+      ...(await nativeCaptureErrors(ROOT, absolute)).map((error) => `${label}: ${error}`),
+    );
+  }
   try {
     const [metadata, fileStat] = await Promise.all([sharp(absolute).metadata(), stat(absolute)]);
     if (metadata.width !== item.width || metadata.height !== item.height) {

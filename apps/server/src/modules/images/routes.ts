@@ -11,6 +11,7 @@ import type { AppEnv } from '../../app';
 import type { AppDeps } from '../../deps';
 import { requireAuth } from '../../middleware/auth';
 import { ImagesService } from './service';
+import { rateLimit } from '../../middleware/rate-limit';
 
 const paramSchema = z.object({
   id: z.string().min(1).max(64),
@@ -19,13 +20,23 @@ const paramSchema = z.object({
 
 /** 업로드 API: /api/images */
 export function imagesRoutes(deps: AppDeps, service: ImagesService) {
-  return new Hono<AppEnv>().post('/', requireAuth(deps), async (c) => {
-    const body = await c.req.parseBody();
-    const file = body.file;
-    if (!(file instanceof File)) return c.json({ error: 'FILE_REQUIRED' }, 400);
-    const image = await service.upload(c.var.userId, file);
-    return c.json({ image }, 201);
-  });
+  return new Hono<AppEnv>().post(
+    '/',
+    requireAuth(deps),
+    rateLimit(deps, { name: 'image-upload', limit: 30, windowSeconds: 60 }),
+    async (c) => {
+      const budget = await deps.kv.increment(`rate:image-user:${c.var.userId}`, 3600);
+      if (budget.count > 100) {
+        c.header('Retry-After', String(budget.retryAfter));
+        return c.json({ error: 'RATE_LIMITED' }, 429);
+      }
+      const body = await c.req.parseBody();
+      const file = body.file;
+      if (!(file instanceof File)) return c.json({ error: 'FILE_REQUIRED' }, 400);
+      const image = await service.upload(c.var.userId, file);
+      return c.json({ image }, 201);
+    },
+  );
 }
 
 /** 파일 서빙: /img/:id/:variant */
@@ -40,8 +51,8 @@ export function imgRoutes(deps: AppDeps, service: ImagesService) {
       return new Response(Bun.file(file.path), {
         headers: {
           'Content-Type': file.contentType,
-          // 이미지 내용은 절대 바뀌지 않으므로 브라우저가 영구 캐시하게 한다.
-          'Cache-Control': 'private, max-age=31536000, immutable',
+          // 계정 전환/차단 이후에도 이전 인증 응답이 재사용되지 않게 한다.
+          'Cache-Control': 'no-store',
           // orig는 저장(다운로드) UX를 위해 파일명을 지정한다. thumb은 인라인 표시.
           ...(variant === 'orig'
             ? { 'Content-Disposition': `attachment; filename="${file.downloadName}"` }

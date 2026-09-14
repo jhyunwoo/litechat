@@ -1,6 +1,7 @@
 /**
  * 채팅방 라우트 (iPhone) — 글래스 헤더 + ChatRoomView
  */
+import { useTranslation } from '@/lib/i18n';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,6 +16,7 @@ import { spacing } from '@/theme/tokens';
 import { api, errorMessage, unwrap } from '@/lib/api';
 
 export default function ChatRoomScreen() {
+  const t = useTranslation();
   const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const convId = Number(id);
@@ -29,9 +31,9 @@ export default function ChatRoomScreen() {
 
   function safetyMenu() {
     if (!conversation) return;
-    Alert.alert(conversation.peer.nickname, '안전 옵션', [
+    Alert.alert(conversation.peer.nickname, t('안전 옵션'), [
       {
-        text: '사용자 신고',
+        text: t('사용자 신고'),
         onPress: () =>
           void (async () => {
             try {
@@ -40,27 +42,27 @@ export default function ChatRoomScreen() {
                   json: {
                     userId: conversation.peer.id,
                     reason: 'other',
-                    details: '사용자 프로필에서 신고',
+                    details: t('사용자 프로필에서 신고'),
                   },
                 }),
               );
-              Alert.alert('신고 접수', '신고가 접수되었어요. 운영팀이 검토합니다.');
+              Alert.alert(t('신고 접수'), t('신고가 접수되었어요. 운영팀이 검토합니다.'));
             } catch (cause) {
-              Alert.alert('신고 실패', errorMessage(cause));
+              Alert.alert(t('신고 실패'), errorMessage(cause));
             }
           })(),
       },
       {
-        text: '사용자 차단',
+        text: t('사용자 차단'),
         style: 'destructive',
         onPress: () =>
           Alert.alert(
-            '이 사용자를 차단할까요?',
-            '서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.',
+            t('이 사용자를 차단할까요?'),
+            t('서로 검색, 친구 요청, 대화와 기존 메시지가 보이지 않게 됩니다.'),
             [
-              { text: '취소', style: 'cancel' },
+              { text: t('취소'), style: 'cancel' },
               {
-                text: '차단',
+                text: t('차단'),
                 style: 'destructive',
                 onPress: () =>
                   void (async () => {
@@ -73,14 +75,14 @@ export default function ChatRoomScreen() {
                       await queryClient.invalidateQueries();
                       router.replace('/');
                     } catch (cause) {
-                      Alert.alert('차단 실패', errorMessage(cause));
+                      Alert.alert(t('차단 실패'), errorMessage(cause));
                     }
                   })(),
               },
             ],
           ),
       },
-      { text: '취소', style: 'cancel' },
+      { text: t('취소'), style: 'cancel' },
     ]);
   }
 
@@ -90,7 +92,7 @@ export default function ChatRoomScreen() {
       <Glass style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          accessibilityLabel="뒤로"
+          accessibilityLabel={t('뒤로')}
           hitSlop={8}
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.5 }]}
         >
@@ -99,14 +101,14 @@ export default function ChatRoomScreen() {
         <Avatar nickname={conversation?.peer.nickname ?? '?'} size={36} />
         <View style={styles.headerText}>
           <Text style={styles.peerName} numberOfLines={1}>
-            {conversation?.peer.nickname ?? '대화'}
+            {conversation?.peer.nickname ?? t('대화')}
           </Text>
           {conversation && <Text style={styles.peerUsername}>@{conversation.peer.username}</Text>}
         </View>
         <Pressable
           onPress={safetyMenu}
           accessibilityRole="button"
-          accessibilityLabel="대화 안전 옵션"
+          accessibilityLabel={t('대화 안전 옵션')}
           hitSlop={8}
           style={({ pressed }) => [styles.menu, pressed && styles.menuPressed]}
         >

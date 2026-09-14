@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "ko",
+  "capture": "captures/android/tablet-7/05-notifications.jpg",
+  "capturedAt": "2026-09-13T07:16:15.667Z",
+  "nativeBuild": null,
+  "inputSha256": "03298b0429fe7bb24531c21880795514e428d7708477d5bb294374c78ee6ca92",
+  "outputSha256": "feb32b32fba0482594fc34df8d4999b5ea4bbcc5b5d077d9e298783b6607cefe"
+}

@@ -238,7 +238,7 @@ describe('오프라인 Expo 푸시 발송', () => {
     await jsonRequest(bothApp, '/api/push/subscribe', {
       method: 'POST',
       token: bobToken,
-      body: { endpoint: 'https://push.example.com/bob', keys: { p256dh: 'k', auth: 'a' } },
+      body: { endpoint: 'https://fcm.googleapis.com/fcm/send/bob', keys: { p256dh: 'k', auth: 'a' } },
     });
 
     await jsonRequest(bothApp, `/api/chat/${conversationId}/messages`, {

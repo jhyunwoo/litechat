@@ -1,0 +1,9 @@
+{
+  "source": "browser-preview",
+  "language": "en",
+  "capture": "captures/en/android/phone/03-photo-chat.jpg",
+  "capturedAt": "2026-09-13T07:12:40.062Z",
+  "nativeBuild": null,
+  "inputSha256": "f2b3260efae8ed6d4f84e17226c85f873374447dc1be4b68484ba7bf99e9bb0e",
+  "outputSha256": "4c81e885149cd94564cab3d7554ad9b3827d8c3f4cc0c808d947445c6ec28aed"
+}

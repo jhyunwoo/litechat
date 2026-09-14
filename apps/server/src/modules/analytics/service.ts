@@ -30,7 +30,7 @@ export class AnalyticsService {
 
   /** 로그인 세션(lc_sess/Bearer)이 있으면 userId, 없으면 null — 실패해도 요청을 막지 않는다. */
   private async resolveUserId(c: Context<AppEnv>): Promise<number | null> {
-    const token = tokenFromRequest(c);
+    const token = tokenFromRequest(c, this.deps);
     if (!token) return null;
     return getSessionUserId(this.deps, token);
   }

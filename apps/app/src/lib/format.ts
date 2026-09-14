@@ -1,18 +1,19 @@
 /**
  * 표시용 포맷 유틸리티
  */
+import { t, getLocale } from '@/lib/i18n';
 import type { MessageKind } from '@litechat/types';
 
 /** unix epoch 초 → 채팅 시간 표시 (오늘이면 시:분, 아니면 날짜) */
-export function formatTime(ts: number): string {
+export function formatTime(ts: number, locale = getLocale()): string {
   const date = new Date(ts * 1000);
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
   if (sameDay) {
-    return date.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+    return date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
   }
   const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString('ko-KR', {
+  return date.toLocaleDateString(locale, {
     ...(sameYear ? {} : { year: 'numeric' }),
     month: 'short',
     day: 'numeric',
@@ -42,5 +43,5 @@ export function isEmojiOnly(text: string): boolean {
  * 새로 내려받는 일이 없어야 한다.
  */
 export function quoteText(kind: MessageKind, content: string): string {
-  return kind === 'i' ? '사진' : content;
+  return kind === 'i' ? t('사진') : content;
 }
