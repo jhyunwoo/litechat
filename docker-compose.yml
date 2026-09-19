@@ -156,8 +156,34 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    # 세션은 재생성 가능하므로 영속화 없이 가볍게 운용한다.
-    command: redis-server --save '' --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # 로그인 세션의 **유일한** 저장소다 (sess:<token> → userId, TTL 30일 /
+    # admin_sess:<token> → adminId, TTL 12시간). SQLite에는 세션이 없으므로
+    # 이 컨테이너의 메모리가 비면 전원이 로그아웃된다.
+    #
+    # 예전에는 `--save '' --appendonly no`로 순수 인메모리였다("세션은 재생성
+    # 가능하다"는 전제). 그 전제가 틀렸다 — 호스트를 재부팅하면 컨테이너가 빈
+    # 데이터셋으로 다시 떠서 30일짜리 세션이 통째로 사라진다. 볼륨조차 없어
+    # 영속화를 켜더라도 dump 파일이 컨테이너 쓰기 레이어와 함께 죽는다.
+    #
+    # AOF(append-only file)를 켜고 명명 볼륨에 얹어 둘 다 막는다:
+    #  - appendfsync everysec → 비정상 종료(전원 차단)에도 손실은 최대 1초
+    #  - RDB(save)는 계속 끈다. 인증 요청마다 GETEX(슬라이딩 만료)가 쓰기로
+    #    잡히는 워크로드라 스냅샷 fork까지 겹칠 이유가 없고, AOF만으로 충분하다.
+    #  - AOF는 GETEX가 쌓이며 커지므로 auto-aof-rewrite로 자동 압축시킨다
+    #    (기본값 100% / 64mb — 데이터셋이 수 MB라 재작성은 순식간이다).
+    #
+    # maxmemory 256mb는 세션 하나가 키/값/오버헤드 합쳐 ~150B라 100만 세션도
+    # 들어가는 값이다. allkeys-lru는 그 한계를 넘겼을 때의 안전판으로 남긴다
+    # (레이트리밋 카운터와 세션이 같은 keyspace를 쓰고 둘 다 TTL이 있어
+    # volatile-lru로 바꿔도 구분되지 않는다 — 넘치지 않게 두는 것이 실제 방어다).
+    command: >-
+      redis-server --save '' --appendonly yes --appendfsync everysec
+      --dir /data --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - litechat-redis:/data       # 세션 AOF 영속화 (재부팅/재생성에도 유지)
+    # AOF 버퍼를 비우고 끝낼 시간을 준다. Docker 기본 10초로도 충분하지만
+    # 재부팅 중 호스트가 바쁠 때 SIGKILL과 겹치지 않도록 여유를 둔다.
+    stop_grace_period: 20s
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -166,6 +192,7 @@ services:
 
 volumes:
   litechat-data:
+  litechat-redis:                    # 로그인 세션 AOF — 지우면 전원 로그아웃된다
 
 networks:
   # Dokploy가 Traefik과 함께 사용하는 외부 네트워크. 이 네트워크에 연결돼야
