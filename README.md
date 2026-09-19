@@ -222,8 +222,17 @@ Dokploy가 모든 도메인을 `app:3000`으로 라우팅하면,
 
 ### 5. 볼륨 확인
 
-`docker-compose.yml`의 `litechat-data` 볼륨이 SQLite DB와 업로드 이미지를 담는다. Dokploy가 compose를
-그대로 적용하므로 별도 설정 없이 자동으로 영속 볼륨이 생성된다 — 재배포해도 데이터가 유지된다.
+`docker-compose.yml`은 영속 볼륨 두 개를 만든다. Dokploy가 compose를 그대로 적용하므로 별도 설정
+없이 자동으로 생성되고, 재배포/재부팅에도 내용이 유지된다.
+
+| 볼륨 | 내용 | 지우면 |
+| --- | --- | --- |
+| `litechat-data` | SQLite DB, 업로드 이미지, GeoLite2 mmdb | 계정·대화·사진이 사라진다 |
+| `litechat-redis` | 로그인 세션 AOF (`sess:` / `admin_sess:` / `watchsess:`) | 전원이 로그아웃된다 |
+
+세션은 Redis에만 존재하므로(SQLite에 없다) `litechat-redis` 볼륨과 Redis의 AOF 영속화가
+"재부팅해도 로그인이 풀리지 않는" 유일한 근거다. Redis를 인메모리로 되돌리면 호스트를 재부팅할
+때마다 전원이 로그아웃된다.
 
 ### 6. 배포 및 확인
 
