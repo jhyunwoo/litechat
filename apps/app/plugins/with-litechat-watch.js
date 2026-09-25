@@ -60,6 +60,9 @@ module.exports = function withLiteChatWatch(config) {
     attributes.TargetAttributes[target.uuid] ??= {};
     attributes.TargetAttributes[target.uuid].SystemCapabilities ??= {};
     attributes.TargetAttributes[target.uuid].SystemCapabilities['com.apple.Push'] = { enabled: 1 };
+    // The watch reads the phone's shared session token through the companion's
+    // keychain access group, so its App ID needs Keychain Sharing enabled.
+    attributes.TargetAttributes[target.uuid].SystemCapabilities['com.apple.Keychain'] = { enabled: 1 };
     return config;
   });
 };

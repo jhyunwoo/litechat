@@ -44,7 +44,10 @@ import Network
         guard !booted else { return }; booted = true
         defer { ready = true }
         do {
-            guard let token = try WatchSessionStore.read() else { return }
+            let local = try WatchSessionStore.read()
+            let shared = local == nil ? try? SharedSessionLink.read() : nil
+            if let shared { try? WatchSessionStore.save(shared) }
+            guard let token = local ?? shared else { startSharePolling(); return }
             await api.setToken(token)
             if let saved = await cache.load() {
                 user = saved.user; conversations = saved.conversations
@@ -53,6 +56,26 @@ import Network
             }
             await refresh()
         } catch { self.error = error.localizedDescription }
+    }
+    /// iCloud Keychain delivers the phone's published token on its own
+    /// schedule; retry while signed out so a fresh install still adopts it.
+    private var sharePoll: Task<Void, Never>?
+    private func startSharePolling() {
+        sharePoll?.cancel()
+        sharePoll = Task { [weak self] in
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                guard !Task.isCancelled, let self, self.user == nil else { return }
+                if let token = try? SharedSessionLink.read() { await self.adopt(token); return }
+            }
+        }
+    }
+    private func adopt(_ token: String) async {
+        try? WatchSessionStore.save(token)
+        sessionGeneration += 1
+        await api.setToken(token)
+        registerNotifications?()
+        await refresh()
     }
     func signIn(username: String, password: String, nickname: String?) async throws {
         await finishPendingLogout()
@@ -88,7 +111,10 @@ import Network
     func setActive(_ value: Bool) {
         active = value
         guard ready else { return }
-        if value { Task { await refresh(); startPolling() } }
+        if value {
+            Task { await refresh(); startPolling() }
+            if user == nil { startSharePolling() }
+        }
         else { poll?.cancel(); readTask?.cancel(); persist() }
     }
     func open(_ id: Int64) {
@@ -233,8 +259,8 @@ import Network
     }
     private func clearSession() async {
         sessionGeneration += 1
-        poll?.cancel(); readTask?.cancel(); saveTask?.cancel()
-        await api.setToken(nil); try? WatchSessionStore.delete()
+        poll?.cancel(); readTask?.cancel(); saveTask?.cancel(); sharePoll?.cancel()
+        await api.setToken(nil); try? WatchSessionStore.delete(); SharedSessionLink.deleteShared()
         user = nil; conversations=[]; chats=[:]; pending=[]; pendingReads=[:]; path=[]; activeChat=nil
         await cache.clear()
     }

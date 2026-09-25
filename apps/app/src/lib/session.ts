@@ -7,6 +7,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { publishSessionToken } from './watch-session';
+
 const KEY = 'lc_sess';
 
 /** 동기 접근용 캐시 — SecureStore와 항상 동기화된다 */
@@ -20,6 +22,7 @@ export async function hydrateToken(): Promise<string | null> {
     Platform.OS === 'web'
       ? (globalThis.sessionStorage?.getItem(KEY) ?? null)
       : await SecureStore.getItemAsync(KEY);
+  publishSessionToken(cached);
   return cached;
 }
 
@@ -37,6 +40,7 @@ export async function setToken(token: string): Promise<void> {
       // 기기 잠금 해제 상태에서만 접근 가능 + iCloud/기기 이전에 포함되지 않음
       keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
+    publishSessionToken(token);
   }
   cached = token;
 }
@@ -45,5 +49,8 @@ export async function setToken(token: string): Promise<void> {
 export async function clearToken(): Promise<void> {
   cached = null;
   if (Platform.OS === 'web') globalThis.sessionStorage?.removeItem(KEY);
-  else await SecureStore.deleteItemAsync(KEY);
+  else {
+    await SecureStore.deleteItemAsync(KEY);
+    publishSessionToken(null);
+  }
 }
