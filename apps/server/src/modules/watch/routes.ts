@@ -14,7 +14,7 @@ import type { AppEnv } from '../../app';
 import { errors } from '../../errors';
 import { rateLimit } from '../../middleware/rate-limit';
 import { AuthService } from '../auth/service';
-import { destroyAllUserSessions } from '../auth/session';
+import { destroyAllUserSessions, getSessionUserId } from '../auth/session';
 import type { ChatService } from '../chat/service';
 import { ImagesService } from '../images/service';
 import { createWatchSession, revokeWatchSessions, validateWatchSession } from './session';
@@ -89,6 +89,22 @@ export function watchRoutes(deps: AppDeps, chat: ChatService, push: WatchPushSer
         const user = await auth.register(c.req.valid('json'));
         c.header('Cache-Control', 'no-store');
         return c.json({ user, token: await createWatchSession(deps, user.id) }, 201);
+      },
+    )
+    .post(
+      '/auth/exchange',
+      rateLimit(deps, { name: 'watchExchange', limit: 60, windowSeconds: 300 }),
+      async (c) => {
+        // A paired watch trades the phone's published session token for a
+        // watch-scoped session; phone tokens never hit the watch-only parser.
+        const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(c.req.header('Authorization') ?? '')?.[1];
+        const userId = token ? await getSessionUserId(deps, token) : null;
+        if (!userId) return c.json({ error: 'UNAUTHORIZED' }, 401);
+        c.header('Cache-Control', 'no-store');
+        return c.json(
+          { user: auth.getUserById(userId), token: await createWatchSession(deps, userId) },
+          200,
+        );
       },
     )
     .use('*', requireWatch)

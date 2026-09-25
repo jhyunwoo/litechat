@@ -55,6 +55,19 @@ describe('independent Watch', () => {
     expect((await request('/auth/me', 'GET', undefined, bob.token)).status).toBe(401);
     expect((await request('/conversations')).status).toBe(200);
   });
+  test('phone session exchanges once for a watch-scoped session', async () => {
+    const res = await request('/auth/exchange', 'POST', undefined, bob.token);
+    expect(res.status).toBe(200);
+    const exchanged = ((await res.json()) as any).token;
+    expect(exchanged).toMatch(/^w_[A-Za-z0-9_-]{43}$/);
+    expect((await request('/auth/me', 'GET', undefined, exchanged)).status).toBe(200);
+    // The phone credential itself is still not a watch credential.
+    expect((await request('/auth/me', 'GET', undefined, bob.token)).status).toBe(401);
+    // Ending the phone session ends future exchanges, not the issued token.
+    await jsonRequest(app, '/api/auth/logout', { method: 'POST', token: bob.token });
+    expect((await request('/auth/exchange', 'POST', undefined, bob.token)).status).toBe(401);
+    expect((await request('/auth/me', 'GET', undefined, exchanged)).status).toBe(200);
+  });
   test('standalone registration returns only a Watch session', async () => {
     const res = await request(
       '/auth/register',

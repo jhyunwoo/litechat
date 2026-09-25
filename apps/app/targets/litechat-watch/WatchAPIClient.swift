@@ -35,18 +35,22 @@ actor WatchAPIClient {
         self.session = URLSession(configuration: config, delegate: SameOriginDelegate(base: base), delegateQueue: nil)
     }
     func setToken(_ value: String?) { token = value }
-    func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, timeout: TimeInterval = 15) async throws -> T {
-        let data = try await bytes(path, method: method, body: body, timeout: timeout)
+    /// Trades a companion-app session token for a watch-scoped session.
+    func exchange(_ phoneToken: String) async throws -> AuthResponse {
+        try await request("/api/watch/auth/exchange", method: "POST", bearer: phoneToken)
+    }
+    func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, timeout: TimeInterval = 15, bearer: String? = nil) async throws -> T {
+        let data = try await bytes(path, method: method, body: body, timeout: timeout, bearer: bearer)
         do { return try JSONDecoder().decode(T.self, from: data) } catch { throw WatchError.invalidResponse }
     }
-    func bytes(_ path: String, method: String = "GET", body: Data? = nil, timeout: TimeInterval = 15) async throws -> Data {
+    func bytes(_ path: String, method: String = "GET", body: Data? = nil, timeout: TimeInterval = 15, bearer: String? = nil) async throws -> Data {
         guard base.scheme == "https", let url = URL(string: path, relativeTo: base)?.absoluteURL,
               url.host == base.host, url.scheme == "https" else { throw WatchError.configuration }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = method; request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
-        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let authorization = bearer ?? token { request.setValue("Bearer \(authorization)", forHTTPHeaderField: "Authorization") }
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse else { throw WatchError.invalidResponse }

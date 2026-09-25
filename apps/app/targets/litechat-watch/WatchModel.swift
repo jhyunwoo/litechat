@@ -44,38 +44,55 @@ import Network
         guard !booted else { return }; booted = true
         defer { ready = true }
         do {
-            let local = try WatchSessionStore.read()
-            let shared = local == nil ? try? SharedSessionLink.read() : nil
-            if let shared { try? WatchSessionStore.save(shared) }
-            guard let token = local ?? shared else { startSharePolling(); return }
-            await api.setToken(token)
-            if let saved = await cache.load() {
-                user = saved.user; conversations = saved.conversations
-                chats = Dictionary(uniqueKeysWithValues: saved.chats.compactMap { key, value in Int64(key).map { ($0,value) } })
-                pending = saved.pending.map { var p = $0; p.sending = false; return p }
+            if let token = try WatchSessionStore.read() {
+                await api.setToken(token)
+                if let saved = await cache.load() {
+                    user = saved.user; conversations = saved.conversations
+                    chats = Dictionary(uniqueKeysWithValues: saved.chats.compactMap { key, value in Int64(key).map { ($0,value) } })
+                    pending = saved.pending.map { var p = $0; p.sending = false; return p }
+                }
+                await refresh()
+            } else if let shared = try? SharedSessionLink.read() {
+                await adopt(shared)
+            } else {
+                startSharePolling()
             }
-            await refresh()
         } catch { self.error = error.localizedDescription }
     }
     /// iCloud Keychain delivers the phone's published token on its own
-    /// schedule; retry while signed out so a fresh install still adopts it.
+    /// schedule; keep watching while signed out and active, backing off to
+    /// once a minute.
     private var sharePoll: Task<Void, Never>?
     private func startSharePolling() {
         sharePoll?.cancel()
         sharePoll = Task { [weak self] in
-            for _ in 0..<30 {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                guard !Task.isCancelled, let self, self.user == nil else { return }
-                if let token = try? SharedSessionLink.read() { await self.adopt(token); return }
+            var delay: UInt64 = 4
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: delay * 1_000_000_000) } catch { return }
+                guard let self, self.user == nil, self.active else { return }
+                if let token = try? SharedSessionLink.read() {
+                    await self.adopt(token)
+                    if self.user != nil { return }
+                }
+                delay = min(delay * 2, 60)
             }
         }
     }
-    private func adopt(_ token: String) async {
-        try? WatchSessionStore.save(token)
-        sessionGeneration += 1
-        await api.setToken(token)
-        registerNotifications?()
-        await refresh()
+    private func adopt(_ phoneToken: String) async {
+        do {
+            // Watch endpoints only accept watch-scoped sessions, so trade the
+            // phone token for one instead of using it directly.
+            let response: AuthResponse = try await api.exchange(phoneToken)
+            sessionGeneration += 1
+            try? WatchSessionStore.save(response.token)
+            if user?.id != response.user.id { conversations = []; chats = [:]; pending = []; await cache.clear() }
+            await api.setToken(response.token); user = response.user; error = nil
+            registerNotifications?(); await refresh()
+        } catch WatchError.unauthorized {
+            // The published credential is stale; drop it so polling waits for
+            // the phone to republish a fresh one.
+            SharedSessionLink.deleteShared()
+        } catch { /* Transient failure — the polling loop retries. */ }
     }
     func signIn(username: String, password: String, nickname: String?) async throws {
         await finishPendingLogout()
@@ -112,8 +129,8 @@ import Network
         active = value
         guard ready else { return }
         if value {
-            Task { await refresh(); startPolling() }
-            if user == nil { startSharePolling() }
+            if user != nil { Task { await refresh(); startPolling() } }
+            else { startSharePolling() }
         }
         else { poll?.cancel(); readTask?.cancel(); persist() }
     }
@@ -243,6 +260,7 @@ import Network
         // If offline, keep a revocation-only credential in Keychain to retry next activation.
         if let token = try? WatchSessionStore.read() { try? WatchSessionStore.save(token,account:"pendingLogout") }
         let _: OK? = try? await api.request("/api/watch/auth/logout",method:"POST")
+        SharedSessionLink.deleteShared()
         await clearSession()
     }
     func finishPendingLogout() async {
@@ -255,18 +273,23 @@ import Network
     }
     func deleteAccount(password: String) async throws {
         let _: OK = try await api.request("/api/watch/auth/account",method:"DELETE",body:JSONEncoder().encode(DeleteBody(password:password)))
+        SharedSessionLink.deleteShared()
         await clearSession()
     }
     private func clearSession() async {
         sessionGeneration += 1
         poll?.cancel(); readTask?.cancel(); saveTask?.cancel(); sharePoll?.cancel()
-        await api.setToken(nil); try? WatchSessionStore.delete(); SharedSessionLink.deleteShared()
+        await api.setToken(nil); try? WatchSessionStore.delete()
         user = nil; conversations=[]; chats=[:]; pending=[]; pendingReads=[:]; path=[]; activeChat=nil
         await cache.clear()
     }
     private func handle(_ error: Error) async {
-        if case WatchError.unauthorized = error { await clearSession(); self.error = error.localizedDescription }
-        else { status = WatchL10n.text("Waiting for connection…") }
+        if case WatchError.unauthorized = error {
+            await clearSession(); self.error = error.localizedDescription
+            // A revoked watch session does not end the phone's; keep watching
+            // the shared item so a still-signed-in phone re-adopts us.
+            if active { startSharePolling() }
+        } else { status = WatchL10n.text("Waiting for connection…") }
     }
     private func persist() {
         saveTask?.cancel()
