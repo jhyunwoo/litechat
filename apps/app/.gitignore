@@ -42,5 +42,9 @@ example
 /ios
 /android
 
+# EAS local credentials
+credentials.json
+/credentials/
+
 # Swift package build products
 .build/
