@@ -24,6 +24,20 @@ export interface KVStore {
   getAndRefresh(key: string, ttlSeconds: number): Promise<string | null>;
   /** 고정 시간창 카운터를 원자적으로 증가시키고 현재 값/남은 TTL을 반환 */
   increment(key: string, ttlSeconds: number): Promise<{ count: number; retryAfter: number }>;
+  /**
+   * 세션 조회(+슬라이딩 연장)와 레이트 카운터 증가를 왕복 1회로 묶는다.
+   * 레이트 키는 `rateKeyPrefix + <세션 값>` — 세션 값을 읽기 전에는 키를 알 수 없으므로
+   * 접두사만 받아 구현 쪽에서 이어 붙인다.
+   * 인증 미들웨어와 WS 프레임 경로(서버에서 가장 뜨거운 경로) 전용 — 세션과 레이트를
+   * 따로 조회하면 요청/프레임마다 Redis 왕복이 2번 발생한다.
+   * 세션이 없으면 카운터는 건드리지 않고 value=null로 반환한다.
+   */
+  getSessionAndRate(
+    key: string,
+    ttlSeconds: number,
+    rateKeyPrefix: string,
+    rateTtlSeconds: number,
+  ): Promise<{ value: string | null; count: number; retryAfter: number }>;
   /** 접두사 아래에서 값이 일치하는 키를 모두 삭제 (계정 전체 세션 파기용) */
   deleteByValue(prefix: string, value: string): Promise<number>;
   /** 연결 종료 (테스트 정리/서버 셧다운용) */
@@ -75,6 +89,18 @@ export class MemoryKV implements KVStore {
     const expiresAt = existing?.expiresAt ?? this.now() + ttlSeconds * 1000;
     this.store.set(key, { value: String(current), expiresAt });
     return { count: current, retryAfter: Math.max(1, Math.ceil((expiresAt - this.now()) / 1000)) };
+  }
+
+  async getSessionAndRate(
+    key: string,
+    ttlSeconds: number,
+    rateKeyPrefix: string,
+    rateTtlSeconds: number,
+  ): Promise<{ value: string | null; count: number; retryAfter: number }> {
+    const value = await this.getAndRefresh(key, ttlSeconds);
+    if (value === null) return { value: null, count: 0, retryAfter: 0 };
+    const { count, retryAfter } = await this.increment(rateKeyPrefix + value, rateTtlSeconds);
+    return { value, count, retryAfter };
   }
 
   async deleteByValue(prefix: string, value: string): Promise<number> {

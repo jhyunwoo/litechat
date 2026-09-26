@@ -12,7 +12,11 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AppEnv } from '../app';
 import type { AppDeps } from '../deps';
-import { getSessionUserId, sessionCookieName } from '../modules/auth/session';
+import {
+  getSessionUserIdAndRate,
+  sessionCookieName,
+  USER_RATE_LIMIT,
+} from '../modules/auth/session';
 
 /** 요청에서 세션 토큰을 추출한다 — Bearer 헤더 우선, 쿠키 폴백. */
 export function tokenFromRequest(c: Context<AppEnv>, deps: AppDeps): string | undefined {
@@ -31,12 +35,12 @@ export function requireAuth(deps: AppDeps): MiddlewareHandler<AppEnv> {
     const token = tokenFromRequest(c, deps);
     if (!token) return c.json({ error: 'UNAUTHORIZED' }, 401);
 
-    const userId = await getSessionUserId(deps, token);
+    // 세션 확인 + 레이트 카운트를 Redis 왕복 1회로 처리한다 (가장 뜨거운 경로).
+    const { userId, count, retryAfter } = await getSessionUserIdAndRate(deps, token);
     if (userId === null) return c.json({ error: 'UNAUTHORIZED' }, 401);
 
-    const budget = await deps.kv.increment(`rate:user:${userId}`, 60);
-    if (budget.count > 240) {
-      c.header('Retry-After', String(budget.retryAfter));
+    if (count > USER_RATE_LIMIT) {
+      c.header('Retry-After', String(retryAfter));
       return c.json({ error: 'RATE_LIMITED' }, 429);
     }
 

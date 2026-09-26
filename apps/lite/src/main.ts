@@ -33,6 +33,20 @@ let requests: { incoming: { id: number; user: PublicUser }[]; outgoing: { id: nu
   incoming: [],
   outgoing: [],
 };
+/** 낙관적 메시지의 임시 id/전송 키 — 같은 밀리초의 연속 전송에도 겹치지 않게 단조 증가 */
+let tempSeq = 0;
+
+/** 로그아웃 시 사용자 데이터가 담긴 모듈 상태를 전부 비운다 — 계정 전환 후 이전 데이터가 남지 않게 */
+function resetState(): void {
+  convs = [];
+  msgs.clear();
+  hasMore.clear();
+  drafts.clear();
+  quotes.clear();
+  replyTo.clear();
+  friends = [];
+  requests = { incoming: [], outgoing: [] };
+}
 
 const app = document.getElementById('app')!;
 
@@ -520,6 +534,7 @@ function profileView(): HTMLElement {
             await req('/api/auth/logout', 'POST', {});
             stopSocket();
             me = null;
+            resetState();
             go('login');
           },
         },
@@ -745,16 +760,19 @@ function chatView(convId: number): HTMLElement {
     if (!text || !me) return;
     input.value = '';
     drafts.delete(convId);
-    const tempKey = `t${Date.now()}`;
+    const tempKey = `t${++tempSeq}`;
     const r = replyTo.get(convId);
     const optimistic: Msg = {
-      id: -Date.now(), c: convId, s: me.id,
+      id: -tempSeq, c: convId, s: me.id,
       k: isEmojiOnly(text) ? 'e' : 't', x: text,
       ts: Math.floor(Date.now() / 1000), _i: tempKey,
       ...(r !== undefined ? { r } : {}),
     };
     replyTo.delete(convId);
-    (msgs.get(convId) ?? []).push(optimistic);
+    // 대화의 메시지 배열이 아직 없으면 만들어 저장한다 — 버려진 배열에 push하면 낙관적 메시지가 사라진다
+    const pendingList = msgs.get(convId);
+    if (pendingList) pendingList.push(optimistic);
+    else msgs.set(convId, [optimistic]);
     if (conv) conv.last = optimistic;
     if (!send({ t: 'm', c: convId, k: optimistic.k, x: text, i: tempKey, ...(r !== undefined ? { r } : {}) })) {
       // WS가 끊겨 있으면 REST로 보낸다.
@@ -784,7 +802,7 @@ function chatView(convId: number): HTMLElement {
       const res = await fetch('/api/images', { method: 'POST', body: form });
       const { image, error } = (await res.json()) as { image?: { id: string }; error?: string };
       if (!res.ok || !image) throw new Error(error ?? 'INVALID_IMAGE');
-      if (!send({ t: 'm', c: convId, k: 'i', x: image.id, i: `t${Date.now()}` })) {
+      if (!send({ t: 'm', c: convId, k: 'i', x: image.id, i: `t${++tempSeq}` })) {
         await req(`/api/chat/${convId}/messages`, 'POST', { k: 'i', x: image.id });
         const last = msgs.get(convId)?.findLast((m) => m.id > 0);
         await loadMsgs(convId, last?.id ?? 0);
