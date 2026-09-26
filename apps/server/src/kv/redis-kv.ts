@@ -58,6 +58,38 @@ export class RedisKV implements KVStore {
     return { count: Number(result[0]), retryAfter: Math.max(1, Number(result[1])) };
   }
 
+  /**
+   * GETEX + INCR을 하나의 Lua 스크립트로 묶어 왕복 1회로 끝낸다.
+   * 세션 값이 레이트 키(`rate:user:<userId>`)의 일부라 명령 두 개로 나눌 수 없다 —
+   * 스크립트 안에서 읽은 값으로 두 번째 키를 만든다.
+   */
+  async getSessionAndRate(
+    key: string,
+    ttlSeconds: number,
+    rateKeyPrefix: string,
+    rateTtlSeconds: number,
+  ): Promise<{ value: string | null; count: number; retryAfter: number }> {
+    const [value, count, ttl] = (await this.redis.eval(
+      `local value = redis.call('GETEX', KEYS[1], 'EX', ARGV[1])
+       if not value then return {0, 0, 0} end
+       local rate_key = KEYS[2] .. value
+       local count = redis.call('INCR', rate_key)
+       if count == 1 then redis.call('EXPIRE', rate_key, ARGV[2]) end
+       return {value, count, redis.call('TTL', rate_key)}`,
+      2,
+      key,
+      rateKeyPrefix,
+      ttlSeconds,
+      rateTtlSeconds,
+    )) as [string | number, number, number];
+    // Lua false는 반환 배열을 자르므로 세션 없음을 0으로 표시한다 (userId는 양수라 겹치지 않음)
+    return {
+      value: typeof value === 'string' ? value : null,
+      count: Number(count),
+      retryAfter: Math.max(1, Number(ttl)),
+    };
+  }
+
   async deleteByValue(prefix: string, value: string): Promise<number> {
     let cursor = '0';
     let deleted = 0;

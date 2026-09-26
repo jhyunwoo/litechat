@@ -52,6 +52,16 @@ export function getQuote(convId: number, id: number): WireQuote | undefined {
   return quoteCache.get(convId)?.get(id);
 }
 
+/**
+ * 로그아웃/계정 삭제 시 모듈 수준 캐시를 비운다.
+ * react-query 캐시는 auth.tsx가 지우지만 이 맵들은 모듈에 붙어 있어
+ * 같은 탭에서 계정을 갈아끼워도 이전 사용자의 인용 미리보기가 남는다.
+ */
+export function clearSessionCaches(): void {
+  quoteCache.clear();
+  pendingSends.clear();
+}
+
 /* ------------------------------------------------------------------ */
 /* 조회 훅                                                              */
 /* ------------------------------------------------------------------ */
@@ -113,6 +123,10 @@ export function useFriendRequests() {
 /** 전송 대기 중인 임시 ID → 대화방 매핑 (ack 프레임에는 대화 ID가 없어서 필요) */
 const pendingSends = new Map<string, number>();
 
+/** 낙관적 메시지의 임시 ID — 같은 밀리초의 연속 전송에도 React key가 겹치지 않게 단조 감소 */
+let tempIdSeq = 0;
+const nextTempId = () => --tempIdSeq;
+
 /**
  * 메시지를 보낸다.
  * 1) 임시 메시지를 캐시에 즉시 추가 (낙관적 UI)
@@ -130,7 +144,7 @@ export async function sendMessage(
 ): Promise<void> {
   const tempKey = `t${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
   const optimistic: WireMessage = {
-    id: -Date.now(), // 음수 = 아직 서버 확인 전
+    id: nextTempId(), // 음수 = 아직 서버 확인 전
     c: convId,
     s: meId,
     k: kind,

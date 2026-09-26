@@ -14,6 +14,7 @@ import { clearAnalyticsIdentity } from '@/lib/analytics';
 import { clearLocalPushState, unregisterPush } from '@/lib/notifications';
 import { clearToken, hydrateToken, setToken } from '@/lib/session';
 import { socket } from '@/lib/ws';
+import { clearSessionCaches } from './data';
 
 interface Credentials {
   username: string;
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.api.auth.logout.$post().catch(() => {});
       socket.stop();
       await clearToken().catch(() => {});
+      clearSessionCaches(); // react-query 외 모듈 캐시(인용 미리보기 등)도 지운다
       // me를 먼저 null로 만들어 화면을 즉시 로그아웃 상태로 전환하고,
       // 나머지 캐시만 제거한다. (clear()는 me 쿼리까지 비워 재조회 레이스를 만든다)
       queryClient.setQueryData(['me'], null);
@@ -104,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.api.auth.account.$delete({ json: { password } });
       await unwrap(res);
       socket.stop();
+      clearSessionCaches();
       // The server deletion has committed. Local cleanup is best effort per
       // storage API, but the in-memory token/cache must always be invalidated.
       await Promise.allSettled([clearToken(), clearAnalyticsIdentity(), clearLocalPushState()]);

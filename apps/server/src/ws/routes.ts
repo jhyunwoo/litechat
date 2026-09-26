@@ -10,7 +10,11 @@ import type { AppEnv } from '../app';
 import type { AppDeps } from '../deps';
 import { ApiError } from '../errors';
 import { requireAuth, tokenFromRequest } from '../middleware/auth';
-import { getSessionUserId } from '../modules/auth/session';
+import {
+  getSessionUserId,
+  getSessionUserIdAndRate,
+  USER_RATE_LIMIT,
+} from '../modules/auth/session';
 import type { ChatService } from '../modules/chat/service';
 import { upgradeWebSocket } from './hub';
 
@@ -37,15 +41,16 @@ export function wsRoutes(deps: AppDeps, chat: ChatService) {
           if (!frame) return; // 알 수 없는 프레임은 조용히 무시 (프로토콜 강건성)
 
           try {
-            if ((await getSessionUserId(deps, token)) !== userId) {
+            // 세션 재확인 + 레이트 카운트 — 프레임마다 Redis 왕복 1회 (이전에는 2회).
+            const { userId: authedUserId, count } = await getSessionUserIdAndRate(deps, token);
+            if (authedUserId !== userId) {
               deps.hub.remove(userId, ws);
               ws.close(1008, 'Session ended');
               return;
             }
-            const budget = await deps.kv.increment(`rate:user:${userId}`, 60);
             // Logout may have removed the socket while Redis was awaited.
             if (!deps.hub.hasSession(userId, ws, token)) return;
-            if (budget.count > 240) {
+            if (count > USER_RATE_LIMIT) {
               ws.close(1008, 'RATE_LIMITED');
               deps.hub.remove(userId, ws);
               return;

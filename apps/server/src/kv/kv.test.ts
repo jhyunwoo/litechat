@@ -54,6 +54,38 @@ describe('MemoryKV', () => {
     expect(await kv.increment('rate', 10)).toEqual({ count: 1, retryAfter: 10 });
   });
 
+  test('getSessionAndRate는 세션 조회와 카운터 증가를 한 번에 처리한다', async () => {
+    let now = 0;
+    const kv = new MemoryKV(() => now);
+    await kv.set('sess:tok', '7', 100);
+
+    // 세션이 있으면 값 + 증가된 카운트를 돌려준다
+    expect(await kv.getSessionAndRate('sess:tok', 100, 'rate:user:', 60)).toEqual({
+      value: '7',
+      count: 1,
+      retryAfter: 60,
+    });
+    expect(await kv.getSessionAndRate('sess:tok', 100, 'rate:user:', 60)).toEqual({
+      value: '7',
+      count: 2,
+      retryAfter: 60,
+    });
+
+    // 세션이 없으면 카운터를 만들지 않는다
+    expect(await kv.getSessionAndRate('sess:gone', 100, 'rate:user:', 60)).toEqual({
+      value: null,
+      count: 0,
+      retryAfter: 0,
+    });
+    expect(await kv.get('rate:user:gone-user')).toBeNull();
+
+    // 슬라이딩: 조회가 세션 만료를 미룬다
+    now = 99_000;
+    expect((await kv.getSessionAndRate('sess:tok', 100, 'rate:user:', 60)).value).toBe('7');
+    now = 101_000;
+    expect(await kv.get('sess:tok')).toBe('7');
+  });
+
   test('deleteByValue는 지정 접두사의 일치 세션만 삭제한다', async () => {
     const kv = new MemoryKV();
     await kv.set('sess:a', '1');

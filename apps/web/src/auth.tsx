@@ -7,6 +7,7 @@ import type { PublicUser } from '@litechat/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { api, unwrap } from './api';
+import { clearSessionCaches } from './data';
 import { socket } from './ws';
 
 interface AuthState {
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout: async () => {
       await api.api.auth.logout.$post();
       socket.stop();
+      clearSessionCaches(); // react-query 외 모듈 캐시(인용 미리보기 등)도 지운다
       // me를 먼저 null로 만들어 화면을 즉시 로그아웃 상태로 전환하고,
       // 나머지 캐시만 제거한다. (clear()는 me 쿼리까지 비워 재조회 레이스를 만든다)
       queryClient.setQueryData(['me'], null);

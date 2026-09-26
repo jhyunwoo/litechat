@@ -33,6 +33,29 @@ export async function getSessionUserId(deps: AppDeps, token: string): Promise<nu
   return value === null ? null : Number(value);
 }
 
+/** 사용자별 레이트 카운터 키 접두사/시간창 — getSessionAndRate 호출부에서 공유 */
+const USER_RATE_PREFIX = 'rate:user:';
+const USER_RATE_WINDOW_SECONDS = 60;
+/** 시간창당 허용 횟수 — 미들웨어와 WS 프레임 경로가 공유하는 한도 */
+export const USER_RATE_LIMIT = 240;
+
+/**
+ * 세션 확인 + 사용자 레이트 카운트 — 인증 미들웨어/WS 프레임 경로 전용.
+ * 두 명령을 한 번의 Redis 왕복으로 묶어 가장 뜨거운 경로의 왕복을 절반으로 줄인다.
+ */
+export async function getSessionUserIdAndRate(
+  deps: AppDeps,
+  token: string,
+): Promise<{ userId: number | null; count: number; retryAfter: number }> {
+  const { value, count, retryAfter } = await deps.kv.getSessionAndRate(
+    PREFIX + token,
+    deps.config.sessionTtlSeconds,
+    USER_RATE_PREFIX,
+    USER_RATE_WINDOW_SECONDS,
+  );
+  return { userId: value === null ? null : Number(value), count, retryAfter };
+}
+
 /** 세션 파기 (로그아웃) */
 export async function destroySession(deps: AppDeps, token: string): Promise<void> {
   await deps.kv.del(PREFIX + token);
