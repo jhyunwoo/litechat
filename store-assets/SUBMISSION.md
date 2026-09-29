@@ -18,7 +18,7 @@ Copy Korean copy from `metadata/ko.md` and English copy from `metadata/en.md`. M
 | appStore.name / playStore.name | Name                         | App name                |
 | appStore.subtitle              | Subtitle                     | —                       |
 | appStore.promotionalText       | Promotional Text             | —                       |
-| appStore.description           | Description (includes Watch) | —                       |
+| appStore.description           | Description                  | —                       |
 | appStore.keywords              | Keywords                     | —                       |
 | playStore.shortDescription     | —                            | Short description       |
 | playStore.fullDescription      | —                            | Full description        |
