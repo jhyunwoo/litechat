@@ -7,7 +7,7 @@ Suggested values describe only existing functionality. Items marked **MANUAL** n
 | Field              | Suggested value / action                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | App name           | `litechat` (confirm name availability)                                                                                |
-| Subtitle           | `가볍게 이어지는 우리 대화`                                                                                           |
+| Subtitle           | `데이터를 아끼는 1:1 채팅`                                                                                            |
 | Primary category   | Social Networking                                                                                                     |
 | Secondary category | Utilities (optional; omit if the owner prefers one category)                                                          |
 | Promotional text   | `아이디로 친구를 찾고, 텍스트와 이모지, 사진으로 편안하게 대화해요. 알림과 안전 설정도 내 방식대로 관리할 수 있어요.` |

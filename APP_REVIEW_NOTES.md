@@ -11,7 +11,7 @@ Replace the bracketed account fields in the store consoles only. Do not commit t
 
 ## Suggested Apple review notes
 
-> litechat is a private 1:1 messaging app. Sign in with the review credentials above. The Chat tab shows conversations; Friends lets you search by username and exchange friend requests. Open a conversation to send text, emoji or an optional photo.
+> litechat is a private 1:1 messaging app. Sign in with the review credentials above. The Chats tab is pre-populated with a conversation and messages; Friends lets you search by username and exchange friend requests. Open a conversation to send text, emoji or an optional photo.
 >
 > Photo-library access is requested only after tapping the photo button. Notifications are optional and enabled from Profile; declining either permission does not block chat.
 >
@@ -19,7 +19,7 @@ Replace the bracketed account fields in the store consoles only. Do not commit t
 >
 > Account deletion is at Profile → Account management → Permanently delete account. It requires the current password and a second destructive confirmation, deletes server data and sessions, removes local credentials/caches, and returns to sign-in.
 >
-> The app has no social login, ads, purchases, subscriptions, third-party AI, background location or unrestricted web browser. `litechat://` is an internal custom scheme; Universal Links are not a product feature.
+> The companion watch app uses the same credentials and shows existing conversations. The app has no social login, ads, purchases, subscriptions, third-party AI, background location or unrestricted web browser. `litechat://` is an internal custom scheme; Universal Links are not a product feature.
 
 ## Suggested Google App Access instructions
 
