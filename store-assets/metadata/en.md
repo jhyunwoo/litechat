@@ -10,11 +10,11 @@ litechat
 
 ### subtitle
 
-Everyday chats, made simple
+Private chats, less data
 
 ### promotionalText
 
-Find friends by username and share everyday moments with messages and photos. Read and send messages in your existing conversations on Apple Watch, too.
+Find friends by username and share everyday moments with messages and photos. Fast, focused conversations with less data.
 
 ### description
 
@@ -36,12 +36,9 @@ Block a user or report a message when needed. Review your account information an
 
 Available in Korean and English, following your device language settings. An account and an internet connection are required.
 
-Keep in touch on Apple Watch
-Sign in directly on your watch to read and send text messages in existing conversations, and view received photos. Use the phone app to connect with new friends.
-
 ### keywords
 
-chat,messenger,friends,messages,photos,watch,conversation
+chat,messenger,friends,messages,photos,conversation,private
 
 ## playStore
 
@@ -85,4 +82,4 @@ https://chat.moveto.kr/privacy
 
 ## reviewNotes
 
-Sign in with the review account containing existing conversations and photos. Use the Friends tab to search by username and send a friend request. On Apple Watch, sign in separately with the same account and test text messaging and received photos in an existing conversation. Friend search and photo sending are not available on Watch. Enter real credentials in the console’s private review access fields.
+Sign in with the review account containing an existing conversation and messages. Use the Friends tab to search by username and send a friend request. Open the existing conversation to test text, emoji, optional photos, reporting, and blocking. The companion watch app uses the same credentials and shows existing conversations. Enter real credentials in the console’s private review access fields.
