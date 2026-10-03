@@ -49,7 +49,9 @@ module.exports = function withLiteChatWatch(config) {
     target.setBuildSetting('MARKETING_VERSION', config.ios?.version || config.version || '1.0.0');
     for (const build of target.props.buildConfigurationList.props.buildConfigurations) {
       build.props.buildSettings.LITECHAT_APNS_ENVIRONMENT =
-        process.env.EAS_BUILD === 'true' || process.env.EAS_BUILD_PROFILE
+        // Same input as the aps-environment entitlement (see expo-target.config.js);
+        // eas.json profiles set WATCH_APS_ENV=production for EAS builds.
+        process.env.WATCH_APS_ENV === 'production'
           ? 'production'
           : build.props.name === 'Debug'
             ? 'sandbox'

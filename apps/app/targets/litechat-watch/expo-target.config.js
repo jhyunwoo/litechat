@@ -11,9 +11,10 @@ module.exports = () => ({
     // TestFlight/App Store distribution requires the production APNs environment;
     // local simulator builds keep the development environment.
     'aps-environment':
-      process.env.EAS_BUILD === 'true' || process.env.EAS_BUILD_PROFILE
-        ? 'production'
-        : 'development',
+      // Read only eas.json profile env (injected identically during the local
+      // fingerprint pass and on the EAS worker); EAS_BUILD* differs between the
+      // two and breaks the fingerprint runtimeVersion check.
+      process.env.WATCH_APS_ENV === 'production' ? 'production' : 'development',
     // The watch declares its own group first so unqualified keychain items stay
     // private, then the companion's group so the iPhone's shared session item is
     // readable once iCloud Keychain syncs it.
