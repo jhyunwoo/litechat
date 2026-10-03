@@ -31,7 +31,9 @@ actor WatchAPIClient {
         config.httpCookieStorage = nil; config.urlCredentialStorage = nil; config.urlCache = nil
         config.httpShouldSetCookies = false; config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 35; config.timeoutIntervalForResource = 40
-        config.waitsForConnectivity = false; config.allowsCellularAccess = true
+        // Let watchOS establish its phone/Wi-Fi/cellular route before failing.
+        // The resource timeout above still bounds the wait to 40 seconds.
+        config.waitsForConnectivity = true; config.allowsCellularAccess = true
         self.session = URLSession(configuration: config, delegate: SameOriginDelegate(base: base), delegateQueue: nil)
     }
     func setToken(_ value: String?) { token = value }

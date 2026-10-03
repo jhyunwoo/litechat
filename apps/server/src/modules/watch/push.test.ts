@@ -96,6 +96,28 @@ test('provider configuration errors do not delete valid tokens', async () => {
   expect(deps.db.query('SELECT * FROM watch_push_tokens').all()).toHaveLength(1);
   expect(deps.db.query('SELECT status FROM watch_push_jobs').get()).toEqual({ status: 'failed' });
 });
+test('missing APNs credentials are recorded as configuration failure, not transport failure', async () => {
+  deps.config.watchAPNsSandbox = { keyId: '', privateKey: '' };
+  service = new WatchPushService(deps);
+  chat.sendMessage(user, c, 't', 'hello');
+  await service.flush();
+  expect(deps.db.query('SELECT status,reason FROM watch_push_jobs').get()).toEqual({
+    status: 'pending',
+    reason: 'APNS_NOT_CONFIGURED',
+  });
+  expect(deps.db.query('SELECT COUNT(*) n FROM watch_push_tokens').get()).toEqual({ n: 1 });
+});
+test('invalid APNs signing key is recorded without exposing key contents', async () => {
+  deps.config.watchAPNsTeamId = 'TESTTEAM';
+  deps.config.watchAPNsSandbox = { keyId: 'TESTKEY', privateKey: 'private-key-must-not-be-logged' };
+  service = new WatchPushService(deps);
+  chat.sendMessage(user, c, 't', 'hello');
+  await service.flush();
+  expect(deps.db.query('SELECT status,reason FROM watch_push_jobs').get()).toEqual({
+    status: 'pending',
+    reason: 'APNS_INVALID_SIGNING_KEY',
+  });
+});
 test('delayed Unregistered cannot prune a newer registration', async () => {
   result = { status: 410, reason: 'Unregistered', timestamp: 1 };
   chat.sendMessage(user, c, 't', 'hello');

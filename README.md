@@ -199,6 +199,14 @@ VAPID_PUBLIC_KEY=<generate-vapid-keys 출력값>
 VAPID_PRIVATE_KEY=<generate-vapid-keys 출력값>
 ```
 
+워치 단독 푸시는 Web Push/Expo Push와 별도로 APNs 설정이 필요하다.
+TestFlight/App Store 빌드에는 `WATCH_APNS_TEAM_ID`,
+`WATCH_APNS_PRODUCTION_KEY_ID`, `WATCH_APNS_PRODUCTION_PRIVATE_KEY`를 등록한다.
+개발용 sandbox 빌드는 대응하는 `WATCH_APNS_SANDBOX_KEY_ID`,
+`WATCH_APNS_SANDBOX_PRIVATE_KEY`도 필요하다. 개인 키는 `.p8` PEM 전체이며
+Dokploy 서버 환경 변수에만 보관한다. 미설정이면 메시지 송수신은 동작해도
+워치 직접 알림은 발송되지 않는다. 상세 확인은 [워치 문서](docs/apple-watch.md)를 참고한다.
+
 `COOKIE_DOMAIN`, `WEB_HOST`, `LITE_HOST`, `LITE_HOST_ALIASES` 등 나머지는 `docker-compose.yml`에 기본값이 박혀 있으므로,
 도메인을 바꾸지 않는 한 추가 설정이 필요 없다. 다른 도메인을 쓴다면 compose 파일의 값을 직접 수정한다.
 

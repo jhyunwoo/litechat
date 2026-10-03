@@ -47,3 +47,8 @@
 "This username is already taken." = "이미 사용 중인 아이디예요.";
 "Please try again shortly." = "잠시 후 다시 시도해 주세요.";
 "Could not complete the request. Please try again." = "요청을 완료하지 못했어요. 다시 시도해 주세요.";
+"Notifications are disabled. Enable LiteChat notifications in Settings." = "알림이 꺼져 있어요. 설정에서 LiteChat 알림을 허용해 주세요.";
+"Notification alerts are disabled. Enable alerts in Settings." = "알림 표시가 꺼져 있어요. 설정에서 알림 표시를 켜 주세요.";
+"Could not enable notifications. Please try again." = "알림 권한을 요청하지 못했어요. 다시 시도해 주세요.";
+"Could not register this Watch for notifications. Please try again." = "Watch를 푸시 알림에 등록하지 못했어요. 다시 시도해 주세요.";
+"Could not register notifications with the server. Open the app to retry." = "서버에 알림을 등록하지 못했어요. 앱을 다시 열어 재시도해 주세요.";

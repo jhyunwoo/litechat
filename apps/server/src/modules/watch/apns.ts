@@ -25,6 +25,12 @@ export interface APNsResult {
 }
 export type WatchPushSender = (push: WatchPush) => Promise<APNsResult>;
 
+export class APNsConfigurationError extends Error {
+  constructor(readonly code: 'APNS_NOT_CONFIGURED' | 'APNS_INVALID_SIGNING_KEY') {
+    super(code);
+  }
+}
+
 /** APNs needs HTTP/2, not fetch's unspecified negotiated protocol. No raw credentials in errors. */
 export class APNsProvider {
   private connections = new Map<string, ClientHttp2Session>();
@@ -43,13 +49,19 @@ export class APNsProvider {
     const credentials =
       environment === 'sandbox' ? this.config.watchAPNsSandbox : this.config.watchAPNsProduction;
     if (!credentials.keyId || !credentials.privateKey || !this.config.watchAPNsTeamId)
-      throw new Error('APNS_NOT_CONFIGURED');
+      throw new APNsConfigurationError('APNS_NOT_CONFIGURED');
     const now = Math.floor(Date.now() / 1000);
     const cached = this.tokens.get(environment);
     if (cached && now - cached.issued < 50 * 60) return cached.value;
     let key = this.keys.get(environment);
     if (!key) {
-      key = createPrivateKey(credentials.privateKey.replace(/\\n/g, '\n'));
+      try {
+        key = createPrivateKey(credentials.privateKey.replace(/\\n/g, '\n'));
+        if (key.asymmetricKeyType !== 'ec' || key.asymmetricKeyDetails?.namedCurve !== 'prime256v1')
+          throw new Error('Expected ES256 key');
+      } catch {
+        throw new APNsConfigurationError('APNS_INVALID_SIGNING_KEY');
+      }
       this.keys.set(environment, key);
     }
     const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');

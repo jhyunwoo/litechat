@@ -178,6 +178,48 @@ WhenUnlockedThisDeviceOnly Keychain storage. Password fields clear after submiss
 
 ## Direct APNs and operations
 
+### Missing standalone Watch alerts (2026-10-03)
+
+Code audit found that authorization was requested only by the account screen's
+Allow Notifications button. Launch/login registered for APNs without asking for
+alert permission, and permission/APNs/upload failures were silently discarded.
+The Watch now checks authorization after authentication and on activation, requests
+it if undetermined, and displays denied permission or registration errors in
+Account & Notifications. Denied permission requires enabling notifications in
+Settings; repeated calls cannot override the user's decision. Token changes during
+an upload trigger registration of the latest token/session, with the captured
+session used for authentication.
+
+The server also used to record missing/invalid APNs credentials as `TransportError`.
+Regression tests reproduced this. Jobs and sanitized logs now distinguish
+`APNS_NOT_CONFIGURED` and `APNS_INVALID_SIGNING_KEY`, without logging credentials.
+These fixes do not prove which condition affected a particular deployed device:
+production configuration, signed entitlements and physical delivery remain unverified.
+
+For a failed delivery, inspect these read-only aggregates on the production SQLite
+database (never dump device tokens or session credentials):
+
+```sql
+SELECT environment, COUNT(*) AS devices FROM watch_push_tokens GROUP BY environment;
+SELECT status, reason, COUNT(*) AS jobs FROM watch_push_jobs GROUP BY status, reason;
+```
+
+- No registration: check Watch notification status, authentication and signed Push capability.
+- `APNS_NOT_CONFIGURED`: supply the environment's APNs team/key/private-key values
+  described below and redeploy the server. Expo/VAPID keys do not configure Watch APNs.
+- `APNS_INVALID_SIGNING_KEY`: supply the complete valid ES256 `.p8` PEM.
+- `InvalidProviderToken`, `DeviceTokenNotForTopic` or `BadDeviceToken`: verify the
+  APNs key, Watch topic and signed sandbox/production environment, then reopen the
+  Watch app to register again.
+- `accepted`: APNs accepted the request; check permission, alert settings and actual
+  device arrival separately. This is not a delivery receipt.
+
+After correcting server configuration, send a new test message; terminal failed
+jobs are not automatically replayed. Client fixes require a new native Watch build.
+Verify with the iPhone off, Watch Wi-Fi off and the Watch app in the background;
+keep the tested conversation out of the foreground, where banners are intentionally
+suppressed. See [the cellular verification procedure](watch-cellular-verification.md).
+
 `watch_push_tokens` is separate from Expo tokens. Registrations are session-scoped,
 up to ten/account, and cannot claim another user's association. Same-token refresh
 and token rotation preserve pending delivery jobs. Logout removes the registration;
@@ -226,7 +268,9 @@ is a release gate. Direct Watch delivery must never be disabled to work around i
 
 `WatchAPIClient` uses ephemeral URLSession HTTPS with no persistent cookie/credential
 storage and rejects redirects. Ordinary requests time out in 15 seconds and polls in
-35 seconds. Poll cancellation follows scene/conversation/network lifecycle, with
+35 seconds. Requests wait for connectivity within the 40-second resource deadline.
+Poll cancellation follows scene/conversation lifecycle; URLSession, rather than a
+low-level path monitor, determines whether a request can connect. Failed polls use
 jittered reconnect delay capped at 60 seconds. No background keepalive, sockets,
 WatchConnectivity imports, React renderer, custom keyboard or photo upload exists.
 
@@ -242,6 +286,23 @@ There is no persistent full-resolution image cache.
 Native system fields provide watchOS keyboard/Dictation/Scribble/emoji where available.
 Account and message content are not sent through a phone keyboard requirement.
 Swift package model tests live outside the app target so XCTest is not embedded.
+
+### Message-send regression checks
+
+The composer handles both the text field's submit event and the arrow button through
+one action. Previously only the arrow sent a message; completing native text input
+did not send. Clearing the draft before scheduling the send prevents a second submit
+of that draft. URLSession now waits for a route instead of failing immediately during
+connection setup, and server/storage/decoding errors no longer appear as a generic
+connection wait. Failed requests still require explicit retry with the original UUID.
+
+On a physical Watch, verify native keyboard and Dictation submission, the arrow
+button, and a rapid second submit (one delivered message). Also verify sending while
+switching between phone relay, Wi-Fi and cellular, and sending fully offline: the
+request must finish with an error within the resource deadline, remain available for
+retry, and produce only one canonical message after retry. Confirm foreground
+reception recovers after reconnecting and stops when leaving the chat. These native
+checks require a new Watch build; server integration tests do not verify them.
 
 The local config plugin runs before apple-targets registration, then applies its Xcode
 changes after the target is generated. React Native's CocoaPods privacy aggregation

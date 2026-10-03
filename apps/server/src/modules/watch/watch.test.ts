@@ -78,6 +78,70 @@ describe('independent Watch', () => {
     expect(res.status).toBe(201);
     expect(res.headers.get('set-cookie')).toBeNull();
   });
+  test('Watch login, messaging and read state work after the phone session ends', async () => {
+    expect(
+      (
+        await jsonRequest(app, '/api/auth/logout', {
+          method: 'POST',
+          token: bob.token,
+        })
+      ).status,
+    ).toBe(200);
+    expect((await jsonRequest(app, '/api/auth/me', { token: bob.token })).status).toBe(401);
+    // Discard the existing Watch session too: reauthentication must not need
+    // the phone credential, its app, or the exchange endpoint.
+    expect((await request('/auth/logout', 'POST')).status).toBe(200);
+    const login = await request(
+      '/auth/login',
+      'POST',
+      {
+        username: 'bob',
+        password: 'password123',
+      },
+      '',
+    );
+    expect(login.status).toBe(200);
+    token = ((await login.json()) as any).token;
+    expect((await request('/auth/me')).status).toBe(200);
+    const conversations = (await (await request('/conversations')).json()) as any;
+    expect(conversations.conversations.map((item: any) => item.id)).toContain(c);
+
+    const sent = await request(`/conversations/${c}/messages`, 'POST', {
+      i: crypto.randomUUID(),
+      k: 't',
+      x: 'Independent Watch message',
+    });
+    expect(sent.status).toBe(201);
+    const outgoing = ((await sent.json()) as any).message;
+    const peerHistory = (await (
+      await jsonRequest(app, `/api/chat/${c}/messages`, {
+        token: alice.token,
+      })
+    ).json()) as any;
+    expect(peerHistory.messages).toEqual([outgoing]);
+
+    const poll = request(`/conversations/${c}/messages?after=${outgoing.id}&wait=1`);
+    for (let attempt = 0; attempt < 100 && deps.watchWaiters.size === 0; attempt++)
+      await Bun.sleep(1);
+    expect(deps.watchWaiters.size).toBe(1);
+    const reply = await jsonRequest(app, `/api/chat/${c}/messages`, {
+      method: 'POST',
+      token: alice.token,
+      body: { k: 't', x: 'Reply to Watch' },
+    });
+    expect(reply.status).toBe(201);
+    const received = (await (await poll).json()) as any;
+    expect(received.messages).toHaveLength(1);
+    expect(received.messages[0].x).toBe('Reply to Watch');
+    const read = await request(`/conversations/${c}/read`, 'POST', {
+      m: received.messages[0].id,
+    });
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual({ watermark: received.messages[0].id });
+    const refreshed = (await (await request(`/conversations/${c}/messages`)).json()) as any;
+    expect(refreshed.read).toBe(received.messages[0].id);
+    expect(deps.watchWaiters.size).toBe(0);
+  });
   test('idempotent text/emoji retry returns one canonical message', async () => {
     const i = crypto.randomUUID();
     const first = await request(`/conversations/${c}/messages`, 'POST', { i, k: 'e', x: '👋' });
@@ -105,6 +169,31 @@ describe('independent Watch', () => {
         })
       ).status,
     ).toBe(400);
+  });
+  test('Watch text send completes during its own long poll and retries without duplicates', async () => {
+    const poll = request(`/conversations/${c}/messages?after=0&wait=20`);
+    // Subscribe before sending, just as an open Watch conversation does.
+    for (let attempt = 0; attempt < 100 && deps.watchWaiters.size === 0; attempt++)
+      await Bun.sleep(1);
+    expect(deps.watchWaiters.size).toBe(1);
+    const body = { i: crypto.randomUUID(), k: 't', x: '워치에서 보낸 메시지 👋' };
+    const sent = await request(`/conversations/${c}/messages`, 'POST', body);
+    expect(sent.status).toBe(201);
+    const result = (await sent.json()) as any;
+    const received = (await (await poll).json()) as any;
+    expect(result.i).toBe(body.i);
+    expect(result.message.x).toBe(body.x);
+    expect(received.messages).toEqual([result.message]);
+    expect(received.acks).toEqual([{ i: body.i, id: result.message.id }]);
+
+    const retry = await request(`/conversations/${c}/messages`, 'POST', body);
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual(result);
+    const history = (await (
+      await jsonRequest(app, `/api/chat/${c}/messages`, { token: alice.token })
+    ).json()) as any;
+    expect(history.messages).toEqual([result.message]);
+    expect(deps.watchWaiters.size).toBe(0);
   });
   test('direct Watch push dispatch with zero Expo tokens, even with a live phone socket', async () => {
     const registered = await request('/push/register', 'POST', {

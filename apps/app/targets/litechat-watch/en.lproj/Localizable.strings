@@ -47,3 +47,8 @@
 "This username is already taken." = "This username is already taken.";
 "Please try again shortly." = "Please try again shortly.";
 "Could not complete the request. Please try again." = "Could not complete the request. Please try again.";
+"Notifications are disabled. Enable LiteChat notifications in Settings." = "Notifications are disabled. Enable LiteChat notifications in Settings.";
+"Notification alerts are disabled. Enable alerts in Settings." = "Notification alerts are disabled. Enable alerts in Settings.";
+"Could not enable notifications. Please try again." = "Could not enable notifications. Please try again.";
+"Could not register this Watch for notifications. Please try again." = "Could not register this Watch for notifications. Please try again.";
+"Could not register notifications with the server. Open the app to retry." = "Could not register notifications with the server. Open the app to retry.";

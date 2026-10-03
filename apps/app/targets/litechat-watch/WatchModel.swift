@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import Network
 
 @MainActor final class WatchModel: ObservableObject {
     @Published var user: PublicUser?
@@ -11,14 +10,13 @@ import Network
     @Published var path: [Int64] = []
     @Published var status: String?
     @Published var error: String?
+    @Published var notificationStatus: String?
     @Published var active = true
     let api: WatchAPIClient
     private let cache = WatchCacheStore()
-    private let monitor = NWPathMonitor()
     private var poll: Task<Void, Never>?
     private var readTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
-    private var online = true
     private var pendingReads: [Int64:Int64] = [:]
     private var activeChat: Int64?
     private var booted = false
@@ -29,16 +27,6 @@ import Network
     init() {
         let raw = Bundle.main.object(forInfoDictionaryKey: "LiteChatAPIURL") as? String ?? ""
         api = WatchAPIClient(base: URL(string: raw) ?? URL(string: "https://invalid.invalid")!)
-        monitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in
-                guard let self else { return }
-                let restored = !self.online && path.status == .satisfied
-                self.online = path.status == .satisfied
-                if !self.online { self.status = WatchL10n.text("Offline"); self.poll?.cancel() }
-                if restored && self.active && self.booted { await self.refresh(); self.startPolling() }
-            }
-        }
-        monitor.start(queue: DispatchQueue(label: "LiteChat.Watch.Network"))
     }
     func bootstrap() async {
         guard !booted else { return }; booted = true
@@ -151,7 +139,9 @@ import Network
     }
     private func startPolling() {
         poll?.cancel()
-        guard active, online, user != nil, let id = activeChat else { return }
+        // URLSession can use routes that a low-level path monitor cannot see on
+        // watchOS. Attempt the request and let the bounded retry loop recover.
+        guard active, user != nil, let id = activeChat else { return }
         let generation = sessionGeneration
         poll = Task { [weak self] in
             guard let self else { return }
@@ -226,6 +216,7 @@ import Network
             let response: SendResponse = try await api.request("/api/watch/conversations/\(item.conversation)/messages",method:"POST",
                 body:JSONEncoder().encode(SendBody(i:item.id,k:"t",x:item.text)))
             guard generation == sessionGeneration else { return }
+            status = nil
             pending.removeAll { $0.id == response.i }
             var chat = chats[item.conversation] ?? ChatCache()
             if !chat.messages.contains(where: { $0.id == response.message.id }) { chat.messages.append(response.message); chat.messages.sort { $0.id < $1.id } }
@@ -281,6 +272,7 @@ import Network
         poll?.cancel(); readTask?.cancel(); saveTask?.cancel(); sharePoll?.cancel()
         await api.setToken(nil); try? WatchSessionStore.delete()
         user = nil; conversations=[]; chats=[:]; pending=[]; pendingReads=[:]; path=[]; activeChat=nil
+        notificationStatus = nil
         await cache.clear()
     }
     private func handle(_ error: Error) async {
@@ -289,7 +281,14 @@ import Network
             // A revoked watch session does not end the phone's; keep watching
             // the shared item so a still-signed-in phone re-adopts us.
             if active { startSharePolling() }
-        } else { status = WatchL10n.text("Waiting for connection…") }
+        } else if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            return
+        } else if error is URLError {
+            status = error.localizedDescription
+        } else {
+            status = nil
+            self.error = error.localizedDescription
+        }
     }
     private func persist() {
         saveTask?.cancel()

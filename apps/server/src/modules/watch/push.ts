@@ -3,7 +3,7 @@ import type { AppDeps } from '../../deps';
 import { errors } from '../../errors';
 import { MessagesRepo } from '../chat/messages-repo';
 import { messageNotification } from '../push/message-notification';
-import { APNsProvider, type WatchPushSender } from './apns';
+import { APNsConfigurationError, APNsProvider, type WatchPushSender } from './apns';
 
 export class WatchPushService {
   private provider: APNsProvider;
@@ -184,8 +184,13 @@ export class WatchPushService {
             m: n.m,
           },
         });
-      } catch {
-        result = { status: 503, reason: 'TransportError' };
+      } catch (error) {
+        result = {
+          status: 503,
+          reason: error instanceof APNsConfigurationError ? error.code : 'TransportError',
+        };
+        if (error instanceof APNsConfigurationError)
+          console.error('[watch-push]', job.environment, error.code);
       }
       if (this.stopped) break;
       const currentToken = this.deps.db

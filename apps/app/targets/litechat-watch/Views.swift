@@ -79,6 +79,12 @@ struct WatchConversationView: View {
     @State private var loadingOlder = false
     private var chat: ChatCache { model.chats[id] ?? ChatCache() }
     private var peer: String { model.conversations.first { $0.id == id }?.peer.nickname ?? WatchL10n.text("Conversation") }
+    private func submitDraft() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text.utf16.count <= 2000 else { return }
+        draft = ""
+        Task { await model.send(text, in: id) }
+    }
     var body: some View {
         ScrollViewReader { scroll in
             ScrollView {
@@ -108,11 +114,11 @@ struct WatchConversationView: View {
                         }.frame(maxWidth:.infinity,alignment:.trailing)
                     }
                     HStack {
-                        TextField(WatchL10n.text("Message"),text:$draft).accessibilityLabel(WatchL10n.text("Enter message"))
-                        Button {
-                            let text = draft; draft = ""
-                            Task { await model.send(text,in:id) }
-                        } label: { Image(systemName:"arrow.up.circle.fill") }
+                        TextField(WatchL10n.text("Message"),text:$draft)
+                            .accessibilityLabel(WatchL10n.text("Enter message"))
+                            .submitLabel(.send)
+                            .onSubmit { submitDraft() }
+                        Button { submitDraft() } label: { Image(systemName:"arrow.up.circle.fill") }
                         .disabled(draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || draft.utf16.count > 2000)
                         .accessibilityLabel(WatchL10n.text("Send message"))
                     }.id("composer")
@@ -182,6 +188,9 @@ struct WatchAccountView: View {
         Form {
             if let user = model.user { Text(user.nickname); Text("@\(user.username)").font(.caption) }
             Button(WatchL10n.text("Allow Notifications")) { Task { await requestPermission() } }
+            if let status = model.notificationStatus {
+                Text(status).font(.footnote).foregroundStyle(.secondary)
+            }
             Button(WatchL10n.text("Sign Out")) { Task { await model.logout() } }
             Section(WatchL10n.text("Delete Account")) {
                 Text(WatchL10n.text("Your account and conversations will be permanently deleted on all devices.")).font(.footnote)
